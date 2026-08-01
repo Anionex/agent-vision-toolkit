@@ -167,44 +167,21 @@ def _image_desc_from_data_url(data_url: str, glance_cmd: list[str]) -> str | Non
         return None
 
 
-def _rewrite_image_list(items: list, glance_cmd: list[str]) -> tuple[bool, list]:
-    """Rewrite input_image entries inside a content/output list to text descriptions."""
-    replaced = False
-    new_items = []
-    for c in items:
-        if isinstance(c, dict) and c.get("type") == "input_image":
-            url = c.get("image_url")
-            if isinstance(url, str) and url.startswith("data:"):
-                desc = _image_desc_from_data_url(url, glance_cmd)
-                if desc:
-                    new_items.append(
-                        {
-                            "type": "input_text",
-                            "text": "[local vision model description] " + desc,
-                        }
-                    )
-                    _log(
-                        "[ua-proxy] image -> glance (desc_len=%d, cache=%d)"
-                        % (len(desc), len(_GLANCE_CACHE))
-                    )
-                    replaced = True
-                    continue
-        new_items.append(c)
-    return replaced, new_items
-
-
-def _rewrite_image_inputs(parsed: dict, glance_cmd: list[str]) -> bool:
+async def _rewrite_image_inputs(parsed: dict, glance_cmd: list[str]) -> bool:
     """Replace input_image entries with text descriptions. Returns True if any replaced.
 
     Images can arrive in two shapes:
       - message.content: [{type: input_image, ...}] (pasted images)
       - function_call_output.output: [{type: input_image, ...}] (view_image results)
     Both are rewritten so the upstream model receives readable text.
+
+    Multiple images in one request are described concurrently (async to_thread),
+    so N images cost ~1 vision call instead of N serialized ones.
     """
     inp = parsed.get("input")
     if not isinstance(inp, list):
         return False
-    replaced = False
+    jobs = []  # (item, field, list_index, data_url)
     for item in inp:
         if not isinstance(item, dict):
             continue
@@ -212,10 +189,39 @@ def _rewrite_image_inputs(parsed: dict, glance_cmd: list[str]) -> bool:
             lst = item.get(field)
             if not isinstance(lst, list):
                 continue
-            changed, new_lst = _rewrite_image_list(lst, glance_cmd)
-            if changed:
-                item[field] = new_lst
-                replaced = True
+            for idx, c in enumerate(lst):
+                if isinstance(c, dict) and c.get("type") == "input_image":
+                    url = c.get("image_url")
+                    if isinstance(url, str) and url.startswith("data:"):
+                        jobs.append((item, field, idx, url))
+    if not jobs:
+        return False
+    # 同一请求内同图只描述一次
+    urls = []
+    for _, _, _, url in jobs:
+        if url not in urls:
+            urls.append(url)
+
+    async def describe(url: str) -> tuple[str, str | None]:
+        desc = await asyncio.to_thread(_image_desc_from_data_url, url, glance_cmd)
+        if desc:
+            _log(
+                "[ua-proxy] image -> glance (desc_len=%d, cache=%d)"
+                % (len(desc), len(_GLANCE_CACHE))
+            )
+        return url, desc
+
+    results = dict(await asyncio.gather(*(describe(u) for u in urls)))
+    replaced = False
+    for item, field, idx, url in jobs:
+        desc = results.get(url)
+        if not desc:
+            continue
+        item[field][idx] = {
+            "type": "input_text",
+            "text": "[local vision model description] " + desc,
+        }
+        replaced = True
     return replaced
 
 
@@ -392,7 +398,7 @@ class Proxy:
                     if mapped:
                         parsed["model"] = mapped
                     try:
-                        _rewrite_image_inputs(parsed, self.glance_cmd)
+                        await _rewrite_image_inputs(parsed, self.glance_cmd)
                     except Exception as e:
                         _log("[ua-proxy] image rewrite failed: %r" % e)
                     body = json.dumps(parsed).encode()

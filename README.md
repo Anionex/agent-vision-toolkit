@@ -24,6 +24,16 @@ Codex 调 view_image → 拿到 data URL → 请求带图 → 本地代理
 
 ---
 
+## 亮点
+
+- **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图 ≈ 1 张图的延迟。实测 3 张真实截图 **5.7s** 完成全部描述（串行需要约 3 倍）。
+- **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都会被改写为文字描述。
+- **同图只调一次**：按图片 sha256 缓存描述，同一张图反复出现不重复调用视觉 API（缓存命中近乎零延迟）。
+- **零依赖自包含**：只需 `.env` 填一个 OpenAI 兼容的视觉 API key，不需要安装任何本地工具。
+- **无 key 也能用**：没配 `VISION_API_KEY` 时自动回退本地 `glance` CLI。
+
+---
+
 ## ⚡ 最省事的用法：把仓库发给 Codex 帮你安装
 
 不用自己敲命令。把这个仓库链接发给你的 Codex，说一句**"安装这个仓库"**，它就会自己照着本 README 完成：clone → 配置 `.env` → 跑 `install.sh` → 拉起代理并提醒你重启 app。这份 README 本身就是给 Agent 看的安装手册。
@@ -156,7 +166,7 @@ API key 解析顺序：环境变量 `DEEPSEEK_API_KEY` → `--key-cmd`（shell �
 
 1. catalog 模型声明 `input_modalities: ["text","image"]` → app-server 认为模型支持图像 → `view_image` 检查通过，返回 data URL。
 2. 模型把 data URL 作为 `input_image` 放进请求 → 请求经 127.0.0.1:19100。
-3. 代理调用视觉模型 API（或回退本地 CLI）拿文本描述（按 data URL sha256 缓存，同图只调一次）→ 把 `input_image` 替换成 `[local vision model description] <描述>` 的 `input_text`。
+3. 代理**并发**调用视觉模型 API（或回退本地 CLI）拿文本描述（按 data URL sha256 缓存，同图只调一次）→ 把 `input_image` 替换成 `[local vision model description] <描述>` 的 `input_text`。
 4. DeepSeek 收到的是文本，正常回答图片内容。
 
 补充：DeepSeek V4 系列 API 层面接受 `input_image` 但实际看不到图（实测返回 "I'm unable to see the image"），所以必须走上面的改写。代理同时承担了 Codex 链路必需的 UA 改写/头剥离（否则 DeepSeek 强制开启思考）。
@@ -199,7 +209,7 @@ rm ~/Library/LaunchAgents/com.codex.deepseek-ua-rewrite-proxy.plist
 - **看图 = 文本描述，不是真视觉**：`view_image` 的结果是视觉模型生成的文字描述，DeepSeek 本身不接收图片；描述质量取决于你配的视觉模型（`VISION_MODEL`）。
 - **必须有一个视觉 API key**：未配置 `VISION_API_KEY` 且没有 `--glance-cmd` 本地 CLI 时，请求会原样转发，DeepSeek 会回复 "I'm unable to see the image"。
 - **UI 仍显示 `[Unsupported Image]`**：Codex 前端把 `view_image` 的原始结果渲染为不可解析的图像占位，模型实际拿到的是代理改写后的文本描述——这是设计如此，不影响实际看图。
-- **每张新图一次视觉 API 调用**：按 data URL sha256 缓存、同图只调一次；但 app-server 可能对图片重新编码，偶尔不命中缓存会重复调用。
+- **每张新图一次视觉 API 调用**：多张图在同一个请求里并发描述、一次往返；按 data URL sha256 缓存、同图只调一次。但 app-server 可能对图片重新编码，偶尔不命中缓存会重复调用。
 - **只对 catalog 里声明了 image 模态的模型生效**：没声明 `input_modalities: ["image"]` 的模型，`view_image` 检查直接不通过（本仓库模板默认已开启）。
 - **平台验证范围**：目前针对 macOS + Codex 桌面 app 验证；`codex exec` CLI 场景未逐一覆盖。
 - **自定义网关需自行并入改写**：只有走本仓库代理（默认 127.0.0.1:19100）的请求会被改写；其他网关请参考上文"情况 B"合并三件套。
