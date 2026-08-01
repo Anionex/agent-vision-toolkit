@@ -4,6 +4,8 @@
 
 让已经在 Codex 中正常使用 DeepSeek 的用户，通过轻量本地代理使用 Codex 内置 `view_image`。本仓库主要供用户的 Codex Agent 阅读并根据本机真实配置完成部署，不提供通用一键安装器。
 
+执行部署前必须先完整阅读 `README.md`，再按照 `AGENT_INSTALL.md` 操作。
+
 ## 不可偏离的范围
 
 - 保留用户现有的模型、slug、`display_name`、provider、鉴权方式和 DeepSeek key。
