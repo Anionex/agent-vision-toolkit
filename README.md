@@ -16,7 +16,7 @@
 - **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都会被改写为文字描述。
 - **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
 - **同图只调一次**：按图片 sha256 缓存描述，同一张图反复出现不重复调用视觉 API，缓存命中近乎零延迟。
-- **可选 `glance`**：需要在 Codex 之外直接进行图片描述、问答或 OCR 时，可以单独使用。
+- **可选 `glance`**：简洁的独立cli工具，用于image qa 或 OCR，以提供更加灵活的图片理解能力。
 
 ## 使用方式
 
@@ -34,27 +34,27 @@
 
 ## 配置
 
-视觉 env 只包含：
+env 只需配置：
 
 | 变量 | 必需 | 说明 |
 |---|---:|---|
-| `VISION_API_KEY` | 是 | 视觉 API key |
-| `VISION_BASE_URL` | 是 | OpenAI-compatible API 根地址 |
-| `VISION_MODEL` | 是 | 视觉模型名 |
+| `VISION_API_KEY` | 是 | 多模态模型的 API key |
+| `VISION_BASE_URL` | 是 | OpenAI-compatible API 地址 |
+| `VISION_MODEL` | 是 | 多模态模型名 |
 
-DeepSeek 的认证继续由 Codex 发送并由代理透传，不要在 env 中重复保存。
+DeepSeek 的认证继续由 Codex 发送并由代理透传，不需要在 env 中重复保存。
 
-## 可选：glance
+## 可选工具：glance Cli
 
-`glance` 是独立工具，不是代理回退路径。它复用同一份视觉配置：
+`glance` 是独立cli工具。配置好proxy后不需要独立再配置凭证。
+
+需要全局命令时，可让 Codex Agent 按照安装说明创建 wrapper。得到更简洁的调用形式如下：
 
 ```bash
-CODEX_DEEPSEEK_VISION_ENV=~/.config/codex-deepseek-vision/env python3 bin/glance screenshot.png
-CODEX_DEEPSEEK_VISION_ENV=~/.config/codex-deepseek-vision/env python3 bin/glance screenshot.png -q "这个报错应该怎么修？"
-CODEX_DEEPSEEK_VISION_ENV=~/.config/codex-deepseek-vision/env python3 bin/glance screenshot.png --ocr
+
+
 ```
 
-需要全局命令时，可让 Codex Agent 按照安装说明创建 wrapper。
 
 ## 工作原理
 
