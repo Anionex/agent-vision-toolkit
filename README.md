@@ -30,7 +30,7 @@
 
 ## 前置条件
 
-- macOS 和已可正常使用 DeepSeek 的 Codex
+- 已可正常使用 DeepSeek 的 Codex
 - Python 3.11+
 - 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API
 
