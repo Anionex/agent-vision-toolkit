@@ -1,6 +1,10 @@
 # AGENTS.md — codex-deepseek-vision
 
-让 Codex 桌面 app 里的 DeepSeek 获得看图能力的可分发仓库。所有代码已在真实会话验证。
+面向**已把 DeepSeek 接入 Codex** 的用户，补上"看图能力"的可分发仓库。所有代码已在真实会话验证。
+
+- 用户已有自己的代理/网关时，README 走"情况 B：最小接入"（只并入图像改写三件套），不要全量 install。
+- 仓库不捆绑视觉 CLI：`--glance-cmd` 指向任何"图片路径→文本"命令（默认 /usr/local/bin/glance）。
+- 仓库不自带任何密钥/凭据：API key 一律来自环境变量或调用方注入。
 
 ## 维护约定
 

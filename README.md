@@ -1,8 +1,10 @@
 # codex-deepseek-vision
 
-让 Codex 桌面 app 里的 **DeepSeek** 模型获得看图能力：`view_image` 不再返回失败或不可解析的图像数据，模型拿到的是一段**有效的自然语言图片描述**。
+**面向已经接入 DeepSeek 到 Codex 的用户**：如果你的 Codex 已经能用 DeepSeek 对话（已有 catalog 模型、config 指向你的端点），只差"看图"这一块，本仓库补上它。
 
-原理一句话：Codex 发给 DeepSeek 的请求先经过本仓库部署的本地代理（127.0.0.1:19100），代理检测到请求里的图片（`input_image` data URL）时，用本地视觉 CLI（`glance`，gemini-3.5-flash）生成描述文本，替换后转发给 DeepSeek。模型"看到"的就是这段文本。
+效果：`view_image` 不再返回失败或不可解析的图像数据，模型拿到一段**有效的自然语言图片描述**。
+
+原理一句话：Codex 发给 DeepSeek 的请求先经过本地代理（默认 127.0.0.1:19100），代理检测到请求里的图片（`input_image` data URL）时，用本地视觉 CLI（`glance`，gemini-3.5-flash，可用任何"图片→文本"命令替代）生成描述，替换后转发给 DeepSeek。模型"看到"的就是这段文本。
 
 ```
 Codex 调 view_image → 拿到 data URL → 请求带图 → 本地代理
@@ -15,12 +17,13 @@ Codex 调 view_image → 拿到 data URL → 请求带图 → 本地代理
 
 ## 前置条件
 
-- macOS + Codex 桌面 app（0.146+）
-- DeepSeek API key（`api.deepseek.com`）
+- macOS + Codex 桌面 app，**DeepSeek 已接入并能正常对话**（有 API key、config 已指向你的端点、catalog 里有你的模型）
 - Python 3.10+
-- 本地视觉 CLI `glance`：`/usr/local/bin/glance <图片>` 能输出图片描述（它调用 gemini-3.5-flash；没有的话用 `--glance-cmd` 指到任何"吃图片路径、输出文本"的命令，比如 OCR 工具）
+- 一个"图片路径 → 文本描述"的本地命令（默认 `/usr/local/bin/glance`，gemini-3.5-flash；也可以是任何 OCR/视觉 CLI，用 `--glance-cmd` 指定）
 
 ## 快速开始
+
+### 情况 A：没有本地代理（或者愿意整体换用本仓库的代理）
 
 ```bash
 git clone <本仓库> && cd codex-deepseek-vision
@@ -28,6 +31,19 @@ git clone <本仓库> && cd codex-deepseek-vision
 ```
 
 然后**重启 Codex 桌面 app**（app 在启动时缓存 config，不重启不生效）。
+
+### 情况 B：已经有自己的代理/网关（推荐，最小改动）
+
+你已有的代理负责 UA 改写/模型路由/关思考等，**不要全量安装**，只并入图像改写三件套：
+
+1. 从 `deepseek-ua-rewrite-proxy.py` 复制这三个函数到你的代理：
+   - `_image_desc_from_data_url(data_url, glance_cmd)` — data URL → 临时文件 → 视觉 CLI → 文本（带 sha256 缓存）
+   - `_rewrite_image_inputs(parsed, glance_cmd)` — 遍历请求体 `input`，把 `input_image` 替换成 `[local vision model description] <描述>` 的 `input_text`
+   - 在请求转发前调用：`parsed = json.loads(body); _rewrite_image_inputs(parsed, glance_cmd); body = json.dumps(parsed)`
+2. 确保你 catalog 里模型的 `input_modalities` 含 `"image"`（否则 `view_image` 检查不过，模型拿不到 data URL，改写无从触发）。可以直接用 `catalog-model.template.json` 的条目。
+3. 重启你的代理，跑验证。
+
+两条路都需要：**重启 Codex 桌面 app** + catalog 模型含 image 模态。
 
 验证：
 
