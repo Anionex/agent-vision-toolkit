@@ -30,7 +30,6 @@ Codex 调 view_image → 拿到 data URL → 请求带图 → 本地代理
 - **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都会被改写为文字描述。
 - **同图只调一次**：按图片 sha256 缓存描述，同一张图反复出现不重复调用视觉 API（缓存命中近乎零延迟）。
 - **零依赖自包含**：只需 `.env` 填一个 OpenAI 兼容的视觉 API key，不需要安装任何本地工具。
-- **无 key 也能用**：没配 `VISION_API_KEY` 时自动回退本地 `glance` CLI。
 
 ---
 
