@@ -189,6 +189,20 @@ Codex -> 127.0.0.1:19100 -> 用户原有的 DeepSeek 上游
 
 第一次模型响应只要求 Codex 调用 `view_image`。Codex 在本机执行工具后，第二次请求才携带图片；代理在这个请求方向完成图片转文字。若 catalog 明确声明仅支持 `text`，Codex 的 handler 会先拒绝工具，因此只在这一种情况下给现有条目追加 `image`。
 
+## 常见问题
+
+### `base_url` 指向本地代理后，代理也需要配置 DeepSeek API key 吗？
+
+不需要。访问 DeepSeek 上游的网络请求虽然由 `127.0.0.1:19100` 的代理进程发出，但 DeepSeek API key 仍由 Codex 按原有配置放在 `Authorization` 请求头中，代理会将这个请求头原样转发给 DeepSeek：
+
+```text
+Codex（携带原有 Authorization）
+  -> 127.0.0.1:19100
+  -> DeepSeek 上游（原样收到 Authorization）
+```
+
+因此不要修改 Codex 原有的认证配置，也不要在代理 env 中重复保存 `DEEPSEEK_API_KEY`。代理 env 只需配置 `VISION_API_KEY`、`VISION_BASE_URL` 和 `VISION_MODEL`。
+
 ## 文件清单
 
 | 文件 | 作用 |
