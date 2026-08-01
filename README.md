@@ -1,15 +1,6 @@
 # codex-deepseek-vision
 
-**面向已经接入 DeepSeek 到 Codex 的用户**：如果你的 Codex 已经能用 DeepSeek 对话（已有 catalog 模型、config 指向你的端点），只差"看图"这一块，本仓库补上它。
-
-效果：`view_image` 不再返回失败或不可解析的图像数据，模型拿到一段**有效的自然语言图片描述**。
-
-原理一句话：Codex 发给 DeepSeek 的请求先经过本地代理（默认 127.0.0.1:19100），代理检测到请求里的图片（`input_image` data URL）时，调用 OpenAI 兼容的视觉模型 API（配置在 `.env` 里）生成描述，替换后转发给 DeepSeek。模型"看到"的就是这段文本。
-
-```
-Codex 调 view_image → 拿到 data URL → 请求带图 → 本地代理
-        → 内置视觉 API 生成文本描述 → 替换 input_image → DeepSeek 正常回答图片内容
-```
+如果你的 Codex 已经接入 DeepSeek ，却苦恼于模型没有多模态，不能看图、每次调用看图都会被系统拦下，本仓库提供了一种方式，可以在不引入额外mcp、skills的情况下，让纯文本模型调用codex内置view image的时候不报错，而是给出图片的详细描述，尽量让纯文本模型的交互体验和多模态模型的交互体验保持一致，免去反复配置的风险。
 
 所有代码均已在真实 Codex + DeepSeek 会话中验证过。
 
@@ -44,6 +35,7 @@ Codex 调 view_image → 拿到 data URL → 请求带图 → 本地代理
 - macOS + Codex 桌面 app，**DeepSeek 已接入并能正常对话**（config 已指向你的端点、catalog 里有你的模型）
 - Python 3.10+
 - 一个 OpenAI 兼容的视觉模型 API key（任意支持 `/chat/completions` + `image_url` 的视觉端点）
+- 建议搭配[cc-switch项目](https://github.com/farion1231/cc-switch/)使用，体验更佳
 
 **不需要**下载/安装任何其他东西：不依赖本机私有工具，视觉调用内置在代理里，key 只放 `.env`。
 
