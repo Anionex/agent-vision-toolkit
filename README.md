@@ -1,8 +1,8 @@
 # codex-deepseek-vision
 
-如果你的 Codex 已经接入 DeepSeek ，却苦恼于模型没有多模态，不能看图、每次调用看图都会被系统拦下，本仓库提供了一种方式，可以在不引入额外mcp、skills、cli、其他工具的情况下，让纯文本模型调用codex内置view image的时候不报错，而是给出图片的详细描述，尽量让纯文本模型的交互体验和多模态模型的交互体验保持一致，免去反复配置的风险。
+让 Codex 中的纯文本 DeepSeek 模型可靠处理粘贴图片和内置 `view_image`：本地代理先调用一个 OpenAI-compatible 视觉 API 获取文字描述，再把图片替换为文字后转发给 DeepSeek。
 
-所有代码均已在真实 Codex + DeepSeek 会话中验证过。
+默认只执行图片改写。UA/请求头兼容和 reasoning summary 修复均为显式可选功能，不会悄悄改变请求行为。
 
 ## 实际效果
 
@@ -11,196 +11,157 @@
   <img src="assets/effect-2.jpg" alt="Codex 里的 DeepSeek 看图排查界面字段不一致 bug" width="49%">
 </p>
 
-<p align="center">真实 Codex 会话截图（模型：DeepSeek V4 Flash Max）：左图是让模型对着 UI 截图回答"这是什么风格"，右图是让模型对着界面截图排查字段 bug。
+<p align="center">真实 Codex 会话截图（模型：DeepSeek V4 Flash Max）：左图是让模型对着 UI 截图回答"这是什么风格"，右图是让模型对着界面截图排查字段 bug。</p>
 
----
+## 特性
 
-## 亮点
-
-- **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图 ≈ 1 张图的延迟。实测 3 张真实截图 **5.7s** 完成全部描述（串行需要约 3 倍）。
-- **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都会被改写为文字描述。
-- **同图只调一次**：按图片 sha256 缓存描述，同一张图反复出现不重复调用视觉 API（缓存命中近乎零延迟）。
-- **零依赖自包含**：只需 `.env` 填一个 OpenAI 兼容的视觉 API key，不需要安装任何本地工具。
-
----
-
-## ⚡ 最省事的用法：把仓库发给 Codex 帮你安装
-
-不用自己敲命令。把这个仓库链接发给你的 Codex，说一句**"安装这个仓库"**，它就会自己照着本 README 完成：clone → 配置 `.env` → 跑 `install.sh` → 拉起代理并提醒你重启 app。这份 README 本身就是给 Agent 看的安装手册。
-
----
+- 粘贴图片与 `view_image` 两种 Codex 请求结构都支持。
+- 同一请求的多张图片并发描述。
+- 进程内最多缓存 128 张图片描述。
+- 视觉失败时明确返回错误，绝不把 429/错误文本伪装成图片描述。
+- 默认逐块转发 DeepSeek SSE 响应。
+- 不记录完整请求体、图片、对话或 API key。
+- `.env` 安装到用户配置目录并设为 `0600`；launchd plist 不包含密钥。
+- 可选安装独立 `glance` CLI，直接进行图片描述、图片问答和 OCR。
 
 ## 前置条件
 
-- macOS + Codex 桌面 app，**DeepSeek 已接入并能正常对话**（config 已指向你的端点、catalog 里有你的模型）
-- Python 3.10+
-- 一个 OpenAI 兼容的视觉模型 API key（任意支持 `/chat/completions` + `image_url` 的视觉端点）
-- 建议搭配[cc-switch项目](https://github.com/farion1231/cc-switch/)使用，体验更佳
+- macOS + Codex 桌面 app
+- Python 3.11+
+- DeepSeek API key
+- 一个支持 `/chat/completions` 和 `image_url` 的 OpenAI-compatible 视觉 API key
 
-**不需要**下载/安装任何其他东西：不依赖本机私有工具，视觉调用内置在代理里，key 只放 `.env`。
+代理仅使用 Python 标准库。安装和验证使用 macOS 自带的 shell、launchctl 及 Python。
 
 ## 快速开始
 
-**第 0 步（所有场景都要）**：配置 `.env`
-
 ```bash
-git clone git@github.com:Anionex/codex-deepseek-vision.git && cd codex-deepseek-vision
+git clone https://github.com/Anionex/codex-deepseek-vision.git
+cd codex-deepseek-vision
 cp .env.example .env
-# 编辑 .env：填 VISION_API_KEY（看图必需），以及 DEEPSEEK_API_KEY（跑验证脚本用，可留空）
+# 编辑 .env，至少填写 DEEPSEEK_API_KEY 和 VISION_API_KEY
+./install.sh
 ```
 
-`.env` 已在 `.gitignore` 中，不会被提交。
-
-### 情况 A：没有本地代理（或者愿意整体换用本仓库的代理）
+重启 Codex 桌面 app，然后验证：
 
 ```bash
-git clone <本仓库> && cd codex-deepseek-vision
-./install.sh            # 备份并改写：代理脚本、launchd、模型 catalog、Codex config
+./verify.sh
+./verify.sh /path/to/image.png  # 可选：真实 API 全链路
 ```
 
-然后**重启 Codex 桌面 app**（app 在启动时缓存 config，不重启不生效）。
+安装器会：
 
-### 情况 B：已经有自己的代理/网关（推荐，最小改动）
+1. 将运行文件安装到 `~/.local/share/codex-deepseek-vision/`。
+2. 将 `.env` 复制到 `~/.config/codex-deepseek-vision/env` 并设置权限 `0600`。
+3. 生成不含密钥的 launchd 服务。
+4. 备份后更新 Codex config 和 model catalog。
+5. 添加模型 slug `deepseek-v4-flash-vision`，显示名保持 `DeepSeek V4 Flash`。
 
-你已有的代理负责 UA 改写/模型路由/关思考等，**不要全量安装**，只并入图像改写三件套：
+## 可选：安装 glance
 
-1. 从 `deepseek-ua-rewrite-proxy.py` 复制这三个函数到你的代理：
-   - `_image_desc_from_data_url(data_url, cli_cmd)` — 内置视觉 API（`VISION_API_KEY` 环境变量）优先、可选本地 CLI 兜底，带 sha256 缓存
-   - `_rewrite_image_inputs(parsed, cli_cmd)` — 遍历请求体 `input`，把 `input_image` 替换成 `[local vision model description] <描述>` 的 `input_text`
-   - 在请求转发前调用：`parsed = json.loads(body); _rewrite_image_inputs(parsed, cli_cmd); body = json.dumps(parsed)`
-2. 给你的代理进程注入 `VISION_API_KEY`（及可选 `VISION_BASE_URL`/`VISION_MODEL`），或写进代理读取的 `.env`
-3. 确保你 catalog 里模型的 `input_modalities` 含 `"image"`（否则 `view_image` 检查不过，模型拿不到 data URL，改写无从触发）。可以直接用 `catalog-model.template.json` 的条目。
-4. 重启你的代理，跑验证。
-
-两条路都需要：**重启 Codex 桌面 app** + catalog 模型含 image 模态。
-
-验证：
+`glance` 是独立命令，不参与代理的图片改写，也不是代理回退路径。它用于 Codex 之外的直接图片问答：
 
 ```bash
-./verify.sh <任意图片路径>    # 全链路检查 + 真实图片往返
+./install.sh --with-glance
+
+glance screenshot.png
+glance screenshot.png -q "这个报错应该怎么修？"
+glance screenshot.png --ocr
+glance screenshot.png --ocr "排除日期"
 ```
 
-预期输出末尾：
+默认安装到 `~/.local/bin/glance`；如有需要，把 `~/.local/bin` 加入 `PATH`。
 
+## 配置
+
+`.env` 中的重要变量：
+
+| 变量 | 必需 | 默认示例 | 说明 |
+|---|---:|---|---|
+| `DEEPSEEK_API_KEY` | 是 | 空 | 代理注入到 DeepSeek 上游请求 |
+| `DEEPSEEK_BASE_URL` | 否 | `https://api.deepseek.com` | DeepSeek Responses API 根地址 |
+| `UPSTREAM_MODEL` | 否 | `deepseek-v4-flash` | 实际上游模型 |
+| `VISION_API_KEY` | 是 | 空 | 视觉 API key |
+| `VISION_BASE_URL` | 是 | 示例为 Inferera | OpenAI-compatible API 根地址 |
+| `VISION_MODEL` | 是 | 示例为 `gemini-3.6-flash` | 视觉模型名 |
+| `MODEL_SLUG` | 否 | `deepseek-v4-flash-vision` | Codex catalog 内部标识 |
+| `PORT` | 否 | `19100` | 本地监听端口 |
+
+修改已安装配置后，重新运行 `./install.sh` 使 launchd 重启并生效。
+
+## 可选兼容功能
+
+这些功能与视觉无关，因此默认关闭：
+
+```bash
+# 去掉 Codex 身份请求头，用通用 UA 转发；仅在上游强制思考时开启
+./install.sh --codex-header-compat
+
+# 将 DeepSeek reasoning text 写入 Codex summary；开启后该响应会被缓冲
+./install.sh --inject-reasoning-summary
+
+# 两者同时开启
+./install.sh --codex-header-compat --inject-reasoning-summary
 ```
-deepseek answer: 这张图片展示的是...
-PASS: image was described via the vision rewrite chain
-ALL CHECKS PASSED
+
+模型映射由安装器显式传给代理，不再使用隐藏的 `gpt-5.2` 默认映射。
+
+## 工作原理
+
+1. catalog 把代理模型声明为支持 `text` 和 `image`，Codex 因而允许 `view_image`。
+2. Codex 将图片作为 `input_image` 发送到 `127.0.0.1:19100`。
+3. 代理并发调用视觉 API，并将图片替换为 `[local vision model description] ...`。
+4. 代理把 catalog slug 映射为真正的 DeepSeek 模型名并转发。
+5. 默认逐块转发 DeepSeek SSE 响应；只有 reasoning summary 开关需要缓冲响应。
+
+DeepSeek 本身仍然只接收文本；回答质量取决于视觉模型生成的描述。
+
+## 验证与开发
+
+```bash
+python3 -m py_compile deepseek-vision-proxy.py vision_client.py bin/glance
+python3 test_image_rewrite_shapes.py
+python3 smoke_test_proxy.py
+python3 test_vision_client.py
+python3 test_install.py
+./verify.sh
 ```
 
-之后在 Codex 里发一张图，或让模型调用 `view_image <路径>`，模型就能描述图片内容了。
-
-## 配置（.env）
-
-| 变量 | 必需 | 说明 |
-|---|---|---|
-| `VISION_API_KEY` | 是 | 视觉模型 API key（看图描述） |
-| `VISION_BASE_URL` | 否 | 视觉端点，默认 `https://api.inferera.com/v1` |
-| `VISION_MODEL` | 否 | 视觉模型，默认 `gemini-3.6-flash` |
-| `DEEPSEEK_API_KEY` | 否 | 验证脚本用；Codex 客户端侧已有可不填 |
-| `PORT` | 否 | 代理端口，默认 19100 |
-
-已有本地"图片→文本"CLI 的用户，也可以不改 `.env`，直接给代理传 `--cli-cmd <命令>` 走 CLI 路径（内置 API 优先，无 `VISION_API_KEY` 时回退 CLI）。
-
-## 验证命令
-
-| 命令 | 检查内容 |
-|---|---|
-| `./verify.sh` | 代理存活、catalog 模型含 image 模态、config 指向代理 |
-| `./verify.sh <图片>` | 上述 + 真实"带图请求 → 视觉描述 → DeepSeek"往返（需 API key） |
-| `python3 smoke_test_proxy.py` | 本地 echo 冒烟：UA 改写、Codex 头剥离、body 透传（不需要 key，不改任何配置） |
-| `tail ~/.codex/launchers/deepseek-ua-rewrite-proxy.err.log` | 代理日志，出现 `image -> cli (desc_len=..., cache=N)` 即改写生效 |
-
-API key 解析顺序：环境变量 `DEEPSEEK_API_KEY` → `--key-cmd`（shell 命令打印 key）。
-
-## 安装脚本做了什么
-
-`install.sh` 是幂等的，每步修改前都会备份（`*.bak-<时间戳>`）：
-
-1. 读取 `.env` 里的视觉配置（`VISION_API_KEY` 等）
-2. 复制 `deepseek-ua-rewrite-proxy.py` 到 `~/.codex/launchers/`
-3. 从 `launchd.plist.template` 生成并加载 launchd 常驻服务（KeepAlive，端口 19100，视觉变量注入 EnvironmentVariables）
-4. 把 `catalog-model.template.json` 的模型条目合并进 `~/.codex/cc-switch-model-catalog.json`（slug 已存在则只补齐缺失字段）
-5. 把 `~/.codex/config.toml` 指向本地代理（`model_provider="custom"`、`model="gpt-5.2"`、`base_url=http://127.0.0.1:19100`、`wire_api="responses"`）
-
-## 配置参考
-
-### 代理参数
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--port` | `19100` | 监听端口 |
-| `--upstream` | `https://api.deepseek.com` | 上游地址 |
-| `--cli-cmd` | 空（不启用） | 本地"图片→文本"CLI（无 `VISION_API_KEY` 时的回退路径） |
-| `--env-file` | 空 | 启动前加载的 .env 文件 |
-| `--model-map SLUG=UPSTREAM` | `gpt-5.2=deepseek-v4-flash` | 模型名映射，可重复传 |
-| `--log PATH` | 空（stderr） | 日志文件 |
-
-### 环境变量
-
-| 变量 | 说明 |
-|---|---|
-| `CODEX_HOME` | 默认 `~/.codex` |
-| `DEEPSEEK_API_KEY` | 验证脚本用；也可写进 .env |
-| `VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL` | 代理看图用；也可写进 .env 由 install.sh 注入 launchd |
-
-### 关键文件
-
-| 文件 | 作用 |
-|---|---|
-| `~/.codex/config.toml` | Codex 客户端配置（model / base_url / wire_api） |
-| `~/.codex/cc-switch-model-catalog.json` | 模型目录；`input_modalities` 必须含 `image`，`view_image` 检查才通过 |
-| `~/.codex/launchers/deepseek-ua-rewrite-proxy.py` | 代理本体 |
-| `~/Library/LaunchAgents/com.codex.deepseek-ua-rewrite-proxy.plist` | launchd 常驻配置 |
-
-## 原理
-
-1. catalog 模型声明 `input_modalities: ["text","image"]` → app-server 认为模型支持图像 → `view_image` 检查通过，返回 data URL。
-2. 模型把 data URL 作为 `input_image` 放进请求 → 请求经 127.0.0.1:19100。
-3. 代理**并发**调用视觉模型 API（或回退本地 CLI）拿文本描述（按 data URL sha256 缓存，同图只调一次）→ 把 `input_image` 替换成 `[local vision model description] <描述>` 的 `input_text`。
-4. DeepSeek 收到的是文本，正常回答图片内容。
-
-补充：DeepSeek V4 系列 API 层面接受 `input_image` 但实际看不到图（实测返回 "I'm unable to see the image"），所以必须走上面的改写。代理同时承担了 Codex 链路必需的 UA 改写/头剥离（否则 DeepSeek 强制开启思考）。
+`verify.sh` 检查代理端口、Codex TOML、catalog 图像模态和密钥文件权限。传入图片后才会产生真实 API 调用。
 
 ## 故障排查
 
-| 现象 | 原因 | 处理 |
-|---|---|---|
-| `view_image is not allowed because you do not support image inputs` | catalog 模型缺 `image` 模态 | 重跑 `./install.sh` 或手动检查 catalog；`verify.sh` 第 2 步会报 |
-| 响应仍是 `I'm unable to see the image` | `input_image` 未被替换 | 看代理日志 `vision api failed` / `cli failed`；确认 `.env` 里 `VISION_API_KEY` 有效 |
-| `view_image` 返回仍是 `[Unsupported Image]` | 图片在请求体里位于 `function_call_output.output`（view_image 结果），旧版代理只扫描 `message.content` | 本仓库代理已同时改写两种结构；确认你跑的是最新版代理脚本 |
-| 代理没起来 | launchd 未加载 / 端口占用 | `launchctl kickstart -k gui/$(id -u)/com.codex.deepseek-ua-rewrite-proxy`；`lsof -nP -iTCP:19100` |
-| 模型不调 `view_image` | 工具被过滤（模型无 image 模态） | 同上，先修 catalog |
-| 改了配置没效果 | 桌面 app 缓存旧 config | 重启 Codex 桌面 app |
-| 缓存不命中 | app-server 对图片重新编码，data URL 每次不同 | 属预期；同 URL 才命中 |
+| 现象 | 处理 |
+|---|---|
+| `view_image is not allowed...` | 运行 `./verify.sh` 检查 catalog 的 `image` 模态，然后重启 Codex |
+| 视觉 API 429/5xx | 查看 `~/.codex/log/deepseek-vision-proxy.log`；代理会有限重试并返回明确错误 |
+| 端口未监听 | `launchctl print gui/$(id -u)/com.codex.deepseek-vision-proxy` |
+| 改配置后没生效 | 重跑 `./install.sh` 并重启 Codex |
+| `glance` 找不到 | 把 `~/.local/bin` 加入 `PATH` |
 
 ## 卸载
 
 ```bash
-launchctl bootout gui/$(id -u)/com.codex.deepseek-ua-rewrite-proxy
-rm ~/Library/LaunchAgents/com.codex.deepseek-ua-rewrite-proxy.plist
-# 恢复 config.toml / catalog 请用 install.sh 生成的 *.bak-<时间戳> 备份
+./uninstall.sh
 ```
+
+卸载器只移除代理服务、运行文件及由本项目安装的 glance wrapper，不猜测应该恢复哪一份 Codex 配置。运行后请恢复安装时生成的 `~/.codex/config.toml.bak-<时间戳>` 和对应 catalog 备份，再重启 Codex。
 
 ## 文件清单
 
-| 文件 | 说明 |
+| 文件 | 作用 |
 |---|---|
-| `deepseek-ua-rewrite-proxy.py` | 代理本体（UA 改写 + 模型映射 + 图像→文本改写 + 缓存） |
-| `.env.example` | 配置模板：复制为 `.env` 填写即可用，无需其他安装 |
-| `install.sh` | 一键安装（备份优先） |
-| `verify.sh` | 全链路验证 |
-| `test_view_image_chain.py` | 单发"带图请求"验证（`--proxy/--model/--key-cmd` 可配） |
-| `smoke_test_proxy.py` | 本地 echo 冒烟（不需要 key） |
-| `launchd.plist.template` | launchd 模板（`__PYTHON__`/`__SCRIPT__`/`__PORT__`/`__LOG__` 占位符） |
-| `catalog-model.template.json` | catalog 模型条目模板（含 image 模态 + none/high 思考档） |
+| `deepseek-vision-proxy.py` | 默认只做图片改写并逐块转发响应的本地代理 |
+| `vision_client.py` | 代理与 glance 共用的视觉 API 客户端 |
+| `bin/glance` | 可选安装的独立图片描述/问答/OCR CLI |
+| `install.sh` / `uninstall.sh` | 幂等安装与安全卸载 |
+| `verify.sh` | 本机状态和可选真实图片验证 |
+| `catalog-model.template.json` | Codex 模型模板；显示名为 `DeepSeek V4 Flash` |
 
-## 已知限制（Limits）
+## 限制
 
-- **看图 = 文本描述，不是真视觉**：`view_image` 的结果是视觉模型生成的文字描述，DeepSeek 本身不接收图片；描述质量取决于你配的视觉模型（`VISION_MODEL`）。
-- **必须有一个视觉 API key**：未配置 `VISION_API_KEY` 且没有 `--cli-cmd` 本地 CLI 时，请求会原样转发，DeepSeek 会回复 "I'm unable to see the image"。
-- **UI 仍显示 `[Unsupported Image]`**：Codex 前端把 `view_image` 的原始结果渲染为不可解析的图像占位，模型实际拿到的是代理改写后的文本描述——这是设计如此，不影响实际看图。
-- **每张新图一次视觉 API 调用**：多张图在同一个请求里并发描述、一次往返；按 data URL sha256 缓存、同图只调一次。但 app-server 可能对图片重新编码，偶尔不命中缓存会重复调用。
-- **只对 catalog 里声明了 image 模态的模型生效**：没声明 `input_modalities: ["image"]` 的模型，`view_image` 检查直接不通过（本仓库模板默认已开启）。
-- **平台验证范围**：目前针对 macOS + Codex 桌面 app 验证；`codex exec` CLI 场景未逐一覆盖。
-- **自定义网关需自行并入改写**：只有走本仓库代理（默认 127.0.0.1:19100）的请求会被改写；其他网关请参考上文"情况 B"合并三件套。
+- 这是图片转文字代理，不是真正把视觉 token 交给 DeepSeek。
+- 缓存仅在代理进程内有效；重启后清空。
+- 当前安装流程针对 macOS Codex 桌面 app。
+- 开启 reasoning summary 兼容时需要缓冲对应 SSE 响应；默认关闭时保持逐块转发。

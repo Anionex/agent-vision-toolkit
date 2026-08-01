@@ -15,13 +15,40 @@ import argparse
 import base64
 import json
 import os
-import re
 import subprocess
 import sys
 import urllib.error
 import urllib.request
 
 PROMPT = "请详细描述这张图片的内容"
+
+
+def extract_text(raw):
+    """Extract final text from either JSON or SSE Responses output."""
+    objects = []
+    try:
+        objects.append(json.loads(raw))
+    except json.JSONDecodeError:
+        for line in raw.splitlines():
+            if line.startswith("data:"):
+                try:
+                    objects.append(json.loads(line[5:].strip()))
+                except json.JSONDecodeError:
+                    pass
+
+    texts = []
+    def visit(value):
+        if isinstance(value, dict):
+            if value.get("type") in {"output_text", "response.output_text.done"} and isinstance(value.get("text"), str):
+                texts.append(value["text"])
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+    for obj in objects:
+        visit(obj)
+    return "\n".join(dict.fromkeys(text for text in texts if text.strip())).strip()
 
 
 def load_env_file(path):
@@ -50,7 +77,7 @@ def get_key(key_cmd):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--proxy", default="http://127.0.0.1:19100/responses")
-    ap.add_argument("--model", default="gpt-5.2")
+    ap.add_argument("--model", default=os.environ.get("MODEL_SLUG", "deepseek-v4-flash-vision"))
     ap.add_argument("--key-cmd", default=None,
                     help="shell command printing the DeepSeek API key")
     ap.add_argument("--env-file", default=None,
@@ -85,8 +112,11 @@ def main():
         print(e.read().decode()[:500])
         sys.exit(1)
 
-    m = re.search(r'"text":"(.*?)"', data, re.S)
-    answer = m.group(1) if m else "(no output_text found)"
+    answer = extract_text(data)
+    if not answer:
+        print("FAIL: no output text found")
+        print(data[:500])
+        sys.exit(1)
     print("deepseek answer:", answer[:300])
     if "unable to see the image" in answer.lower() or "unsupported" in answer.lower():
         print("FAIL: image was NOT replaced by a text description")

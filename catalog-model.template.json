@@ -1,7 +1,7 @@
 {
-  "slug": "gpt-5.2",
+  "slug": "deepseek-v4-flash-vision",
   "display_name": "DeepSeek V4 Flash",
-  "description": "DeepSeek V4 Flash (via local proxy)",
+  "description": "DeepSeek V4 Flash with image-to-text vision proxy",
   "context_window": 278000,
   "max_context_window": 278000,
   "effective_context_window_percent": 95,
@@ -24,7 +24,7 @@
   ],
   "default_reasoning_level": "high",
   "default_reasoning_summary": "none",
-  "supports_reasoning_summaries": true,
+  "supports_reasoning_summaries": false,
   "support_verbosity": false,
   "supports_image_detail_original": false,
   "supports_parallel_tool_calls": false,
