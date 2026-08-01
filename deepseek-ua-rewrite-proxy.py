@@ -138,13 +138,19 @@ def _describe_image_with_cli(data_url: str, glance_cmd: list[str]) -> str | None
             glance_cmd + [tmp],
             capture_output=True, text=True, timeout=90,
         )
-        if res.returncode == 0:
-            return res.stdout.strip() or None
-        _log("[ua-proxy] glance cli failed rc=%d: %s"
-             % (res.returncode, (res.stderr or "").strip()[:200]))
-        return None
+        desc = (res.stdout or res.stderr or "").strip()
+        if res.returncode != 0:
+            # 失败信息（如视觉上游 429）不缓存：限流恢复后重试同一张图会重新描述。
+            _log("[ua-proxy] glance cli failed rc=%d: %s"
+                 % (res.returncode, desc[:200]))
+        return desc or None
     finally:
         os.unlink(tmp)
+
+
+def _looks_like_error(text: str) -> bool:
+    """True for upstream failure texts that must not be cached as descriptions."""
+    return text.startswith("请求失败") or '{"error"' in text
 
 
 def _image_desc_from_data_url(data_url: str, glance_cmd: list[str]) -> str | None:
@@ -159,7 +165,7 @@ def _image_desc_from_data_url(data_url: str, glance_cmd: list[str]) -> str | Non
         desc = _describe_image_with_api(data_url, api_key) if api_key else None
         if not desc:
             desc = _describe_image_with_cli(data_url, glance_cmd)
-        if desc:
+        if desc and not _looks_like_error(desc):
             _GLANCE_CACHE[cache_key] = desc
         return desc
     except Exception as e:
