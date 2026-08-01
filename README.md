@@ -28,7 +28,7 @@ Codex 调 view_image → 拿到 data URL → 请求带图 → 本地代理
 **第 0 步（所有场景都要）**：配置 `.env`
 
 ```bash
-git clone <本仓库> && cd codex-deepseek-vision
+git clone git@github.com:Anionex/codex-deepseek-vision.git && cd codex-deepseek-vision
 cp .env.example .env
 # 编辑 .env：填 VISION_API_KEY（看图必需），以及 DEEPSEEK_API_KEY（跑验证脚本用，可留空）
 ```
