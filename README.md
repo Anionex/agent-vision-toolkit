@@ -20,7 +20,7 @@ Codex 调 view_image → 拿到 data URL → 请求带图 → 本地代理
   <img src="assets/effect-2.jpg" alt="Codex 里的 DeepSeek 看图排查界面字段不一致 bug" width="49%">
 </p>
 
-<p align="center">真实 Codex 会话截图（模型：DeepSeek V4 Flash Max）：左图是让模型对着 UI 截图回答"这是什么风格"，右图是让模型对着界面截图排查字段 bug。截图来自 <a href="https://x.com/anion_ex/status/2083490281165570181">@anion_ex 的实测帖</a>。</p>
+<p align="center">真实 Codex 会话截图（模型：DeepSeek V4 Flash Max）：左图是让模型对着 UI 截图回答"这是什么风格"，右图是让模型对着界面截图排查字段 bug。
 
 ---
 
