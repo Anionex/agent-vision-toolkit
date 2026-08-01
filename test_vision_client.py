@@ -38,6 +38,23 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    with tempfile.TemporaryDirectory() as raw:
+        windows_env = Path(raw) / "codex-deepseek-vision" / "env"
+        windows_env.parent.mkdir()
+        windows_env.write_text("WINDOWS_ENV_PROBE=loaded\n")
+        previous_local_appdata = os.environ.get("LOCALAPPDATA")
+        os.environ["LOCALAPPDATA"] = raw
+        os.environ.pop("WINDOWS_ENV_PROBE", None)
+        try:
+            vision_client.load_default_env()
+            assert os.environ.get("WINDOWS_ENV_PROBE") == "loaded"
+        finally:
+            os.environ.pop("WINDOWS_ENV_PROBE", None)
+            if previous_local_appdata is None:
+                os.environ.pop("LOCALAPPDATA", None)
+            else:
+                os.environ["LOCALAPPDATA"] = previous_local_appdata
+
     server = HTTPServer(("127.0.0.1", 0), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     environment = dict(os.environ, VISION_API_KEY="test-key",

@@ -22,9 +22,9 @@
 
 ## 使用方式
 
-本仓库不提供通用一键安装器。推荐把仓库链接交给当前 macOS 上的 Codex Agent：
+本仓库不提供通用一键安装器。推荐把仓库链接交给 Codex Agent：
 
-> 我已经在 Codex 中接入并可正常使用 DeepSeek。请先阅读这个仓库的 README，再按照 AGENT_INSTALL.md 在 macOS 上部署并验证 `view_image`。
+> 我已经在 Codex 中接入并可正常使用 DeepSeek。请先阅读这个仓库的 README，再按照 AGENT_INSTALL.md 根据当前系统部署并验证 `view_image`。
 
 详细执行步骤见 **[Codex Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启 Codex 后，直接粘贴图片或让 DeepSeek 调用内置 `view_image` 即可。
 
@@ -114,7 +114,7 @@ Codex（携带原有 Authorization）
 | `vision_client.py` | 代理与 `glance` 共用的视觉 API 客户端 |
 | `bin/glance` | 可选的图片描述、问答和 OCR CLI |
 | `ground.py` / `bin/ground` | 可选的图片目标定位 CLI |
-| `AGENT_INSTALL.md` | Codex Agent 的 macOS 安装与验证步骤 |
+| `AGENT_INSTALL.md` | Codex Agent 的安装与验证步骤 |
 | `test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |
 | `smoke_test_proxy.py` | 代理透传、鉴权和流式协议测试 |
 | `test_vision_client.py` | 视觉客户端重试与 `glance` 测试 |
@@ -122,7 +122,6 @@ Codex（携带原有 Authorization）
 
 ## 限制
 
-- 当前文档只覆盖 macOS。
 - 这是图片转文字代理，不会把视觉 token 直接交给 DeepSeek。
 - 图片描述质量取决于所配置的视觉模型。
 - 缓存只存在于代理进程内，重启后清空。
