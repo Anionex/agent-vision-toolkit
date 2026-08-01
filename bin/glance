@@ -2,7 +2,6 @@
 """glance: standalone image description, Q&A, and OCR CLI."""
 
 import argparse
-import os
 from pathlib import Path
 import sys
 
@@ -40,16 +39,6 @@ def main():
     group.add_argument("--ocr", nargs="?", const="", metavar="额外要求", help="逐字识别图片文字")
     args = parser.parse_args()
     load_default_env()
-    aliases = {
-        "VISION_API_KEY": ("GLANCE_API_KEY", "GEMINI_API_KEY"),
-        "VISION_BASE_URL": ("GLANCE_BASE_URL", "base_url"),
-        "VISION_MODEL": ("GLANCE_MODEL", "model"),
-    }
-    for target, sources in aliases.items():
-        if not os.environ.get(target):
-            value = next((os.environ.get(source) for source in sources if os.environ.get(source)), None)
-            if value:
-                os.environ[target] = value
     try:
         answer = describe_image(
             image_path_to_data_url(args.image),

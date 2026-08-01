@@ -5,7 +5,8 @@ Runs a plain-HTTP echo upstream + the proxy (both localhost), sends a request
 that carries Codex identity signals, and checks:
   - the downstream proxy response round-trips (HTTP 200)
   - optional Codex header compatibility is isolated behind a flag
-  - explicit model mapping is applied
+  - the user's model name and Authorization header pass through unchanged
+  - a text-only request body passes through byte-for-byte
   - the response body streams through successfully
 """
 
@@ -71,18 +72,20 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
     up = subprocess.Popen([py, up_file], stdout=open("/tmp/ds_up.log", "w"), stderr=subprocess.STDOUT)
     pr = subprocess.Popen(
         [py, proxy_script, "--port", "19101", "--upstream", "http://127.0.0.1:19999",
-         "--log", log, "--model-map", "test-vision=deepseek-v4-flash",
+         "--log", log,
          "--codex-header-compat", "--skip-vision-config-check"],
         stdout=open("/tmp/ds_proxy_proc.log", "w"), stderr=subprocess.STDOUT,
+        env={**os.environ, "DEEPSEEK_API_KEY": "must-not-be-injected"},
     )
     time.sleep(1.2)
     try:
         conn = http.client.HTTPConnection("127.0.0.1", 19101, timeout=5)
-        body = json.dumps({"model": "test-vision", "reasoning": {"effort": "none"}, "input": "hi"})
+        body = '{"model":"user-configured-model", "reasoning":{"effort":"none"}, "input":"hi"}'
         conn.request(
             "POST", "/responses", body=body,
             headers={
                 "Content-Type": "application/json",
+                "Authorization": "Bearer existing-codex-key",
                 "User-Agent": "codex/0.146.0",
                 "x-codex-turn-metadata": "{}",
                 "originator": "Codex Desktop",
@@ -101,7 +104,8 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
             print("  (no log)")
 
         ups = json.load(open("/tmp/up_headers.json"))
-        upb = json.load(open("/tmp/up_body.json"))
+        raw_upstream_body = open("/tmp/up_body.json", "rb").read()
+        upb = json.loads(raw_upstream_body)
         ua = ups.get("User-Agent")
         has_xcodex = any(k.lower().startswith("x-codex-") for k in ups)
         has_originator = any(k.lower() == "originator" for k in ups)
@@ -115,8 +119,10 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
               and ua == "python-urllib/3"
               and not has_xcodex
               and not has_originator
+              and ups.get("Authorization") == "Bearer existing-codex-key"
               and upb.get("reasoning") == {"effort": "none"}
-              and upb.get("model") == "deepseek-v4-flash"
+              and upb.get("model") == "user-configured-model"
+              and raw_upstream_body == body.encode()
               and resp_body == FIRST + SECOND
               and first_elapsed < 0.45)
         print("SMOKE", "PASS" if ok else "FAIL")
@@ -126,12 +132,25 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
         spec = importlib.util.spec_from_file_location("vision_proxy", proxy_script)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        incoming = [("User-Agent", "codex/test"), ("x-codex-test", "1"), ("originator", "Codex")]
-        default_headers = module.Proxy(1, "http://example", "", {}, False, False)._upstream_headers(incoming)
+        incoming = [("Authorization", "Bearer existing-codex-key"), ("User-Agent", "codex/test"),
+                    ("x-codex-test", "1"), ("originator", "Codex")]
+        saved_key = os.environ.get("DEEPSEEK_API_KEY")
+        os.environ["DEEPSEEK_API_KEY"] = "must-not-be-injected"
+        try:
+            default_headers = module.Proxy(1, "http://example", "", False, False)._upstream_headers(incoming)
+        finally:
+            if saved_key is None:
+                os.environ.pop("DEEPSEEK_API_KEY", None)
+            else:
+                os.environ["DEEPSEEK_API_KEY"] = saved_key
+        assert ("Authorization", "Bearer existing-codex-key") in default_headers
+        assert all("must-not-be-injected" not in value for _, value in default_headers)
         assert ("User-Agent", "codex/test") in default_headers
         assert ("x-codex-test", "1") in default_headers
         assert ("originator", "Codex") in default_headers
-        print("DEFAULT HEADER PASS: Codex identity headers are preserved unless opted in")
+        print("DEFAULT HEADER PASS: Codex auth and identity headers are preserved unless opted in")
+
+        print("MODEL PASS: the user's configured model name and text-only body are unchanged")
 
         reasoning_sse = "\r\n\r\n".join([
             'data: {"type":"response.output_item.added","item":{"type":"reasoning","id":"r1"}}',

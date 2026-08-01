@@ -23,16 +23,6 @@ def _header_value(headers, name):
     return next((value for key, value in headers if key.lower() == name.lower()), None)
 
 
-def _parse_model_map(pairs):
-    result = {}
-    for pair in pairs or []:
-        source, separator, target = pair.partition("=")
-        if not separator or not source.strip() or not target.strip():
-            raise SystemExit(f"--model-map 需要 SLUG=UPSTREAM，收到: {pair!r}")
-        result[source.strip()] = target.strip()
-    return result
-
-
 _DESC_CACHE = {}
 
 
@@ -138,10 +128,9 @@ def _inject_reasoning_summaries(text):
 
 
 class Proxy:
-    def __init__(self, port, upstream, log_path, model_map, codex_header_compat=False, inject_reasoning_summary=False):
+    def __init__(self, port, upstream, log_path, codex_header_compat=False, inject_reasoning_summary=False):
         self.port = port
         self.upstream = upstream.rstrip("/")
-        self.model_map = model_map
         self.codex_header_compat = codex_header_compat
         self.inject_reasoning_summary = inject_reasoning_summary
         os.environ["DS_VISION_PROXY_LOG"] = log_path
@@ -154,13 +143,9 @@ class Proxy:
                 continue
             if self.codex_header_compat and (lower in CODEX_HEADERS or lower.startswith("x-codex-")):
                 continue
-            if os.environ.get("DEEPSEEK_API_KEY") and lower == "authorization":
-                continue
             headers.append((key, value))
         if self.codex_header_compat:
             headers.append(("User-Agent", "python-urllib/3"))
-        if os.environ.get("DEEPSEEK_API_KEY"):
-            headers.append(("Authorization", "Bearer " + os.environ["DEEPSEEK_API_KEY"]))
         headers.append(("Connection", "close"))
         return headers
 
@@ -187,7 +172,6 @@ class Proxy:
             if len(body) < content_length:
                 await self._send_error(writer, 400, "incomplete request body")
                 return
-            original_model = None
             parsed = None
             if body:
                 try:
@@ -195,14 +179,10 @@ class Proxy:
                 except json.JSONDecodeError:
                     pass
             if isinstance(parsed, dict):
-                original_model = parsed.get("model")
-                if original_model in self.model_map:
-                    parsed["model"] = self.model_map[original_model]
-                await _rewrite_image_inputs(parsed)
-                body = bytearray(json.dumps(parsed).encode())
-            mapped_model = parsed.get("model") if isinstance(parsed, dict) else None
-            model_label = f"{original_model} -> {mapped_model}" if original_model != mapped_model else str(original_model)
-            _log(f"[vision-proxy] request {method} {path} model={model_label} body_bytes={len(body)}")
+                if await _rewrite_image_inputs(parsed):
+                    body = bytearray(json.dumps(parsed).encode())
+            model = parsed.get("model") if isinstance(parsed, dict) else None
+            _log(f"[vision-proxy] request {method} {path} model={model} body_bytes={len(body)}")
             response = await self._open_upstream(method, path, bytes(body), self._upstream_headers(incoming_headers))
             response_started = True
             await self._send_response(writer, response)
@@ -306,7 +286,6 @@ async def main():
     parser.add_argument("--upstream", default="https://api.deepseek.com")
     parser.add_argument("--log", default="")
     parser.add_argument("--env-file")
-    parser.add_argument("--model-map", action="append", default=[])
     parser.add_argument("--codex-header-compat", action="store_true")
     parser.add_argument("--inject-reasoning-summary", action="store_true")
     parser.add_argument("--skip-vision-config-check", action="store_true", help=argparse.SUPPRESS)
@@ -317,7 +296,7 @@ async def main():
             validate_vision_config()
         except VisionError as exc:
             parser.error(str(exc))
-    proxy = Proxy(args.port, args.upstream, args.log, _parse_model_map(args.model_map), args.codex_header_compat, args.inject_reasoning_summary)
+    proxy = Proxy(args.port, args.upstream, args.log, args.codex_header_compat, args.inject_reasoning_summary)
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):

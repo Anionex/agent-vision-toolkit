@@ -34,13 +34,13 @@ def test_shapes():
     pre = {"type": "message", "role": "user",
            "content": [{"type": "input_text", "text": "hi"}]}
 
-    body_a = {"model": "deepseek-v4-flash-vision", "input": [pre, {
+    body_a = {"model": "user-configured-model", "input": [pre, {
         "type": "message", "role": "user",
         "content": [{"type": "input_image", "image_url": data}]}]}
-    body_b = {"model": "deepseek-v4-flash-vision", "input": [pre, {
+    body_b = {"model": "user-configured-model", "input": [pre, {
         "type": "function_call_output", "call_id": "c1",
         "output": [{"type": "input_image", "image_url": data}]}]}
-    body_c = {"model": "deepseek-v4-flash-vision", "input": [pre, {
+    body_c = {"model": "user-configured-model", "input": [pre, {
         "type": "function_call_output", "call_id": "c2",
         "output": [{"type": "input_text", "text": "ok"}]}]}
 
@@ -68,7 +68,7 @@ def test_parallel():
     try:
         pre = {"type": "message", "role": "user",
                "content": [{"type": "input_text", "text": "hi"}]}
-        body = {"model": "deepseek-v4-flash-vision", "input": [pre, {
+        body = {"model": "user-configured-model", "input": [pre, {
             "type": "message", "role": "user",
             "content": [
                 {"type": "input_image", "image_url": "data:image/png;base64,AAA"},

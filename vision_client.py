@@ -52,7 +52,7 @@ def load_default_env() -> None:
 def _required(name: str) -> str:
     value = os.environ.get(name, "").strip()
     if not value:
-        raise VisionError(f"缺少配置 {name}；请复制 .env.example 并填写后重新安装")
+        raise VisionError(f"缺少配置 {name}；请在 .env 中填写")
     return value
 
 

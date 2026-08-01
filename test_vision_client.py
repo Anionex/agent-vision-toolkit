@@ -14,6 +14,7 @@ import vision_client
 
 class Handler(BaseHTTPRequestHandler):
     statuses = []
+    bodies = []
     calls = 0
 
     def do_POST(self):
@@ -21,7 +22,9 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         self.rfile.read(length)
         status = Handler.statuses.pop(0)
-        if status == 200:
+        if Handler.bodies:
+            body = Handler.bodies.pop(0)
+        elif status == 200:
             body = json.dumps({"choices": [{"message": {"content": "fixture answer"}}]}).encode()
         else:
             body = b'{"error":{"message":"fixture error"}}'
@@ -43,11 +46,11 @@ def main():
     saved = dict(os.environ)
     os.environ.update(environment)
     try:
-        Handler.calls, Handler.statuses = 0, [429, 200]
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [429, 200], []
         assert vision_client.describe_image("data:image/png;base64,AAAA") == "fixture answer"
         assert Handler.calls == 2
 
-        Handler.calls, Handler.statuses = 0, [401]
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [401], []
         try:
             vision_client.describe_image("data:image/png;base64,AAAA")
         except vision_client.VisionError:
@@ -56,7 +59,19 @@ def main():
             raise AssertionError("401 must fail cleanly")
         assert Handler.calls == 1, "401 must not be retried"
 
-        Handler.calls, Handler.statuses = 0, [200]
+        Handler.calls, Handler.statuses, Handler.bodies = (
+            0, [400], [b'{"error":"test-key must not leak"}']
+        )
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        except vision_client.VisionError as exc:
+            assert "test-key" not in str(exc)
+            assert "<redacted>" in str(exc)
+        else:
+            raise AssertionError("HTTP errors must fail cleanly")
+        assert Handler.calls == 1, "400 must not be retried"
+
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         with tempfile.TemporaryDirectory() as raw:
             image = Path(raw) / "fixture.png"
             image.write_bytes(b"\x89PNG\r\n\x1a\nfixture")
