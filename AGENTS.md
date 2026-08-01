@@ -25,6 +25,7 @@
 - 不记录请求 body、图片、对话、系统提示词或 API key。
 - env 只保存视觉 API 配置，macOS 权限必须为 `0600`；密钥不得写入 plist、日志或 Git。
 - `glance` 是可选独立 CLI，不是代理回退路径；它与代理复用 `vision_client.py`。
+- `ground` 是可选独立 CLI，不是代理链路的一部分；它复用 `VISION_*` 配置，额外依赖必须保持隔离且不得影响代理。
 - UA/请求头兼容与 reasoning summary 注入必须默认关闭。
 - 默认逐块转发上游 SSE；只有 reasoning summary 兼容确实需要时才允许缓冲对应响应。
 - 保留必要的有限重试、多图并行和小型进程内缓存，避免部署系统过度工程化。
@@ -39,6 +40,8 @@ python3 smoke_test_proxy.py
 python3 test_vision_client.py
 git diff --check
 ```
+
+修改 `ground.py` 或 `bin/ground` 时，另运行 `python3 test_ground.py`（需要 Pillow）。
 
 还需确认：
 

@@ -161,6 +161,36 @@ launchctl print "gui/$(id -u)/com.codex.deepseek-vision-proxy"
 
 `glance` 是独立附加功能，不是代理回退路径。用户需要时，可以为其创建一个调用仓库内 `bin/glance` 的简单 wrapper，并复用同一份视觉 env。不得覆盖用户已有的同名命令。
 
+## 可选：ground
+
+`ground` 用自然语言定位图片中的对象或区域，并输出原图像素坐标下的边界框。它不是代理链路的一部分，复用 `~/.config/codex-deepseek-vision/env` 中的 `VISION_*` 配置，不需要新的凭证。
+
+用户需要时：
+
+1. 将 `ground.py` 和 `bin/ground` 一并复制到 `~/.local/share/codex-deepseek-vision/` 对应位置。
+2. 用 `uv` 创建只供 `ground` 使用的隔离环境并安装唯一的额外依赖：
+
+   ```bash
+   uv venv ~/.local/share/codex-deepseek-vision/.venv-ground
+   uv pip install --python ~/.local/share/codex-deepseek-vision/.venv-ground/bin/python pillow
+   ```
+
+3. 确认用户没有同名命令后，在 `~/.local/bin/ground` 创建简单 wrapper：
+
+   ```sh
+   #!/bin/sh
+   exec "$HOME/.local/share/codex-deepseek-vision/.venv-ground/bin/python" \
+     "$HOME/.local/share/codex-deepseek-vision/bin/ground" "$@"
+   ```
+
+   设置可执行权限，并确保 `~/.local/bin` 在 `PATH` 中。不得覆盖用户已有的同名命令。
+4. 验证：
+
+   ```bash
+   ground --help
+   ground /path/to/image.png "目标描述"
+   ```
+
 ## 可选兼容功能
 
 以下功能默认关闭，只有确认上游确实需要时才启用：

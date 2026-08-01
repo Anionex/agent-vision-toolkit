@@ -17,6 +17,7 @@
 - **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
 - **同图只调一次**：按图片 sha256 缓存描述，同一张图反复出现不重复调用视觉 API，缓存命中近乎零延迟。
 - **可选 `glance`**：简洁的独立cli工具，用于image qa 或 OCR，以提供更加灵活的图片理解能力。
+- **可选 `ground`**：用自然语言定位图片中的目标，输出原图像素坐标下的边界框。
 
 ## 使用方式
 
@@ -55,6 +56,15 @@ glance screenshot.png -q "这张图片的主色调是什么？"
 glance screenshot.png --ocr 
 ```
 
+## 可选工具：ground
+
+`ground` 复用已经配置好的多模态模型凭证，用于定位图片中的对象或区域：
+
+```bash
+ground screenshot.png "发送按钮"
+```
+
+每次只分析一张完整图片，并输出目标在原图中的像素坐标。
 
 ## 工作原理
 
@@ -87,10 +97,12 @@ Codex（携带原有 Authorization）
 | `deepseek-vision-proxy.py` | 本地图片改写代理与 SSE 转发 |
 | `vision_client.py` | 代理与 `glance` 共用的视觉 API 客户端 |
 | `bin/glance` | 可选的图片描述、问答和 OCR CLI |
+| `ground.py` / `bin/ground` | 可选的图片目标定位 CLI |
 | `AGENT_INSTALL.md` | Codex Agent 的 macOS 安装与验证步骤 |
 | `test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |
 | `smoke_test_proxy.py` | 代理透传、鉴权和流式协议测试 |
 | `test_vision_client.py` | 视觉客户端重试与 `glance` 测试 |
+| `test_ground.py` | `ground` 坐标解析和共享配置测试 |
 
 ## 限制
 
