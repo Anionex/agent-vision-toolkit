@@ -91,6 +91,14 @@ async def _rewrite_image_inputs(parsed):
     return True
 
 
+def _rewrite_model_compat(parsed):
+    if parsed.get("model") != "gpt-5.2":
+        return False
+    parsed["model"] = "deepseek-v4-flash"
+    _log("[vision-proxy] model compatibility gpt-5.2 -> deepseek-v4-flash")
+    return True
+
+
 def _inject_reasoning_summaries(text):
     """Optional compatibility transform; disabled by default."""
     text = text.replace("\r\n", "\n")
@@ -179,7 +187,9 @@ class Proxy:
                 except json.JSONDecodeError:
                     pass
             if isinstance(parsed, dict):
-                if await _rewrite_image_inputs(parsed):
+                image_changed = await _rewrite_image_inputs(parsed)
+                model_changed = _rewrite_model_compat(parsed)
+                if image_changed or model_changed:
                     body = bytearray(json.dumps(parsed).encode())
             model = parsed.get("model") if isinstance(parsed, dict) else None
             _log(f"[vision-proxy] request {method} {path} model={model} body_bytes={len(body)}")

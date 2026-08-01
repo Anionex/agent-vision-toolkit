@@ -9,7 +9,7 @@
 用户的 DeepSeek 必须已经能在 Codex 中正常对话。部署只补充图片转文字代理，不重建用户现有的 DeepSeek 配置。
 
 - 保留现有模型、slug、`display_name`、provider、鉴权方式和 DeepSeek key。
-- 不新增模型，不使用模型别名或模型名映射。
+- 不新增模型，也不主动改写用户的模型配置。代理兼容既有的 `gpt-5.2` 显示别名，并在转发时将其映射为 `deepseek-v4-flash`。
 - 不要求 `DEEPSEEK_API_KEY`；Codex 原有的 `Authorization` 由代理原样转发。
 - `config.toml` 只把当前 provider 的 `base_url` 指向 `http://127.0.0.1:19100`。
 - model catalog 只有在当前条目的 `input_modalities` 明确为 `["text"]` 时才追加 `"image"`。
@@ -89,6 +89,8 @@ base_url = "http://127.0.0.1:19100"
 ```
 
 不要修改 provider 名、`model`、`wire_api`、`requires_openai_auth`、认证配置或其他设置。
+
+如果用户原有配置使用 `gpt-5.2` 作为显示别名，继续保留该配置；代理会在请求转发时兼容映射为 `deepseek-v4-flash`。其他模型名仍原样透传。
 
 ### model catalog
 

@@ -5,7 +5,7 @@ Runs a plain-HTTP echo upstream + the proxy (both localhost), sends a request
 that carries Codex identity signals, and checks:
   - the downstream proxy response round-trips (HTTP 200)
   - optional Codex header compatibility is isolated behind a flag
-  - the user's model name and Authorization header pass through unchanged
+  - model names pass through unchanged except for the gpt-5.2 display alias
   - a text-only request body passes through byte-for-byte
   - the response body streams through successfully
 """
@@ -150,7 +150,21 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
         assert ("originator", "Codex") in default_headers
         print("DEFAULT HEADER PASS: Codex auth and identity headers are preserved unless opted in")
 
-        print("MODEL PASS: the user's configured model name and text-only body are unchanged")
+        print("MODEL PASS: ordinary model names and text-only bodies are unchanged")
+
+        alias = http.client.HTTPConnection("127.0.0.1", 19101, timeout=5)
+        alias.request(
+            "POST", "/responses",
+            body='{"model":"gpt-5.2","input":"hi"}',
+            headers={"Content-Type": "application/json"},
+        )
+        alias_response = alias.getresponse()
+        alias_response.read()
+        alias.close()
+        alias_body = json.load(open("/tmp/up_body.json"))
+        assert alias_response.status == 200
+        assert alias_body["model"] == "deepseek-v4-flash"
+        print("MODEL COMPAT PASS: gpt-5.2 is forwarded as deepseek-v4-flash")
 
         reasoning_sse = "\r\n\r\n".join([
             'data: {"type":"response.output_item.added","item":{"type":"reasoning","id":"r1"}}',
