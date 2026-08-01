@@ -48,9 +48,25 @@ def test_shared_vision_request():
     assert seen["max_tokens"] == 2048
 
 
+def test_output_format():
+    single = [ground.Match("button", (64, 756, 1120, 890))]
+    assert ground.format_matches(single, 1200, 900) == [
+        "x1: 64, y1: 756, x2: 1120, y2: 890"
+    ]
+
+    multiple = [
+        ground.Match("first", (0, 0, 100, 100)),
+        ground.Match("second", (900, 700, 1000, 800)),
+    ]
+    lines = ground.format_matches(multiple, 1200, 900)
+    assert lines[0].startswith("1. 左上 first ")
+    assert lines[1].startswith("2. 右下 second ")
+
+
 def main():
     test_box_parsing()
     test_shared_vision_request()
+    test_output_format()
     subprocess.run([sys.executable, "bin/ground", "--help"], check=True, stdout=subprocess.DEVNULL)
     print("GROUND TEST PASS")
 

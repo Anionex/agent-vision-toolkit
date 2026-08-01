@@ -146,6 +146,18 @@ def _position(box: tuple[int, int, int, int], width: int, height: int) -> str:
     }[(horizontal, vertical)]
 
 
+def format_matches(matches: list[Match], width: int, height: int) -> list[str]:
+    if len(matches) == 1:
+        x1, y1, x2, y2 = matches[0].bbox
+        return [f"x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2}"]
+    lines = []
+    for index, match in enumerate(matches, 1):
+        x1, y1, x2, y2 = match.bbox
+        position = _position(match.bbox, width, height)
+        lines.append(f"{index}. {position} {match.label} x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2}")
+    return lines
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="ground",
@@ -162,10 +174,8 @@ def main() -> None:
             width, height = image.size
     except (GroundError, VisionError) as exc:
         parser.exit(1, f"ground: {exc}\n")
-    for index, match in enumerate(matches, 1):
-        x1, y1, x2, y2 = match.bbox
-        position = _position(match.bbox, width, height)
-        print(f"{index}. {position} {match.label} x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2}")
+    for line in format_matches(matches, width, height):
+        print(line)
 
 
 if __name__ == "__main__":
