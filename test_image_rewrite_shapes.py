@@ -20,11 +20,11 @@ import time
 
 def _load_proxy():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "deepseek-ua-rewrite-proxy.py")
+                        "deepseek-vision-proxy.py")
     spec = importlib.util.spec_from_file_location("ds_proxy_mod", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    mod._image_desc_from_data_url = lambda *a: "TEST-DESC:" + str(a[0])[:20]
+    mod._image_desc_from_url = lambda url: "TEST-DESC:" + str(url)[:20]
     return mod
 
 
@@ -34,20 +34,19 @@ def test_shapes():
     pre = {"type": "message", "role": "user",
            "content": [{"type": "input_text", "text": "hi"}]}
 
-    body_a = {"model": "gpt-5.2", "input": [pre, {
+    body_a = {"model": "deepseek-v4-flash-vision", "input": [pre, {
         "type": "message", "role": "user",
         "content": [{"type": "input_image", "image_url": data}]}]}
-    body_b = {"model": "gpt-5.2", "input": [pre, {
+    body_b = {"model": "deepseek-v4-flash-vision", "input": [pre, {
         "type": "function_call_output", "call_id": "c1",
         "output": [{"type": "input_image", "image_url": data}]}]}
-    body_c = {"model": "gpt-5.2", "input": [pre, {
+    body_c = {"model": "deepseek-v4-flash-vision", "input": [pre, {
         "type": "function_call_output", "call_id": "c2",
         "output": [{"type": "input_text", "text": "ok"}]}]}
 
-    glance_cmd = []  # repository signature: (parsed, glance_cmd)
-    ra = asyncio.run(mod._rewrite_image_inputs(body_a, glance_cmd))
-    rb = asyncio.run(mod._rewrite_image_inputs(body_b, glance_cmd))
-    rc = asyncio.run(mod._rewrite_image_inputs(body_c, glance_cmd))
+    ra = asyncio.run(mod._rewrite_image_inputs(body_a))
+    rb = asyncio.run(mod._rewrite_image_inputs(body_b))
+    rc = asyncio.run(mod._rewrite_image_inputs(body_c))
 
     assert ra, "shape A (message.content) was not rewritten"
     assert rb, "shape B (function_call_output.output) was not rewritten"
@@ -59,17 +58,17 @@ def test_shapes():
 
 def test_parallel():
     mod = _load_proxy()
-    real_desc = mod._image_desc_from_data_url
+    real_desc = mod._image_desc_from_url
 
     def slow_desc(url, *a):
         time.sleep(0.4)
         return "SLOW-DESC"
 
-    mod._image_desc_from_data_url = slow_desc
+    mod._image_desc_from_url = slow_desc
     try:
         pre = {"type": "message", "role": "user",
                "content": [{"type": "input_text", "text": "hi"}]}
-        body = {"model": "gpt-5.2", "input": [pre, {
+        body = {"model": "deepseek-v4-flash-vision", "input": [pre, {
             "type": "message", "role": "user",
             "content": [
                 {"type": "input_image", "image_url": "data:image/png;base64,AAA"},
@@ -77,7 +76,7 @@ def test_parallel():
                 {"type": "input_image", "image_url": "data:image/png;base64,CCC"},
             ]}]}
         t0 = time.time()
-        changed = asyncio.run(mod._rewrite_image_inputs(body, []))
+        changed = asyncio.run(mod._rewrite_image_inputs(body))
         dt = time.time() - t0
         assert changed, "3 images were not rewritten"
         assert dt < 1.1, f"not parallel: 3x0.4s serial would be ~1.2s, got {dt:.2f}s"
@@ -85,9 +84,26 @@ def test_parallel():
         assert all(t.startswith("[local vision model description] SLOW-DESC") for t in texts)
         print(f"PASS: 3 images described in parallel ({dt:.2f}s vs ~1.2s serial)")
     finally:
-        mod._image_desc_from_data_url = real_desc
+        mod._image_desc_from_url = real_desc
+
+
+def test_failure_is_not_forwarded():
+    mod = _load_proxy()
+    mod._image_desc_from_url = lambda _url: None
+    body = {"input": [{"type": "message", "content": [
+        {"type": "input_image", "image_url": "data:image/png;base64,AAA"}
+    ]}]}
+    try:
+        asyncio.run(mod._rewrite_image_inputs(body))
+    except mod.VisionError:
+        pass
+    else:
+        raise AssertionError("failed vision calls must raise instead of forwarding the image")
+    assert body["input"][0]["content"][0]["type"] == "input_image"
+    print("PASS: failed vision call is not converted into an error description")
 
 
 if __name__ == "__main__":
     test_shapes()
     test_parallel()
+    test_failure_is_not_forwarded()

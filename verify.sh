@@ -1,61 +1,59 @@
 #!/usr/bin/env bash
-# End-to-end checks for the DeepSeek vision chain:
-#   1. proxy is listening on the expected port
-#   2. catalog model has image modality (view_image passes its check)
-#   3. config points Codex at the proxy
-#   4. optional: real image -> proxy -> glance -> DeepSeek round trip
-#
-# Usage: ./verify.sh [image-path]   (image-path triggers the live round trip)
-
+# Verify the proxy, Codex configuration, and optional live image path.
 set -uo pipefail
 
-PORT="${PORT:-19100}"
-SLUG="${SLUG:-gpt-5.2}"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+ENV_FILE="${CODEX_DEEPSEEK_VISION_ENV:-$HOME/.config/codex-deepseek-vision/env}"
 IMG="${1:-}"
 FAIL=0
 
-echo "== 1. proxy liveness (port $PORT)"
-if lsof -nP -iTCP:$PORT -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "   OK: proxy listening on 127.0.0.1:$PORT"
+read_env() {
+  [[ -f "$ENV_FILE" ]] || return 0
+  awk -F= -v key="$1" '$1 == key {value=substr($0, index($0, "=")+1); gsub(/^[[:space:]"]+|[[:space:]"]+$/, "", value); print value; exit}' "$ENV_FILE"
+}
+PORT="${PORT:-$(read_env PORT)}"; PORT="${PORT:-19100}"
+SLUG="${SLUG:-$(read_env MODEL_SLUG)}"; SLUG="${SLUG:-deepseek-v4-flash-vision}"
+
+echo "== 1. proxy liveness"
+if python3 - "$PORT" <<'PY'
+import socket, sys
+with socket.socket() as s:
+    s.settimeout(1)
+    raise SystemExit(0 if s.connect_ex(("127.0.0.1", int(sys.argv[1]))) == 0 else 1)
+PY
+then echo "   OK: 127.0.0.1:$PORT"; else echo "   FAIL: proxy is not listening"; FAIL=1; fi
+
+echo "== 2. Codex config and catalog"
+if python3 - "$CODEX_HOME" "$SLUG" "$PORT" <<'PY'
+import json, pathlib, sys, tomllib
+home, slug, port = pathlib.Path(sys.argv[1]), sys.argv[2], int(sys.argv[3])
+config = tomllib.loads((home / "config.toml").read_text())
+assert config.get("model") == slug, (config.get("model"), slug)
+provider = config.get("model_providers", {}).get("deepseek_vision", {})
+assert provider.get("base_url") == f"http://127.0.0.1:{port}", provider
+data = json.loads((home / "cc-switch-model-catalog.json").read_text())
+models = data if isinstance(data, list) else data["models"]
+model = next(item for item in models if item.get("slug") == slug)
+assert "image" in model.get("input_modalities", []), model
+print(f"   OK: model={slug}, display_name={model.get('display_name')!r}")
+PY
+then :; else echo "   FAIL: invalid config or catalog"; FAIL=1; fi
+
+echo "== 3. local env"
+if [[ -f "$ENV_FILE" ]]; then
+  MODE="$(stat -f '%Lp' "$ENV_FILE" 2>/dev/null || stat -c '%a' "$ENV_FILE" 2>/dev/null || true)"
+  [[ "$MODE" == "600" ]] && echo "   OK: env permissions=600" || { echo "   FAIL: env permissions=$MODE"; FAIL=1; }
 else
-  echo "   FAIL: nothing on 127.0.0.1:$PORT; run ./install.sh or launchctl kickstart"
-  FAIL=1
+  echo "   FAIL: missing $ENV_FILE"; FAIL=1
 fi
 
-echo "== 2. catalog model '$SLUG' advertises image modality"
-python3 - "$CODEX_HOME/cc-switch-model-catalog.json" "$SLUG" <<'EOF'
-import json, sys
-path, slug = sys.argv[1], sys.argv[2]
-data = json.load(open(path))
-models = data if isinstance(data, list) else data.get("models", data)
-m = next((x for x in models if isinstance(x, dict) and x.get("slug") == slug), None)
-if m is None:
-    print("   FAIL: slug %r not found in catalog" % slug); sys.exit(1)
-mods = m.get("input_modalities", [])
-if "image" in mods:
-    print("   OK: %s input_modalities=%s" % (slug, mods))
-else:
-    print("   FAIL: %s input_modalities=%s missing 'image'; view_image stays blocked" % (slug, mods))
-    sys.exit(1)
-EOF
-[[ $? -ne 0 ]] && FAIL=1
-
-echo "== 3. config base_url points at the proxy"
-if rg -n 'base_url = "http://127\.0\.0\.1:'"$PORT"'"' "$CODEX_HOME/config.toml" >/dev/null 2>&1; then
-  echo "   OK: base_url -> 127.0.0.1:$PORT"
-else
-  echo "   FAIL: config.toml base_url is not 127.0.0.1:$PORT"
-  FAIL=1
-fi
-
-echo "== 4. live image round trip"
+echo "== 4. optional live image round trip"
 if [[ -n "$IMG" ]]; then
-  python3 "$(dirname "$0")/test_view_image_chain.py" --proxy "http://127.0.0.1:$PORT/responses" "$IMG" || FAIL=1
+  python3 "$(dirname "$0")/test_view_image_chain.py" --proxy "http://127.0.0.1:$PORT/responses" --model "$SLUG" --env-file "$ENV_FILE" "$IMG" || FAIL=1
 else
-  echo "   skip (pass an image path to run: ./verify.sh <image>)"
+  echo "   skip (pass an image path to test the real APIs)"
 fi
 
 echo
-[[ $FAIL -eq 0 ]] && echo "ALL CHECKS PASSED" || echo "SOME CHECKS FAILED (see above)"
+[[ $FAIL -eq 0 ]] && echo "ALL CHECKS PASSED" || echo "SOME CHECKS FAILED"
 exit $FAIL

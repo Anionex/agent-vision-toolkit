@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""glance: standalone image description, Q&A, and OCR CLI."""
+
+import argparse
+import os
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from vision_client import (  # noqa: E402
+    VisionError,
+    describe_image,
+    image_path_to_data_url,
+    load_default_env,
+)
+
+
+def build_prompt(args):
+    if args.ocr is not None:
+        extra = f" 额外要求：{args.ocr}" if args.ocr else ""
+        return (
+            "请识别这张图片中的所有文字(包括标题、正文、标注、水印等全部可见文字),"
+            "直接逐字输出文字本身,一行接一行,不要遗漏任何字符,不要改写、总结、翻译,"
+            "不要添加任何前言、解释或额外内容。" + extra
+        )
+    if args.query:
+        return args.query
+    return None
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="glance",
+        description="使用已配置的视觉模型进行图片描述、问答或 OCR",
+    )
+    parser.add_argument("image", help="图片路径")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-q", "--query", help="针对图片提问")
+    group.add_argument("--ocr", nargs="?", const="", metavar="额外要求", help="逐字识别图片文字")
+    args = parser.parse_args()
+    load_default_env()
+    aliases = {
+        "VISION_API_KEY": ("GLANCE_API_KEY", "GEMINI_API_KEY"),
+        "VISION_BASE_URL": ("GLANCE_BASE_URL", "base_url"),
+        "VISION_MODEL": ("GLANCE_MODEL", "model"),
+    }
+    for target, sources in aliases.items():
+        if not os.environ.get(target):
+            value = next((os.environ.get(source) for source in sources if os.environ.get(source)), None)
+            if value:
+                os.environ[target] = value
+    try:
+        answer = describe_image(
+            image_path_to_data_url(args.image),
+            build_prompt(args),
+            max_tokens=8192,
+        )
+    except VisionError as exc:
+        parser.exit(1, f"glance: {exc}\n")
+    print(answer)
+
+
+if __name__ == "__main__":
+    main()

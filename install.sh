@@ -1,161 +1,162 @@
 #!/usr/bin/env bash
-# Install the DeepSeek vision-capable local proxy for Codex.
-#
-# What it does:
-#   1. backs up anything it touches (config.toml, model catalog, proxy, plist)
-#   2. installs the proxy script + launchd agent (port 19100 by default)
-#   3. merges the catalog model entry (gpt-5.2 -> DeepSeek V4 Flash, image modality)
-#   4. points Codex config at the local proxy
-#
-# After install: restart the Codex desktop app, then run ./verify.sh.
-#
-# Usage: ./install.sh [--port 19100] [--model gpt-5.2]
-
+# Install the Codex DeepSeek vision proxy on macOS.
 set -euo pipefail
 
-PORT=19100
-SLUG="gpt-5.2"
-ENV_FILE=""
+WITH_GLANCE=0
+NO_START=0
+HEADER_COMPAT=0
+REASONING_SUMMARY=0
+usage() {
+  cat <<'EOF'
+Usage: ./install.sh [options]
+  --with-glance               install the standalone glance CLI
+  --codex-header-compat       strip Codex identity headers upstream
+  --inject-reasoning-summary  synthesize reasoning summaries (buffers SSE)
+  --no-start                  write files without starting launchd (tests)
+EOF
+}
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --port) PORT="$2"; shift 2 ;;
-    --model) SLUG="$2"; shift 2 ;;
-    --env-file) ENV_FILE="$2"; shift 2 ;;
-    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
-    *) echo "unknown arg: $1" >&2; exit 1 ;;
+    --with-glance) WITH_GLANCE=1 ;;
+    --codex-header-compat) HEADER_COMPAT=1 ;;
+    --inject-reasoning-summary) REASONING_SUMMARY=1 ;;
+    --no-start) NO_START=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
+  shift
 done
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-LAUNCHERS="$CODEX_HOME/launchers"
-PLIST="$HOME/Library/LaunchAgents/com.codex.deepseek-ua-rewrite-proxy.plist"
-LABEL="com.codex.deepseek-ua-rewrite-proxy"
-LOG="$LAUNCHERS/deepseek-ua-rewrite-proxy.err.log"
-STAMP="$(date +%Y%m%d-%H%M%S)"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/share/codex-deepseek-vision}"
+CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/codex-deepseek-vision}"
+BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
+ENV_SOURCE="${ENV_SOURCE:-$REPO_DIR/.env}"
+ENV_INSTALLED="$CONFIG_DIR/env"
+PLIST="${PLIST:-$HOME/Library/LaunchAgents/com.codex.deepseek-vision-proxy.plist}"
+LABEL="com.codex.deepseek-vision-proxy"
+LOG="$CODEX_HOME/log/deepseek-vision-proxy.log"
 PYTHON="${PYTHON:-$(command -v python3)}"
 
-# ---- .env: vision API credentials (no local tools required) ----
-[[ -z "$ENV_FILE" && -f "$REPO_DIR/.env" ]] && ENV_FILE="$REPO_DIR/.env"
-VISION_API_KEY=""
-VISION_BASE_URL="https://api.inferera.com/v1"
-VISION_MODEL="gemini-3.6-flash"
-if [[ -n "$ENV_FILE" ]]; then
-  VISION_API_KEY="$(awk -F= '/^VISION_API_KEY=/{gsub(/["'"'"' ]/, "", $2); print $2; exit}' "$ENV_FILE")"
-  VISION_BASE_URL="$(awk -F= '/^VISION_BASE_URL=/{gsub(/["'"'"' ]/, "", $2); print $2; exit}' "$ENV_FILE")"
-  [[ -z "$VISION_BASE_URL" ]] && VISION_BASE_URL="https://api.inferera.com/v1"
-  VISION_MODEL="$(awk -F= '/^VISION_MODEL=/{gsub(/["'"'"' ]/, "", $2); print $2; exit}' "$ENV_FILE")"
-  [[ -z "$VISION_MODEL" ]] && VISION_MODEL="gemini-3.6-flash"
-  echo "==> .env loaded from $ENV_FILE"
-else
-  echo "==> no .env found; vision API key left empty (fall back to --glance-cmd if installed)"
-  echo "    hint: cp .env.example .env and fill VISION_API_KEY to avoid extra installs"
+[[ -f "$ENV_SOURCE" ]] || { echo "missing .env; run: cp .env.example .env" >&2; exit 1; }
+chmod 600 "$ENV_SOURCE"
+env_value() {
+  awk -F= -v key="$1" '$1 == key {value=substr($0, index($0, "=")+1); gsub(/^[[:space:]"]+|[[:space:]"]+$/, "", value); print value; exit}' "$ENV_SOURCE"
+}
+PORT="$(env_value PORT)"; PORT="${PORT:-19100}"
+SLUG="$(env_value MODEL_SLUG)"; SLUG="${SLUG:-deepseek-v4-flash-vision}"
+UPSTREAM="$(env_value DEEPSEEK_BASE_URL)"; UPSTREAM="${UPSTREAM:-https://api.deepseek.com}"
+UPSTREAM_MODEL="$(env_value UPSTREAM_MODEL)"; UPSTREAM_MODEL="${UPSTREAM_MODEL:-deepseek-v4-flash}"
+for key in DEEPSEEK_API_KEY VISION_API_KEY VISION_BASE_URL VISION_MODEL; do
+  [[ -n "$(env_value "$key")" ]] || { echo "missing $key in .env" >&2; exit 1; }
+done
+if [[ $WITH_GLANCE -eq 1 && -e "$BIN_DIR/glance" ]] && ! grep -q 'codex-deepseek-vision/bin/glance' "$BIN_DIR/glance"; then
+  echo "glance already exists: $BIN_DIR/glance" >&2
+  exit 1
 fi
 
-mkdir -p "$LAUNCHERS"
+mkdir -p "$INSTALL_DIR/bin" "$CONFIG_DIR" "$CODEX_HOME/log" "$(dirname "$PLIST")"
+install -m 755 "$REPO_DIR/deepseek-vision-proxy.py" "$INSTALL_DIR/deepseek-vision-proxy.py"
+install -m 644 "$REPO_DIR/vision_client.py" "$INSTALL_DIR/vision_client.py"
+install -m 755 "$REPO_DIR/bin/glance" "$INSTALL_DIR/bin/glance"
+install -m 600 "$ENV_SOURCE" "$ENV_INSTALLED"
 
-echo "==> installing proxy (port $PORT, model slug '$SLUG')"
-
-# ---- 1. backups ----
-for f in "$CODEX_HOME/config.toml" "$CODEX_HOME/cc-switch-model-catalog.json" \
-         "$LAUNCHERS/deepseek-ua-rewrite-proxy.py" "$PLIST"; do
-  [[ -f "$f" ]] && cp "$f" "$f.bak-$STAMP" && echo "    backup: $f -> $f.bak-$STAMP"
+STAMP="$(date +%Y%m%d-%H%M%S)-$$"
+for file in "$CODEX_HOME/config.toml" "$CODEX_HOME/cc-switch-model-catalog.json" "$PLIST"; do
+  [[ -f "$file" ]] && cp -p "$file" "$file.bak-$STAMP"
 done
 
-# ---- 2. proxy script + launchd agent ----
-cp "$REPO_DIR/deepseek-ua-rewrite-proxy.py" "$LAUNCHERS/deepseek-ua-rewrite-proxy.py"
-sed -e "s|__PYTHON__|$PYTHON|" \
-    -e "s|__SCRIPT__|$LAUNCHERS/deepseek-ua-rewrite-proxy.py|" \
-    -e "s|__PORT__|$PORT|" \
-    -e "s|__LOG__|$LOG|" \
-    -e "s|__VISION_API_KEY__|$VISION_API_KEY|" \
-    -e "s|__VISION_BASE_URL__|$VISION_BASE_URL|" \
-    -e "s|__VISION_MODEL__|$VISION_MODEL|" \
-    "$REPO_DIR/launchd.plist.template" > "$PLIST"
+EXTRA_ARGS=()
+[[ $HEADER_COMPAT -eq 1 ]] && EXTRA_ARGS+=("--codex-header-compat")
+[[ $REASONING_SUMMARY -eq 1 ]] && EXTRA_ARGS+=("--inject-reasoning-summary")
+CONFIG="$CODEX_HOME/config.toml" CATALOG="$CODEX_HOME/cc-switch-model-catalog.json" \
+TEMPLATE="$REPO_DIR/catalog-model.template.json" SLUG="$SLUG" PORT="$PORT" \
+UPSTREAM_MODEL="$UPSTREAM_MODEL" PYTHON="$PYTHON" SCRIPT="$INSTALL_DIR/deepseek-vision-proxy.py" \
+UPSTREAM="$UPSTREAM" ENV_INSTALLED="$ENV_INSTALLED" LOG="$LOG" PLIST="$PLIST" \
+EXTRA_ARGS="${EXTRA_ARGS[*]:-}" REASONING_SUMMARY="$REASONING_SUMMARY" "$PYTHON" - <<'PY'
+import json, os, plistlib, shlex
+from pathlib import Path
 
-if launchctl list 2>/dev/null | grep -q "$LABEL"; then
-  launchctl kickstart -k "gui/$(id -u)/$LABEL"
-  echo "    launchd: reloaded $LABEL"
-else
-  launchctl bootstrap "gui/$(id -u)" "$PLIST"
-  echo "    launchd: bootstrapped $LABEL"
-fi
-sleep 1
+config_path = Path(os.environ["CONFIG"])
+lines = config_path.read_text().splitlines() if config_path.exists() else []
+top = {
+    "model_provider": 'model_provider = "deepseek_vision"',
+    "model": f'model = "{os.environ["SLUG"]}"',
+    "model_catalog_json": 'model_catalog_json = "cc-switch-model-catalog.json"',
+}
+first_section = next((i for i, line in enumerate(lines) if line.strip().startswith("[")), len(lines))
+for key, value in top.items():
+    found = next((i for i in range(first_section) if lines[i].strip().split("=", 1)[0].strip() == key), None)
+    if found is None:
+        lines.insert(first_section, value); first_section += 1
+    else:
+        lines[found] = value
 
-# ---- 3. catalog entry merge ----
-CATALOG_PATH="$CODEX_HOME/cc-switch-model-catalog.json" \
-TEMPLATE_PATH="$REPO_DIR/catalog-model.template.json" \
-python3 - "$SLUG" <<'EOF'
-import json, sys
-import os
-slug = sys.argv[1]
-catalog_path = os.environ["CATALOG_PATH"]
-template = json.load(open(os.environ["TEMPLATE_PATH"]))
-if template["slug"] != slug:
-    template["slug"] = slug
-    template["display_name"] = "DeepSeek V4 Flash"
+header = "[model_providers.deepseek_vision]"
+try:
+    start = next(i for i, line in enumerate(lines) if line.strip() == header)
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].strip().startswith("[")), len(lines))
+except StopIteration:
+    lines += ([""] if lines and lines[-1].strip() else []) + [header]
+    start, end = len(lines) - 1, len(lines)
+provider = {
+    "name": 'name = "DeepSeek Vision Proxy"',
+    "base_url": f'base_url = "http://127.0.0.1:{os.environ["PORT"]}"',
+    "wire_api": 'wire_api = "responses"',
+    "requires_openai_auth": "requires_openai_auth = false",
+}
+for key, value in provider.items():
+    found = next((i for i in range(start + 1, end) if lines[i].strip().split("=", 1)[0].strip() == key), None)
+    if found is None:
+        lines.insert(end, value); end += 1
+    else:
+        lines[found] = value
+config_path.write_text("\n".join(lines).rstrip() + "\n")
 
-data = json.load(open(catalog_path))
-models = data if isinstance(data, list) else data.get("models", data)
-if not isinstance(models, list):
-    raise SystemExit("unexpected catalog structure: %r" % type(models))
-
-existing = next((m for m in models if isinstance(m, dict) and m.get("slug") == slug), None)
+catalog_path = Path(os.environ["CATALOG"])
+data = json.loads(catalog_path.read_text()) if catalog_path.exists() else {"models": []}
+models = data if isinstance(data, list) else data.setdefault("models", [])
+template = json.loads(Path(os.environ["TEMPLATE"]).read_text())
+template["slug"] = os.environ["SLUG"]
+template["supports_reasoning_summaries"] = os.environ["REASONING_SUMMARY"] == "1"
+existing = next((item for item in models if item.get("slug") == template["slug"]), None)
 if existing is None:
     models.append(template)
-    print("    catalog: added model slug %r" % slug)
 else:
-    for k, v in template.items():
-        existing.setdefault(k, v)
-    print("    catalog: merged template fields into existing slug %r" % slug)
+    for key, value in template.items():
+        existing.setdefault(key, value)
+    modalities = existing.setdefault("input_modalities", [])
+    for modality in ("text", "image"):
+        if modality not in modalities:
+            modalities.append(modality)
+    existing["supports_reasoning_summaries"] = template["supports_reasoning_summaries"]
+catalog_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
-json.dump(data, open(catalog_path, "w"), ensure_ascii=False, indent=1)
-print("    catalog: wrote", catalog_path)
-EOF
+args = [os.environ["PYTHON"], os.environ["SCRIPT"], "--port", os.environ["PORT"],
+        "--upstream", os.environ["UPSTREAM"], "--env-file", os.environ["ENV_INSTALLED"],
+        "--model-map", os.environ["SLUG"] + "=" + os.environ["UPSTREAM_MODEL"],
+        "--log", os.environ["LOG"]] + shlex.split(os.environ.get("EXTRA_ARGS", ""))
+with open(os.environ["PLIST"], "wb") as handle:
+    plistlib.dump({"Label": "com.codex.deepseek-vision-proxy", "ProgramArguments": args,
+                   "RunAtLoad": True, "KeepAlive": True,
+                   "StandardErrorPath": os.environ["LOG"]}, handle)
+PY
+chmod 600 "$PLIST"
 
-# ---- 4. config.toml: point Codex at the local proxy ----
-CONFIG_PATH="$CODEX_HOME/config.toml" \
-python3 - "$SLUG" "$PORT" <<'EOF'
-import sys
-import os
-slug, port = sys.argv[1], sys.argv[2]
-path = os.environ["CONFIG_PATH"]
-lines = open(path).read().splitlines()
+if [[ $WITH_GLANCE -eq 1 ]]; then
+  mkdir -p "$BIN_DIR"
+  WRAPPER="$BIN_DIR/glance"
+  printf '#!/bin/sh\nexec %q %q "$@"\n' "$PYTHON" "$INSTALL_DIR/bin/glance" > "$WRAPPER"
+  chmod 755 "$WRAPPER"
+  echo "glance installed: $WRAPPER"
+  case ":$PATH:" in *":$BIN_DIR:"*) ;; *) echo "add to PATH: export PATH=\"$BIN_DIR:\$PATH\"" ;; esac
+fi
 
-def set_line(pred, new):
-    for i, ln in enumerate(lines):
-        if pred(ln):
-            lines[i] = new
-            return True
-    return False
+if [[ $NO_START -eq 0 ]]; then
+  launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "$PLIST"
+fi
 
-ok = True
-ok &= set_line(lambda l: l.startswith("model_provider"), 'model_provider = "custom"')
-ok &= set_line(lambda l: l.startswith("model ="), 'model = "%s"' % slug)
-ok &= set_line(lambda l: l.startswith("model_catalog_json"),
-               'model_catalog_json = "cc-switch-model-catalog.json"')
-
-# inside the [model_providers.custom] section
-in_custom = False
-for i, ln in enumerate(lines):
-    if ln.startswith("[model_providers."):
-        in_custom = ln == "[model_providers.custom]"
-        continue
-    if in_custom and ln.startswith("base_url"):
-        lines[i] = 'base_url = "http://127.0.0.1:%s"' % port
-        ok &= True
-
-if "[model_providers.custom]" not in "\n".join(lines):
-    lines += ["", "[model_providers.custom]", 'name = "deepseek"',
-              'base_url = "http://127.0.0.1:%s"' % port, 'wire_api = "responses"',
-              "requires_openai_auth = true"]
-
-open(path, "w").write("\n".join(lines) + "\n")
-print("    config: pointed model '%s' at 127.0.0.1:%s" % (slug, port))
-EOF
-
-echo
-echo "==> done. Next steps:"
-echo "    1. restart the Codex desktop app (it caches config at startup)"
-echo "    2. run ./verify.sh  (checks proxy, catalog, config)"
-echo "    3. in a chat, send an image or ask the model to view_image <path>"
+echo "installed: model=$SLUG proxy=127.0.0.1:$PORT"
+echo "restart Codex, then run: ./verify.sh"
