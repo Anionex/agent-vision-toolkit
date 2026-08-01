@@ -7,7 +7,8 @@ Sends a request with an input_image (data URL) through the proxy and asserts
 that the DeepSeek reply describes the image instead of answering
 "I'm unable to see the image".
 
-API key resolution: $DEEPSEEK_API_KEY, else --key-cmd output.
+API key resolution: --key-cmd output, else $DEEPSEEK_API_KEY, else the
+DEEPSEEK_API_KEY line in .env (current dir or --env-file).
 """
 
 import argparse
@@ -21,6 +22,20 @@ import urllib.error
 import urllib.request
 
 PROMPT = "请详细描述这张图片的内容"
+
+
+def load_env_file(path):
+    if not path or not os.path.isfile(path):
+        return
+    for line in open(path):
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 def get_key(key_cmd):
@@ -38,9 +53,12 @@ def main():
     ap.add_argument("--model", default="gpt-5.2")
     ap.add_argument("--key-cmd", default=None,
                     help="shell command printing the DeepSeek API key")
+    ap.add_argument("--env-file", default=None,
+                    help=".env file to load DEEPSEEK_API_KEY from (default: ./.env)")
     ap.add_argument("image")
     args = ap.parse_args()
 
+    load_env_file(args.env_file or ".env")
     img = args.image
     b64 = base64.b64encode(open(img, "rb").read()).decode()
     body = {
@@ -73,7 +91,7 @@ def main():
     if "unable to see the image" in answer.lower() or "unsupported" in answer.lower():
         print("FAIL: image was NOT replaced by a glance description")
         sys.exit(1)
-    print("PASS: image was described via the glance rewrite chain")
+    print("PASS: image was described via the vision rewrite chain")
     sys.exit(0)
 
 

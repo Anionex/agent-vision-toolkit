@@ -20,6 +20,15 @@
     <string>--log</string>
     <string>__LOG__</string>
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>VISION_API_KEY</key>
+    <string>__VISION_API_KEY__</string>
+    <key>VISION_BASE_URL</key>
+    <string>__VISION_BASE_URL__</string>
+    <key>VISION_MODEL</key>
+    <string>__VISION_MODEL__</string>
+  </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>

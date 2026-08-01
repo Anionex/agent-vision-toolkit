@@ -58,47 +58,112 @@ def _parse_model_map(pairs: list[str]) -> dict[str, str]:
 _GLANCE_CACHE: dict[str, str] = {}
 
 
-def _image_desc_from_data_url(data_url: str, glance_cmd: list[str]) -> str | None:
-    """Decode a data URL image, run the local glance CLI, return its text description."""
+def _load_env_file(path: str | None) -> None:
+    """Minimal .env loader; values already in the environment win."""
+    if not path or not os.path.isfile(path):
+        return
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except OSError as e:
+        _log("[ua-proxy] env file load failed: %r" % e)
+
+
+def _vision_api_key() -> str:
+    return (os.environ.get("VISION_API_KEY") or os.environ.get("GLANCE_API_KEY")
+            or os.environ.get("GEMINI_API_KEY") or "").strip()
+
+
+def _describe_image_with_api(data_url: str, api_key: str) -> str | None:
+    """Describe an image via an OpenAI-compatible vision API (no extra installs)."""
+    base_url = os.environ.get("VISION_BASE_URL", "https://api.inferera.com/v1").rstrip("/")
+    model = os.environ.get("VISION_MODEL", "gemini-3.5-flash")
+    payload = {
+        "model": model,
+        "max_tokens": 1024,
+        "reasoning_effort": "none",
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": "请详细描述这张图片中的内容。"},
+            {"type": "image_url", "image_url": {"url": data_url}},
+        ]}],
+    }
+    req = request.Request(
+        base_url + "/chat/completions",
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer " + api_key},
+    )
+    try:
+        with request.urlopen(req, timeout=180) as r:
+            d = json.load(r)
+        return d["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        _log("[ua-proxy] vision api failed: %r" % e)
+        return None
+
+
+def _describe_image_with_cli(data_url: str, glance_cmd: list[str]) -> str | None:
+    """Decode a data URL image and describe it with a local CLI (glance or equivalent)."""
     import base64
-    import hashlib
     import subprocess
     import tempfile
 
+    m = re.match(r"^data:[^,]*;base64,(.+)$", data_url, re.S)
+    if not m:
+        return None
+    raw = base64.b64decode(m.group(1))
+    if raw[:4] == b"\x89PNG":
+        ext = "png"
+    elif raw[:3] == b"\xff\xd8\xff":
+        ext = "jpg"
+    elif raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        ext = "webp"
+    elif raw[:6] in (b"GIF87a", b"GIF89a"):
+        ext = "gif"
+    else:
+        ext = "png"
+    fd, tmp = tempfile.mkstemp(suffix="." + ext)
+    with os.fdopen(fd, "wb") as f:
+        f.write(raw)
     try:
-        m = re.match(r"^data:[^,]*;base64,(.+)$", data_url, re.S)
-        if not m:
-            return None
+        res = subprocess.run(
+            glance_cmd + [tmp],
+            capture_output=True, text=True, timeout=90,
+        )
+        if res.returncode == 0:
+            return res.stdout.strip() or None
+        _log("[ua-proxy] glance cli failed rc=%d: %s"
+             % (res.returncode, (res.stderr or "").strip()[:200]))
+        return None
+    finally:
+        os.unlink(tmp)
+
+
+def _image_desc_from_data_url(data_url: str, glance_cmd: list[str]) -> str | None:
+    """Describe a data URL image: built-in vision API first, local CLI as fallback."""
+    import hashlib
+
+    try:
         cache_key = hashlib.sha256(data_url.encode()).hexdigest()
         if cache_key in _GLANCE_CACHE:
             return _GLANCE_CACHE[cache_key]
-        raw = base64.b64decode(m.group(1))
-        if raw[:4] == b"\x89PNG":
-            ext = "png"
-        elif raw[:3] == b"\xff\xd8\xff":
-            ext = "jpg"
-        elif raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
-            ext = "webp"
-        elif raw[:6] in (b"GIF87a", b"GIF89a"):
-            ext = "gif"
-        else:
-            ext = "png"
-        fd, tmp = tempfile.mkstemp(suffix="." + ext)
-        with os.fdopen(fd, "wb") as f:
-            f.write(raw)
-        try:
-            res = subprocess.run(
-                glance_cmd + [tmp],
-                capture_output=True, text=True, timeout=90,
-            )
-            desc = (res.stdout or res.stderr or "").strip()
-            if desc:
-                _GLANCE_CACHE[cache_key] = desc
-            return desc or None
-        finally:
-            os.unlink(tmp)
+        api_key = _vision_api_key()
+        desc = _describe_image_with_api(data_url, api_key) if api_key else None
+        if not desc:
+            desc = _describe_image_with_cli(data_url, glance_cmd)
+        if desc:
+            _GLANCE_CACHE[cache_key] = desc
+        return desc
     except Exception as e:
-        _log("[ua-proxy] glance failed: %r" % e)
+        _log("[ua-proxy] image describe failed: %r" % e)
         return None
 
 
@@ -471,7 +536,11 @@ async def _main():
     ap.add_argument("--model-map", action="append", default=None,
                     metavar="SLUG=UPSTREAM",
                     help="Map a catalog model slug to an upstream model name. Repeatable.")
+    ap.add_argument("--env-file", default=None,
+                    help="Load KEY=VALUE pairs from a .env file (existing env vars win)")
     args = ap.parse_args()
+
+    _load_env_file(args.env_file)
 
     proxy = Proxy(
         args.port,
