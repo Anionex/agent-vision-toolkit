@@ -13,6 +13,21 @@ Codex 调 view_image → 拿到 data URL → 请求带图 → 本地代理
 
 所有代码均已在真实 Codex + DeepSeek 会话中验证过。
 
+## 实际效果
+
+<p align="center">
+  <img src="assets/effect-1.jpg" alt="Codex 里的 DeepSeek 看 UI 图回答风格问题" width="49%">
+  <img src="assets/effect-2.jpg" alt="Codex 里的 DeepSeek 看图排查界面字段不一致 bug" width="49%">
+</p>
+
+<p align="center">真实 Codex 会话截图（模型：DeepSeek V4 Flash Max）：左图是让模型对着 UI 截图回答"这是什么风格"，右图是让模型对着界面截图排查字段 bug。截图来自 <a href="https://x.com/anion_ex/status/2083490281165570181">@anion_ex 的实测帖</a>。</p>
+
+---
+
+## ⚡ 最省事的用法：把仓库发给 Codex 帮你安装
+
+不用自己敲命令。把这个仓库链接发给你的 Codex，说一句**"安装这个仓库"**，它就会自己照着本 README 完成：clone → 配置 `.env` → 跑 `install.sh` → 拉起代理并提醒你重启 app。这份 README 本身就是给 Agent 看的安装手册。
+
 ---
 
 ## 前置条件
@@ -177,3 +192,13 @@ rm ~/Library/LaunchAgents/com.codex.deepseek-ua-rewrite-proxy.plist
 | `smoke_test_proxy.py` | 本地 echo 冒烟（不需要 key） |
 | `launchd.plist.template` | launchd 模板（`__PYTHON__`/`__SCRIPT__`/`__PORT__`/`__LOG__` 占位符） |
 | `catalog-model.template.json` | catalog 模型条目模板（含 image 模态 + none/high 思考档） |
+
+## 已知限制（Limits）
+
+- **看图 = 文本描述，不是真视觉**：`view_image` 的结果是视觉模型生成的文字描述，DeepSeek 本身不接收图片；描述质量取决于你配的视觉模型（`VISION_MODEL`）。
+- **必须有一个视觉 API key**：未配置 `VISION_API_KEY` 且没有 `--glance-cmd` 本地 CLI 时，请求会原样转发，DeepSeek 会回复 "I'm unable to see the image"。
+- **UI 仍显示 `[Unsupported Image]`**：Codex 前端把 `view_image` 的原始结果渲染为不可解析的图像占位，模型实际拿到的是代理改写后的文本描述——这是设计如此，不影响实际看图。
+- **每张新图一次视觉 API 调用**：按 data URL sha256 缓存、同图只调一次；但 app-server 可能对图片重新编码，偶尔不命中缓存会重复调用。
+- **只对 catalog 里声明了 image 模态的模型生效**：没声明 `input_modalities: ["image"]` 的模型，`view_image` 检查直接不通过（本仓库模板默认已开启）。
+- **平台验证范围**：目前针对 macOS + Codex 桌面 app 验证；`codex exec` CLI 场景未逐一覆盖。
+- **自定义网关需自行并入改写**：只有走本仓库代理（默认 127.0.0.1:19100）的请求会被改写；其他网关请参考上文"情况 B"合并三件套。
