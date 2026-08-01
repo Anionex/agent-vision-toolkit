@@ -95,7 +95,7 @@ ALL CHECKS PASSED
 |---|---|---|
 | `VISION_API_KEY` | 是 | 视觉模型 API key（看图描述） |
 | `VISION_BASE_URL` | 否 | 视觉端点，默认 `https://api.inferera.com/v1` |
-| `VISION_MODEL` | 否 | 视觉模型，默认 `gemini-3.5-flash` |
+| `VISION_MODEL` | 否 | 视觉模型，默认 `gemini-3.6-flash` |
 | `DEEPSEEK_API_KEY` | 否 | 验证脚本用；Codex 客户端侧已有可不填 |
 | `PORT` | 否 | 代理端口，默认 19100 |
 

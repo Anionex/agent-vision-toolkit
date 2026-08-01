@@ -85,7 +85,7 @@ def _vision_api_key() -> str:
 def _describe_image_with_api(data_url: str, api_key: str) -> str | None:
     """Describe an image via an OpenAI-compatible vision API (no extra installs)."""
     base_url = os.environ.get("VISION_BASE_URL", "https://api.inferera.com/v1").rstrip("/")
-    model = os.environ.get("VISION_MODEL", "gemini-3.5-flash")
+    model = os.environ.get("VISION_MODEL", "gemini-3.6-flash")
     payload = {
         "model": model,
         "max_tokens": 1024,
