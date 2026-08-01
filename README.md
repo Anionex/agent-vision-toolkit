@@ -46,9 +46,9 @@ DeepSeek 的认证继续由 Codex 发送并由代理透传，不需要在 env �
 
 ## 可选工具：glance Cli
 
-`glance` 是独立cli工具。配置好proxy后不需要独立再配置凭证。
+`glance` 是独立cli工具。它用于直接对图片发起提问，补充特定细节。
 
-需要全局命令时，可让 Codex Agent 按照安装说明创建 wrapper。得到更简洁的调用形式如下：
+需要全局命令时，可让 Codex 按照安装说明创建 wrapper。得到更简洁的调用形式如下：
 
 ```bash
 glance screenshot.png -q "这张图片的主色调是什么？"
