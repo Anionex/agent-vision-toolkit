@@ -51,8 +51,9 @@ DeepSeek 的认证继续由 Codex 发送并由代理透传，不需要在 env �
 需要全局命令时，可让 Codex Agent 按照安装说明创建 wrapper。得到更简洁的调用形式如下：
 
 ```bash
-
-
+glance screenshot.png
+glance screenshot.png -q "这个报错应该怎么修？"
+glance screenshot.png --ocr
 ```
 
 
