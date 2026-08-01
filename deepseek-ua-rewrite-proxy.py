@@ -167,8 +167,40 @@ def _image_desc_from_data_url(data_url: str, glance_cmd: list[str]) -> str | Non
         return None
 
 
+def _rewrite_image_list(items: list, glance_cmd: list[str]) -> tuple[bool, list]:
+    """Rewrite input_image entries inside a content/output list to text descriptions."""
+    replaced = False
+    new_items = []
+    for c in items:
+        if isinstance(c, dict) and c.get("type") == "input_image":
+            url = c.get("image_url")
+            if isinstance(url, str) and url.startswith("data:"):
+                desc = _image_desc_from_data_url(url, glance_cmd)
+                if desc:
+                    new_items.append(
+                        {
+                            "type": "input_text",
+                            "text": "[local vision model description] " + desc,
+                        }
+                    )
+                    _log(
+                        "[ua-proxy] image -> glance (desc_len=%d, cache=%d)"
+                        % (len(desc), len(_GLANCE_CACHE))
+                    )
+                    replaced = True
+                    continue
+        new_items.append(c)
+    return replaced, new_items
+
+
 def _rewrite_image_inputs(parsed: dict, glance_cmd: list[str]) -> bool:
-    """Replace input_image entries with glance text descriptions. Returns True if any replaced."""
+    """Replace input_image entries with text descriptions. Returns True if any replaced.
+
+    Images can arrive in two shapes:
+      - message.content: [{type: input_image, ...}] (pasted images)
+      - function_call_output.output: [{type: input_image, ...}] (view_image results)
+    Both are rewritten so the upstream model receives readable text.
+    """
     inp = parsed.get("input")
     if not isinstance(inp, list):
         return False
@@ -176,30 +208,14 @@ def _rewrite_image_inputs(parsed: dict, glance_cmd: list[str]) -> bool:
     for item in inp:
         if not isinstance(item, dict):
             continue
-        content = item.get("content")
-        if not isinstance(content, list):
-            continue
-        new_content = []
-        for c in content:
-            if isinstance(c, dict) and c.get("type") == "input_image":
-                url = c.get("image_url")
-                if isinstance(url, str) and url.startswith("data:"):
-                    desc = _image_desc_from_data_url(url, glance_cmd)
-                    if desc:
-                        new_content.append(
-                            {
-                                "type": "input_text",
-                                "text": "[local vision model description] " + desc,
-                            }
-                        )
-                        _log(
-                            "[ua-proxy] image -> glance (desc_len=%d, cache=%d)"
-                            % (len(desc), len(_GLANCE_CACHE))
-                        )
-                        replaced = True
-                        continue
-            new_content.append(c)
-        item["content"] = new_content
+        for field in ("content", "output"):
+            lst = item.get(field)
+            if not isinstance(lst, list):
+                continue
+            changed, new_lst = _rewrite_image_list(lst, glance_cmd)
+            if changed:
+                item[field] = new_lst
+                replaced = True
     return replaced
 
 

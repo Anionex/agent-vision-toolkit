@@ -167,6 +167,7 @@ API key 解析顺序：环境变量 `DEEPSEEK_API_KEY` → `--key-cmd`（shell �
 |---|---|---|
 | `view_image is not allowed because you do not support image inputs` | catalog 模型缺 `image` 模态 | 重跑 `./install.sh` 或手动检查 catalog；`verify.sh` 第 2 步会报 |
 | 响应仍是 `I'm unable to see the image` | `input_image` 未被替换 | 看代理日志 `vision api failed` / `glance failed`；确认 `.env` 里 `VISION_API_KEY` 有效 |
+| `view_image` 返回仍是 `[Unsupported Image]` | 图片在请求体里位于 `function_call_output.output`（view_image 结果），旧版代理只扫描 `message.content` | 本仓库代理已同时改写两种结构；确认你跑的是最新版代理脚本 |
 | 代理没起来 | launchd 未加载 / 端口占用 | `launchctl kickstart -k gui/$(id -u)/com.codex.deepseek-ua-rewrite-proxy`；`lsof -nP -iTCP:19100` |
 | 模型不调 `view_image` | 工具被过滤（模型无 image 模态） | 同上，先修 catalog |
 | 改了配置没效果 | 桌面 app 缓存旧 config | 重启 Codex 桌面 app |
