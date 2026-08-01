@@ -45,7 +45,7 @@ env 只需配置：
 
 DeepSeek 的认证继续由 Codex 发送并由代理透传，不需要在 env 中重复保存。
 
-## 可选工具：glance
+## 可选工具：glance Cli
 
 `glance` 是独立cli工具。它用于直接对图片发起提问，补充特定细节。
 
@@ -53,38 +53,15 @@ DeepSeek 的认证继续由 Codex 发送并由代理透传，不需要在 env �
 
 ```bash
 glance screenshot.png -q "这张图片的主色调是什么？"
-```
-
-返回：
-
-```text
-白色和浅灰色，局部带淡蓝色。
-```
-
-```bash
-glance screenshot.png --ocr
-```
-
-返回：
-
-```text
-用户名
-密码
-登录
+glance screenshot.png --ocr 
 ```
 
 ## 可选工具：ground
 
-`ground` 是独立cli工具，用于定位图片中的对象或区域：
+`ground` 复用已经配置好的多模态模型凭证，用于定位图片中的对象或区域：
 
 ```bash
 ground screenshot.png "发送按钮"
-```
-
-返回：
-
-```text
-x1: 1067, y1: 841, x2: 1108, y2: 881
 ```
 
 每次只分析一张完整图片，并输出目标在原图中的像素坐标。
