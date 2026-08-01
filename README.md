@@ -25,6 +25,8 @@ Codex 调 view_image → 拿到 data URL → 请求带图 → 本地代理
 
 ## 快速开始
 
+**第 0 步（所有场景都要）**：配置 `.env`
+
 ```bash
 git clone <本仓库> && cd codex-deepseek-vision
 cp .env.example .env
@@ -32,8 +34,6 @@ cp .env.example .env
 ```
 
 `.env` 已在 `.gitignore` 中，不会被提交。
-
-## 快速开始
 
 ### 情况 A：没有本地代理（或者愿意整体换用本仓库的代理）
 
