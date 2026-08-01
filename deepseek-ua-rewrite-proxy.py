@@ -53,9 +53,9 @@ def _parse_model_map(pairs: list[str]) -> dict[str, str]:
     return out
 
 
-# data-url sha256 -> glance description; avoids re-describing the same image
+# data-url sha256 -> cached description; avoids re-describing the same image
 # when the model repeats it in later turns of the same conversation.
-_GLANCE_CACHE: dict[str, str] = {}
+_DESC_CACHE: dict[str, str] = {}
 
 
 def _load_env_file(path: str | None) -> None:
@@ -78,8 +78,8 @@ def _load_env_file(path: str | None) -> None:
 
 
 def _vision_api_key() -> str:
-    return (os.environ.get("VISION_API_KEY") or os.environ.get("GLANCE_API_KEY")
-            or os.environ.get("GEMINI_API_KEY") or "").strip()
+    return (os.environ.get("VISION_API_KEY") or os.environ.get("GEMINI_API_KEY")
+            or "").strip()
 
 
 def _describe_image_with_api(data_url: str, api_key: str) -> str | None:
@@ -110,8 +110,10 @@ def _describe_image_with_api(data_url: str, api_key: str) -> str | None:
         return None
 
 
-def _describe_image_with_cli(data_url: str, glance_cmd: list[str]) -> str | None:
-    """Decode a data URL image and describe it with a local CLI (glance or equivalent)."""
+def _describe_image_with_cli(data_url: str, cli_cmd: list[str]) -> str | None:
+    """Decode a data URL image and describe it with a local CLI, if one is configured."""
+    if not cli_cmd:
+        return None
     import base64
     import subprocess
     import tempfile
@@ -135,13 +137,13 @@ def _describe_image_with_cli(data_url: str, glance_cmd: list[str]) -> str | None
         f.write(raw)
     try:
         res = subprocess.run(
-            glance_cmd + [tmp],
+            cli_cmd + [tmp],
             capture_output=True, text=True, timeout=90,
         )
         desc = (res.stdout or res.stderr or "").strip()
         if res.returncode != 0:
             # 失败信息（如视觉上游 429）不缓存：限流恢复后重试同一张图会重新描述。
-            _log("[ua-proxy] glance cli failed rc=%d: %s"
+            _log("[ua-proxy] cli failed rc=%d: %s"
                  % (res.returncode, desc[:200]))
         return desc or None
     finally:
@@ -153,27 +155,27 @@ def _looks_like_error(text: str) -> bool:
     return text.startswith("请求失败") or '{"error"' in text
 
 
-def _image_desc_from_data_url(data_url: str, glance_cmd: list[str]) -> str | None:
+def _image_desc_from_data_url(data_url: str, cli_cmd: list[str]) -> str | None:
     """Describe a data URL image: built-in vision API first, local CLI as fallback."""
     import hashlib
 
     try:
         cache_key = hashlib.sha256(data_url.encode()).hexdigest()
-        if cache_key in _GLANCE_CACHE:
-            return _GLANCE_CACHE[cache_key]
+        if cache_key in _DESC_CACHE:
+            return _DESC_CACHE[cache_key]
         api_key = _vision_api_key()
         desc = _describe_image_with_api(data_url, api_key) if api_key else None
         if not desc:
-            desc = _describe_image_with_cli(data_url, glance_cmd)
+            desc = _describe_image_with_cli(data_url, cli_cmd)
         if desc and not _looks_like_error(desc):
-            _GLANCE_CACHE[cache_key] = desc
+            _DESC_CACHE[cache_key] = desc
         return desc
     except Exception as e:
         _log("[ua-proxy] image describe failed: %r" % e)
         return None
 
 
-async def _rewrite_image_inputs(parsed: dict, glance_cmd: list[str]) -> bool:
+async def _rewrite_image_inputs(parsed: dict, cli_cmd: list[str]) -> bool:
     """Replace input_image entries with text descriptions. Returns True if any replaced.
 
     Images can arrive in two shapes:
@@ -209,11 +211,11 @@ async def _rewrite_image_inputs(parsed: dict, glance_cmd: list[str]) -> bool:
             urls.append(url)
 
     async def describe(url: str) -> tuple[str, str | None]:
-        desc = await asyncio.to_thread(_image_desc_from_data_url, url, glance_cmd)
+        desc = await asyncio.to_thread(_image_desc_from_data_url, url, cli_cmd)
         if desc:
             _log(
-                "[ua-proxy] image -> glance (desc_len=%d, cache=%d)"
-                % (len(desc), len(_GLANCE_CACHE))
+                "[ua-proxy] image -> cli (desc_len=%d, cache=%d)"
+                % (len(desc), len(_DESC_CACHE))
             )
         return url, desc
 
@@ -355,11 +357,11 @@ def _log(msg: str) -> None:
 
 class Proxy:
     def __init__(self, port: int, upstream: str, log: str | None,
-                 glance_cmd: list[str], model_map: dict[str, str]):
+                 cli_cmd: list[str], model_map: dict[str, str]):
         self.port = port
         self.upstream = upstream.rstrip("/")
         self.log = log
-        self.glance_cmd = glance_cmd
+        self.cli_cmd = cli_cmd
         self.model_map = model_map
         os.environ["DS_PROXY_LOG"] = log or ""
 
@@ -404,7 +406,7 @@ class Proxy:
                     if mapped:
                         parsed["model"] = mapped
                     try:
-                        await _rewrite_image_inputs(parsed, self.glance_cmd)
+                        await _rewrite_image_inputs(parsed, self.cli_cmd)
                     except Exception as e:
                         _log("[ua-proxy] image rewrite failed: %r" % e)
                     body = json.dumps(parsed).encode()
@@ -559,8 +561,8 @@ async def _main():
     ap.add_argument("--port", type=int, default=19100)
     ap.add_argument("--upstream", default="https://api.deepseek.com")
     ap.add_argument("--log", default="")
-    ap.add_argument("--glance-cmd", default="/usr/local/bin/glance",
-                    help="Local vision CLI used to describe images (default: /usr/local/bin/glance)")
+    ap.add_argument("--cli-cmd", default="",
+                    help="Optional local image-to-text CLI, used when no VISION_API_KEY is set")
     ap.add_argument("--model-map", action="append", default=None,
                     metavar="SLUG=UPSTREAM",
                     help="Map a catalog model slug to an upstream model name. Repeatable.")
@@ -574,7 +576,7 @@ async def _main():
         args.port,
         args.upstream,
         args.log,
-        [args.glance_cmd],
+        [args.cli_cmd],
         _parse_model_map(args.model_map),
     )
     loop = asyncio.get_running_loop()

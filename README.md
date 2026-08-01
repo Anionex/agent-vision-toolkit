@@ -65,9 +65,9 @@ git clone <本仓库> && cd codex-deepseek-vision
 你已有的代理负责 UA 改写/模型路由/关思考等，**不要全量安装**，只并入图像改写三件套：
 
 1. 从 `deepseek-ua-rewrite-proxy.py` 复制这三个函数到你的代理：
-   - `_image_desc_from_data_url(data_url, glance_cmd)` — 内置视觉 API（`VISION_API_KEY` 环境变量）优先、CLI 兜底，带 sha256 缓存
-   - `_rewrite_image_inputs(parsed, glance_cmd)` — 遍历请求体 `input`，把 `input_image` 替换成 `[local vision model description] <描述>` 的 `input_text`
-   - 在请求转发前调用：`parsed = json.loads(body); _rewrite_image_inputs(parsed, glance_cmd); body = json.dumps(parsed)`
+   - `_image_desc_from_data_url(data_url, cli_cmd)` — 内置视觉 API（`VISION_API_KEY` 环境变量）优先、可选本地 CLI 兜底，带 sha256 缓存
+   - `_rewrite_image_inputs(parsed, cli_cmd)` — 遍历请求体 `input`，把 `input_image` 替换成 `[local vision model description] <描述>` 的 `input_text`
+   - 在请求转发前调用：`parsed = json.loads(body); _rewrite_image_inputs(parsed, cli_cmd); body = json.dumps(parsed)`
 2. 给你的代理进程注入 `VISION_API_KEY`（及可选 `VISION_BASE_URL`/`VISION_MODEL`），或写进代理读取的 `.env`
 3. 确保你 catalog 里模型的 `input_modalities` 含 `"image"`（否则 `view_image` 检查不过，模型拿不到 data URL，改写无从触发）。可以直接用 `catalog-model.template.json` 的条目。
 4. 重启你的代理，跑验证。
@@ -100,7 +100,7 @@ ALL CHECKS PASSED
 | `DEEPSEEK_API_KEY` | 否 | 验证脚本用；Codex 客户端侧已有可不填 |
 | `PORT` | 否 | 代理端口，默认 19100 |
 
-已有本地"图片→文本"CLI 的用户，也可以不改 `.env`，直接给代理传 `--glance-cmd <命令>` 走 CLI 路径（内置 API 优先，无 `VISION_API_KEY` 时回退 CLI）。
+已有本地"图片→文本"CLI 的用户，也可以不改 `.env`，直接给代理传 `--cli-cmd <命令>` 走 CLI 路径（内置 API 优先，无 `VISION_API_KEY` 时回退 CLI）。
 
 ## 验证命令
 
@@ -109,7 +109,7 @@ ALL CHECKS PASSED
 | `./verify.sh` | 代理存活、catalog 模型含 image 模态、config 指向代理 |
 | `./verify.sh <图片>` | 上述 + 真实"带图请求 → 视觉描述 → DeepSeek"往返（需 API key） |
 | `python3 smoke_test_proxy.py` | 本地 echo 冒烟：UA 改写、Codex 头剥离、body 透传（不需要 key，不改任何配置） |
-| `tail ~/.codex/launchers/deepseek-ua-rewrite-proxy.err.log` | 代理日志，出现 `image -> glance (desc_len=..., cache=N)` 即改写生效 |
+| `tail ~/.codex/launchers/deepseek-ua-rewrite-proxy.err.log` | 代理日志，出现 `image -> cli (desc_len=..., cache=N)` 即改写生效 |
 
 API key 解析顺序：环境变量 `DEEPSEEK_API_KEY` → `--key-cmd`（shell 命令打印 key）。
 
@@ -131,7 +131,7 @@ API key 解析顺序：环境变量 `DEEPSEEK_API_KEY` → `--key-cmd`（shell �
 |---|---|---|
 | `--port` | `19100` | 监听端口 |
 | `--upstream` | `https://api.deepseek.com` | 上游地址 |
-| `--glance-cmd` | 空 | 本地"图片→文本"CLI（无 `VISION_API_KEY` 时的回退路径） |
+| `--cli-cmd` | 空（不启用） | 本地"图片→文本"CLI（无 `VISION_API_KEY` 时的回退路径） |
 | `--env-file` | 空 | 启动前加载的 .env 文件 |
 | `--model-map SLUG=UPSTREAM` | `gpt-5.2=deepseek-v4-flash` | 模型名映射，可重复传 |
 | `--log PATH` | 空（stderr） | 日志文件 |
@@ -167,7 +167,7 @@ API key 解析顺序：环境变量 `DEEPSEEK_API_KEY` → `--key-cmd`（shell �
 | 现象 | 原因 | 处理 |
 |---|---|---|
 | `view_image is not allowed because you do not support image inputs` | catalog 模型缺 `image` 模态 | 重跑 `./install.sh` 或手动检查 catalog；`verify.sh` 第 2 步会报 |
-| 响应仍是 `I'm unable to see the image` | `input_image` 未被替换 | 看代理日志 `vision api failed` / `glance failed`；确认 `.env` 里 `VISION_API_KEY` 有效 |
+| 响应仍是 `I'm unable to see the image` | `input_image` 未被替换 | 看代理日志 `vision api failed` / `cli failed`；确认 `.env` 里 `VISION_API_KEY` 有效 |
 | `view_image` 返回仍是 `[Unsupported Image]` | 图片在请求体里位于 `function_call_output.output`（view_image 结果），旧版代理只扫描 `message.content` | 本仓库代理已同时改写两种结构；确认你跑的是最新版代理脚本 |
 | 代理没起来 | launchd 未加载 / 端口占用 | `launchctl kickstart -k gui/$(id -u)/com.codex.deepseek-ua-rewrite-proxy`；`lsof -nP -iTCP:19100` |
 | 模型不调 `view_image` | 工具被过滤（模型无 image 模态） | 同上，先修 catalog |
@@ -186,7 +186,7 @@ rm ~/Library/LaunchAgents/com.codex.deepseek-ua-rewrite-proxy.plist
 
 | 文件 | 说明 |
 |---|---|
-| `deepseek-ua-rewrite-proxy.py` | 代理本体（UA 改写 + 模型映射 + 图像→glance 改写 + 缓存） |
+| `deepseek-ua-rewrite-proxy.py` | 代理本体（UA 改写 + 模型映射 + 图像→文本改写 + 缓存） |
 | `.env.example` | 配置模板：复制为 `.env` 填写即可用，无需其他安装 |
 | `install.sh` | 一键安装（备份优先） |
 | `verify.sh` | 全链路验证 |
@@ -198,7 +198,7 @@ rm ~/Library/LaunchAgents/com.codex.deepseek-ua-rewrite-proxy.plist
 ## 已知限制（Limits）
 
 - **看图 = 文本描述，不是真视觉**：`view_image` 的结果是视觉模型生成的文字描述，DeepSeek 本身不接收图片；描述质量取决于你配的视觉模型（`VISION_MODEL`）。
-- **必须有一个视觉 API key**：未配置 `VISION_API_KEY` 且没有 `--glance-cmd` 本地 CLI 时，请求会原样转发，DeepSeek 会回复 "I'm unable to see the image"。
+- **必须有一个视觉 API key**：未配置 `VISION_API_KEY` 且没有 `--cli-cmd` 本地 CLI 时，请求会原样转发，DeepSeek 会回复 "I'm unable to see the image"。
 - **UI 仍显示 `[Unsupported Image]`**：Codex 前端把 `view_image` 的原始结果渲染为不可解析的图像占位，模型实际拿到的是代理改写后的文本描述——这是设计如此，不影响实际看图。
 - **每张新图一次视觉 API 调用**：多张图在同一个请求里并发描述、一次往返；按 data URL sha256 缓存、同图只调一次。但 app-server 可能对图片重新编码，偶尔不命中缓存会重复调用。
 - **只对 catalog 里声明了 image 模态的模型生效**：没声明 `input_modalities: ["image"]` 的模型，`view_image` 检查直接不通过（本仓库模板默认已开启）。

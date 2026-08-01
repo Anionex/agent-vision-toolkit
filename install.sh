@@ -48,7 +48,7 @@ if [[ -n "$ENV_FILE" ]]; then
   [[ -z "$VISION_MODEL" ]] && VISION_MODEL="gemini-3.6-flash"
   echo "==> .env loaded from $ENV_FILE"
 else
-  echo "==> no .env found; vision API key left empty (fall back to --glance-cmd if installed)"
+  echo "==> no .env found; vision API key left empty (set VISION_API_KEY in .env)"
   echo "    hint: cp .env.example .env and fill VISION_API_KEY to avoid extra installs"
 fi
 

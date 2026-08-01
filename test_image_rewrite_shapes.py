@@ -44,10 +44,10 @@ def test_shapes():
         "type": "function_call_output", "call_id": "c2",
         "output": [{"type": "input_text", "text": "ok"}]}]}
 
-    glance_cmd = []  # repository signature: (parsed, glance_cmd)
-    ra = asyncio.run(mod._rewrite_image_inputs(body_a, glance_cmd))
-    rb = asyncio.run(mod._rewrite_image_inputs(body_b, glance_cmd))
-    rc = asyncio.run(mod._rewrite_image_inputs(body_c, glance_cmd))
+    cli_cmd = []  # repository signature: (parsed, cli_cmd)
+    ra = asyncio.run(mod._rewrite_image_inputs(body_a, cli_cmd))
+    rb = asyncio.run(mod._rewrite_image_inputs(body_b, cli_cmd))
+    rc = asyncio.run(mod._rewrite_image_inputs(body_c, cli_cmd))
 
     assert ra, "shape A (message.content) was not rewritten"
     assert rb, "shape B (function_call_output.output) was not rewritten"

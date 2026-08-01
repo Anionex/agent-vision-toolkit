@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the proxy's image -> glance rewrite chain end to end.
+"""Verify the proxy's image -> text rewrite chain end to end.
 
 Usage: test_view_image_chain.py [--proxy URL] [--model SLUG] <image-path>
 
@@ -89,7 +89,7 @@ def main():
     answer = m.group(1) if m else "(no output_text found)"
     print("deepseek answer:", answer[:300])
     if "unable to see the image" in answer.lower() or "unsupported" in answer.lower():
-        print("FAIL: image was NOT replaced by a glance description")
+        print("FAIL: image was NOT replaced by a text description")
         sys.exit(1)
     print("PASS: image was described via the vision rewrite chain")
     sys.exit(0)

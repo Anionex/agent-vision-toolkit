@@ -13,8 +13,6 @@
     <string>__PORT__</string>
     <string>--upstream</string>
     <string>https://api.deepseek.com</string>
-    <string>--glance-cmd</string>
-    <string>/usr/local/bin/glance</string>
     <string>--model-map</string>
     <string>gpt-5.2=deepseek-v4-flash</string>
     <string>--log</string>

@@ -3,7 +3,7 @@
 #   1. proxy is listening on the expected port
 #   2. catalog model has image modality (view_image passes its check)
 #   3. config points Codex at the proxy
-#   4. optional: real image -> proxy -> glance -> DeepSeek round trip
+#   4. optional: real image -> proxy -> vision -> DeepSeek round trip
 #
 # Usage: ./verify.sh [image-path]   (image-path triggers the live round trip)
 
