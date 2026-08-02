@@ -106,7 +106,28 @@ def test_failure_is_not_forwarded():
     print("PASS: failed vision call is not converted into an error description")
 
 
+def test_failure_reason_is_included():
+    mod = _load_proxy()
+
+    def boom(_url):
+        raise mod.VisionError("Vision API HTTP 403: balance insufficient")
+
+    mod._image_desc_from_url = boom
+    body = {"input": [{"type": "message", "content": [
+        {"type": "input_image", "image_url": "data:image/png;base64,AAA"}
+    ]}]}
+    try:
+        asyncio.run(mod._rewrite_image_inputs(body))
+    except mod.VisionError as exc:
+        assert "balance insufficient" in str(exc), exc
+        assert "not forwarded" in str(exc), exc
+    else:
+        raise AssertionError("failed vision calls must raise")
+    print("PASS: failure reason is included in the raised error")
+
+
 if __name__ == "__main__":
     test_shapes()
     test_parallel()
     test_failure_is_not_forwarded()
+    test_failure_reason_is_included()

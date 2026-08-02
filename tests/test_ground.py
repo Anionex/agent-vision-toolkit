@@ -61,8 +61,8 @@ def test_output_format():
         ground.Match("second", (900, 700, 1000, 800)),
     ]
     lines = ground.format_matches(multiple, 1200, 900)
-    assert lines[0].startswith("1. 左上 first ")
-    assert lines[1].startswith("2. 右下 second ")
+    assert lines[0].startswith("1. top-left first ")
+    assert lines[1].startswith("2. bottom-right second ")
 
 
 def main():

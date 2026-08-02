@@ -17,11 +17,11 @@ from vision_client import (  # noqa: E402
 
 def build_prompt(args):
     if args.ocr is not None:
-        extra = f" 额外要求：{args.ocr}" if args.ocr else ""
+        extra = f" Additional requirements: {args.ocr}" if args.ocr else ""
         return (
-            "请识别这张图片中的所有文字(包括标题、正文、标注、水印等全部可见文字),"
-            "直接逐字输出文字本身,一行接一行,不要遗漏任何字符,不要改写、总结、翻译,"
-            "不要添加任何前言、解释或额外内容。" + extra
+            "Transcribe every piece of visible text in this image verbatim (titles, body text, labels, watermarks, etc.), "
+            "line by line, without omitting any characters. Do not rewrite, summarize, or translate the text, "
+            "and do not add any preamble, explanation, or extra content." + extra
         )
     if args.query:
         return args.query
@@ -31,19 +31,19 @@ def build_prompt(args):
 def main():
     parser = argparse.ArgumentParser(
         prog="glance",
-        description="使用已配置的视觉模型进行图片描述、问答或 OCR",
+        description="Describe, answer questions about, or OCR an image with the configured vision model",
     )
-    parser.add_argument("image", help="图片路径")
+    parser.add_argument("image", help="path to the image")
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("-q", "--query", help="针对图片提问")
-    group.add_argument("--ocr", nargs="?", const="", metavar="额外要求", help="逐字识别图片文字")
+    group.add_argument("-q", "--query", help="ask a question about the image")
+    group.add_argument("--ocr", nargs="?", const="", metavar="EXTRA", help="transcribe all visible text verbatim")
     args = parser.parse_args()
     load_default_env()
     try:
         answer = describe_image(
             image_path_to_data_url(args.image),
             build_prompt(args),
-            max_tokens=8192,
+            max_tokens=None,  # no output cap; the vision model decides
             apply_lang=args.ocr is None,
         )
     except VisionError as exc:

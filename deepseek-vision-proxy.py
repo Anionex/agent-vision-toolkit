@@ -45,11 +45,7 @@ def _image_desc_from_url(image_url):
     cached = _DESC_CACHE.get(key)
     if cached is not None:
         return cached
-    try:
-        description = describe_image(image_url)
-    except VisionError as exc:
-        _log(f"[vision-proxy] image description failed: {exc}")
-        return None
+    description = describe_image(image_url)
     if len(_DESC_CACHE) >= 128:
         _DESC_CACHE.pop(next(iter(_DESC_CACHE)))
     _DESC_CACHE[key] = description
@@ -78,12 +74,25 @@ async def _rewrite_image_inputs(parsed):
 
     async def run(url):
         async with semaphore:
-            return url, await asyncio.to_thread(_image_desc_from_url, url)
+            try:
+                return url, await asyncio.to_thread(_image_desc_from_url, url)
+            except VisionError as exc:
+                _log(f"[vision-proxy] image description failed: {exc}")
+                return url, exc
 
-    descriptions = dict(await asyncio.gather(*(run(url) for url in urls)))
-    failed = sum(value is None for value in descriptions.values())
-    if failed:
-        raise VisionError(f"{failed} 张图片描述失败；未将原图转发给纯文本模型")
+    results = await asyncio.gather(*(run(url) for url in urls))
+    descriptions = {}
+    errors = []
+    for url, value in results:
+        if value is None or isinstance(value, VisionError):
+            errors.append(str(value) if isinstance(value, VisionError) else "image description failed")
+        else:
+            descriptions[url] = value
+    if errors:
+        details = "；".join(dict.fromkeys(errors))
+        raise VisionError(
+            f"{len(errors)} image(s) failed to describe; original images were not forwarded to the text-only model: {details}"
+        )
     prefix = "[local vision model description] "
     for item, field, index, url in jobs:
         item[field][index] = {"type": "input_text", "text": prefix + descriptions[url]}
@@ -203,7 +212,7 @@ class Proxy:
         except Exception as exc:
             _log(f"[vision-proxy] handler error: {exc!r}")
             if not response_started:
-                await self._send_error(writer, 502, "上游代理请求失败")
+                await self._send_error(writer, 502, "Upstream proxy request failed")
         finally:
             if response is not None:
                 response.close()
@@ -227,7 +236,7 @@ class Proxy:
         try:
             return await asyncio.to_thread(open_request)
         except urllib.error.URLError as exc:
-            raise RuntimeError(f"上游网络错误: {exc.reason}") from exc
+            raise RuntimeError(f"Upstream network error: {exc.reason}") from exc
 
     async def _send_response(self, writer, response):
         status = getattr(response, "status", None) or getattr(response, "code", 502)

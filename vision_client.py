@@ -13,7 +13,7 @@ import time
 import urllib.error
 import urllib.request
 
-DEFAULT_PROMPT = "请详细描述这张图片中的内容。"
+DEFAULT_PROMPT = "Please describe the contents of this image in detail."
 
 LANG_INSTRUCTIONS = {
     "zh": "请使用简体中文回答。",
@@ -62,7 +62,7 @@ def load_default_env() -> None:
 def _required(name: str) -> str:
     value = os.environ.get(name, "").strip()
     if not value:
-        raise VisionError(f"缺少配置 {name}；请在 .env 中填写")
+        raise VisionError(f"Missing config {name}; fill it in the .env file")
     return value
 
 
@@ -74,10 +74,10 @@ def validate_vision_config() -> None:
 def image_path_to_data_url(path: str | os.PathLike[str]) -> str:
     image_path = Path(path).expanduser()
     if not image_path.is_file():
-        raise VisionError(f"图片不存在: {image_path}")
+        raise VisionError(f"Image not found: {image_path}")
     mime, _ = mimetypes.guess_type(image_path.name)
     if mime not in {"image/png", "image/jpeg", "image/gif", "image/webp"}:
-        raise VisionError("只支持 PNG、JPEG、GIF 和 WebP 图片")
+        raise VisionError("Only PNG, JPEG, GIF, and WebP images are supported")
     return f"data:{mime};base64,{base64.b64encode(image_path.read_bytes()).decode()}"
 
 
@@ -92,12 +92,12 @@ def _message_text(message: object) -> str:
     return ""
 
 
-def describe_image(image_url: str, prompt: str | None = None, max_tokens: int | None = None,
+def describe_image(image_url: str, prompt: str | None = None, max_tokens: int = 4096,
                    apply_lang: bool = True) -> str:
     """Describe a data/http image URL through an OpenAI-compatible endpoint."""
     validate_vision_config()
     if not image_url.startswith(("data:", "http://", "https://")):
-        raise VisionError("只支持 data URL 或 http(s) 图片 URL")
+        raise VisionError("Only data URLs or http(s) image URLs are supported")
     base_url = _required("VISION_BASE_URL").rstrip("/")
     api_key = _required("VISION_API_KEY")
     text = prompt or DEFAULT_PROMPT
@@ -107,12 +107,13 @@ def describe_image(image_url: str, prompt: str | None = None, max_tokens: int | 
             text = f"{instruction}\n\n{text}"
     payload = {
         "model": _required("VISION_MODEL"),
-        "max_tokens": max_tokens or 4096,
         "messages": [{"role": "user", "content": [
             {"type": "text", "text": text},
             {"type": "image_url", "image_url": {"url": image_url}},
         ]}],
     }
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
     request = urllib.request.Request(
         base_url + "/chat/completions",
         data=json.dumps(payload).encode(),
@@ -127,9 +128,9 @@ def describe_image(image_url: str, prompt: str | None = None, max_tokens: int | 
             try:
                 text = _message_text(data["choices"][0]["message"]["content"])
             except (KeyError, IndexError, TypeError) as exc:
-                raise VisionError("视觉 API 返回了不兼容的响应结构") from exc
+                raise VisionError("Vision API returned an incompatible response structure") from exc
             if not text:
-                raise VisionError("视觉 API 返回了空描述")
+                raise VisionError("Vision API returned an empty description")
             return text
         except urllib.error.HTTPError as exc:
             body = exc.read().decode(errors="replace")[:400].replace(api_key, "<redacted>")
@@ -137,13 +138,13 @@ def describe_image(image_url: str, prompt: str | None = None, max_tokens: int | 
             if exc.code in {429, 500, 502, 503, 504} and attempt < retries:
                 time.sleep(min(2 ** attempt, 4))
                 continue
-            raise VisionError(f"视觉 API HTTP {exc.code}: {body}") from exc
+            raise VisionError(f"Vision API HTTP {exc.code}: {body}") from exc
         except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as exc:
             if attempt < retries:
                 time.sleep(min(2 ** attempt, 4))
                 continue
             reason = getattr(exc, "reason", str(exc))
-            raise VisionError(f"视觉 API 网络错误: {reason}") from exc
+            raise VisionError(f"Vision API network error: {reason}") from exc
         except json.JSONDecodeError as exc:
-            raise VisionError("视觉 API 返回了无效 JSON") from exc
-    raise VisionError("视觉 API 请求失败")
+            raise VisionError("Vision API returned invalid JSON") from exc
+    raise VisionError("Vision API request failed")

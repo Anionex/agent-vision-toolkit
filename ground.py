@@ -71,14 +71,14 @@ def _items(text: str) -> list[Any]:
         fallback = _fallback_items(cleaned)
         if fallback:
             return fallback
-        raise GroundError("视觉 API 没有返回可解析的边界框 JSON")
+        raise GroundError("Vision API did not return parseable bounding-box JSON")
     if isinstance(payload, list):
         return payload
     if isinstance(payload, dict):
         for key in ("boxes", "bounding_boxes", "bboxes", "objects", "items", "results"):
             if isinstance(payload.get(key), list):
                 return payload[key]
-    raise GroundError("视觉 API 返回的边界框 JSON 结构不兼容")
+    raise GroundError("Vision API returned an incompatible bounding-box JSON structure")
 
 
 def _normalize_box(item: dict[str, Any], width: int, height: int) -> tuple[int, int, int, int] | None:
@@ -122,13 +122,13 @@ def parse_matches(text: str, width: int, height: int, target: str) -> list[Match
 
 def locate(image_path: Path, target: str) -> list[Match]:
     if Image is None:
-        raise GroundError("ground 需要 Pillow；请先安装可选依赖 pillow")
+        raise GroundError("ground requires Pillow; install the optional dependency pillow first")
     load_default_env()
     try:
         with Image.open(image_path) as image:
             width, height = image.size
     except (OSError, ValueError) as exc:
-        raise GroundError(f"无法读取图片: {image_path}") from exc
+        raise GroundError(f"Cannot read image: {image_path}") from exc
     response = describe_image(image_path_to_data_url(image_path), build_prompt(target), max_tokens=2048)
     return parse_matches(response, width, height, target)
 
@@ -137,12 +137,12 @@ def _position(box: tuple[int, int, int, int], width: int, height: int) -> str:
     x1, y1, x2, y2 = box
     x = (x1 + x2) / 2
     y = (y1 + y2) / 2
-    horizontal = "左" if x < width / 3 else ("右" if x > width * 2 / 3 else "中")
-    vertical = "上" if y < height / 3 else ("下" if y > height * 2 / 3 else "中")
+    horizontal = "left" if x < width / 3 else ("right" if x > width * 2 / 3 else "center")
+    vertical = "top" if y < height / 3 else ("bottom" if y > height * 2 / 3 else "center")
     return {
-        ("左", "上"): "左上", ("中", "上"): "上", ("右", "上"): "右上",
-        ("左", "中"): "左", ("中", "中"): "中央", ("右", "中"): "右",
-        ("左", "下"): "左下", ("中", "下"): "下", ("右", "下"): "右下",
+        ("left", "top"): "top-left", ("center", "top"): "top", ("right", "top"): "top-right",
+        ("left", "center"): "left", ("center", "center"): "center", ("right", "center"): "right",
+        ("left", "bottom"): "bottom-left", ("center", "bottom"): "bottom", ("right", "bottom"): "bottom-right",
     }[(horizontal, vertical)]
 
 
@@ -161,15 +161,15 @@ def format_matches(matches: list[Match], width: int, height: int) -> list[str]:
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="ground",
-        description="用自然语言定位图片中的目标并输出像素坐标",
+        description="Locate targets in an image with natural language and output pixel coordinates",
     )
-    parser.add_argument("image", type=Path, help="图片路径")
-    parser.add_argument("target", help="要定位的对象或区域")
+    parser.add_argument("image", type=Path, help="path to the image")
+    parser.add_argument("target", help="target object or region to locate")
     args = parser.parse_args()
     try:
         matches = locate(args.image.expanduser(), args.target)
         if Image is None:
-            raise GroundError("ground 需要 Pillow；请先安装可选依赖 pillow")
+            raise GroundError("ground requires Pillow; install the optional dependency pillow first")
         with Image.open(args.image.expanduser()) as image:
             width, height = image.size
     except (GroundError, VisionError) as exc:
