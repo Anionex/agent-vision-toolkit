@@ -19,6 +19,15 @@
   <img src="assets/effect-2.jpg" alt="Codex 里的 DeepSeek 看图排查界面字段不一致 bug" width="49%">
 </p>
 
+*左：DeepSeek V4 回答 UI 背景风格问题并对比相近风格；右：DeepSeek V4 根据截图排查字段名称不符预期的 bug。*
+
+<p align="center">
+  <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
+  <img src="assets/effect-4.jpg" alt="DeepSeek V4 用 glance/ground 定位屏幕元素自主游玩国际象棋" width="49%">
+</p>
+
+*左：安装可选 `glance` 后的多轮图片问答；右：安装 `ground` 后，DeepSeek V4 定位屏幕视觉元素，自主游玩国际象棋。*
+
 ## 亮点
 
 - **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图

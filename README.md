@@ -19,6 +19,15 @@ All code has been verified in real Codex + DeepSeek sessions. Use cases include 
   <img src="assets/effect-2.jpg" alt="DeepSeek in Codex debugging mismatched UI fields from a screenshot" width="49%">
 </p>
 
+*Left: DeepSeek V4 answers a UI style question with similar-style comparisons. Right: DeepSeek V4 debugs a field-name mismatch from a screenshot.*
+
+<p align="center">
+  <img src="assets/effect-3.jpg" alt="Multi-round image Q&A with the optional glance CLI" width="49%">
+  <img src="assets/effect-4.jpg" alt="DeepSeek V4 playing chess by locating screen elements with glance/ground" width="49%">
+</p>
+
+*Left: multi-round image Q&A after installing the optional `glance` CLI. Right: after installing `ground`, DeepSeek V4 locates screen elements to play chess autonomously.*
+
 ## Highlights
 
 - **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
