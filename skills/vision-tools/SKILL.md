@@ -1,6 +1,6 @@
 ---
 name: vision-tools
-description: Use the locally installed glance and ground CLIs for image analysis. Use when the user asks to describe, view, answer questions about, or OCR an image, locate an object/region in an image and get pixel coordinates, or mentions glance/ground. If the commands are missing, report that the tools are not installed.
+description: Use the locally installed glance and ground CLIs for image analysis. Use when the user asks to describe, view, answer questions about, or OCR an image, locate an object/region in an image and get pixel coordinates, or mentions glance/ground — and to re-examine an image when a proxy-provided "[vision model description ...]" lacks the detail you need. If the commands are missing, report that the tools are not installed.
 ---
 
 # vision-tools
@@ -13,12 +13,15 @@ The codex-deepseek-vision project installs the following CLIs on this machine. T
 ## glance
 
 ```bash
-glance <image>                   # describe the image in detail
-glance <image> -q "<question>"   # ask a question about the image
-glance <image> --ocr             # verbatim OCR of all visible text
+glance <image>                            # describe the image in detail
+glance <image> -q "<question>"            # ask a question about the image
+glance <image> --ocr                      # verbatim OCR of all visible text
+glance <image> --region X1,Y1,X2,Y2 -q "<question>"  # crop first; ask about the crop only
 ```
 
 Output language follows the `LANG` setting in the vision config (`zh`/`en`).
+`--region` crops locally and uploads only the crop — use it to zoom into small
+text or icons that a full-image pass missed (requires the optional `pillow`).
 
 ## ground
 
@@ -27,6 +30,20 @@ ground <image> "<target description>"
 ```
 
 Output format: `x1: .., y1: .., x2: .., y2: ..` (pixel coordinates in the original image).
+
+## Re-examining an image (follow-up looks)
+
+Image content in this conversation may arrive as text starting with
+`[vision model description ...]` — a one-shot transcription made by a vision
+model on your behalf. If it lacks a detail you need and the image's file path
+is visible in the conversation (pasted images live at a `codex-clipboard-*.png`
+temp path; `view_image` calls name their path explicitly), look again yourself:
+
+1. `glance <path> -q "<the specific detail you need>"` — targeted follow-up question.
+2. `ground <path> "<target>"` then `glance <path> --region <that box> -q "..."` —
+   locate, zoom in, and read small text or fine detail.
+
+If the file no longer exists (temp files are cleaned up), say so instead of guessing.
 
 ## Notes
 
