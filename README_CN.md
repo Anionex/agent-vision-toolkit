@@ -12,7 +12,7 @@
 
 所有代码均已在真实 Codex + DeepSeek 会话中验证过。可用场景包括但不限于：图片问答，截图分析，Computer Use GUI界面操作，多步图像推理
 
-如果你正在用的 agent 不是 Codex，也可以尝试一下安装项目里的 [visual toolkit](#安装-codex-skill可选)，提供了 cli 让 agent 与图片交互
+如果你正在用的 agent 不是 Codex，也可以尝试一下安装项目里的 [visual toolkit](#安装-vision-tools-skill可选)，提供了 cli 让 agent 与图片交互
 
 > 如果项目对你有用，欢迎 star🌟 & follow～，我会分享更多的实用工具和技巧
 > 
@@ -37,9 +37,10 @@
 
 - **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图
 - **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
-- **同图只调一次**：按图片 sha256 缓存描述，同一张图反复出现不重复调用视觉 API，缓存命中近乎零延迟。
+- **同图只调一次**：按（图片, prompt）缓存描述，同一张图反复出现不重复调用视觉 API，缓存命中近乎零延迟。
 - **可选 `glance`**：简洁的独立cli工具，用于image qa 或 OCR，以提供更加灵活的图片理解能力。
 - **可选 `ground`**：用自然语言定位图片中的目标，输出原图像素坐标下的边界框。
+- **可选 `trace`**：本地确定性图转 SVG 描摹，输出精确形状几何，不经过视觉 API。
 - **后续可能加入的更多视觉工具** 
 
 ## 使用方式
@@ -114,7 +115,7 @@ trace diagram.png --polygon
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 ```
 
-## 安装 Codex skill（可选）
+## 安装 vision-tools skill（可选）
 
 安装额外视觉工具包的方式之一，是安装仓库内附带的 `vision-tools` skill：它告诉 Codex `glance`/`ground` 是什么以及怎么用。使用官方 skills CLI 安装：
 

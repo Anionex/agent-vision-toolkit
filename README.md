@@ -12,7 +12,7 @@ If your Codex is already connected to DeepSeek, but you're frustrated that the m
 
 All code has been verified in real Codex + DeepSeek sessions. Use cases include but are not limited to: image Q&A, screenshot analysis, Computer Use GUI operation, and multi-step image reasoning.
 
-If the agent you're using isn't Codex, you can also try installing the [visual toolkit](#install-the-codex-skill-optional) from this repository — it provides CLIs that let agents interact with images.
+If the agent you're using isn't Codex, you can also try installing the [visual toolkit](#install-the-vision-tools-skill-optional) from this repository — it provides CLIs that let agents interact with images.
 
 > If this project helps you, feel free to star🌟 & follow～ I'll keep sharing more practical tools and tips.
 
@@ -36,9 +36,10 @@ If the agent you're using isn't Codex, you can also try installing the [visual t
 
 - **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
 - **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
-- **Same image, one call**: descriptions are cached by image sha256, so the same image appearing repeatedly doesn't re-invoke the vision API; cache hits are nearly zero-latency.
+- **Same image, one call**: descriptions are cached per (image, prompt), so the same image appearing repeatedly doesn't re-invoke the vision API; cache hits are nearly zero-latency.
 - **Optional `glance`**: a concise standalone CLI for image Q&A or OCR, offering more flexible image understanding.
 - **Optional `ground`**: locate a target in an image with natural language and get a bounding box in original pixel coordinates.
+- **Optional `trace`**: local, deterministic image-to-SVG tracing for exact shape geometry — no vision API involved.
 - **More vision tools may be added later**
 
 ## Usage
@@ -114,7 +115,7 @@ trace diagram.png --polygon
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 ```
 
-## Install the Codex Skill (optional)
+## Install the vision-tools Skill (optional)
 
 One way to install the extra vision tools into Codex is the bundled `vision-tools` skill, which tells Codex what `glance`/`ground` are and how to use them. Install it with the official skills CLI:
 
