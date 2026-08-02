@@ -5,7 +5,7 @@ description: Use the locally installed glance and ground CLIs for image analysis
 
 # vision-tools
 
-The codex-deepseek-vision project installs the following CLIs on this machine. They share the same vision config as the proxy (`VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL` / `LANG`) — no extra credentials needed:
+The codex-vision-proxy project installs the following CLIs on this machine. They share the same vision config as the proxy (`VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL` / `LANG`) — no extra credentials needed:
 
 - `glance`: image description, Q&A, and OCR
 - `ground`: locate targets in an image with natural language and get bounding boxes in original pixel coordinates
@@ -52,6 +52,6 @@ If the file no longer exists (temp files are cleaned up), say so instead of gues
 - If `glance`/`ground` are not found, the optional tools were not installed — report this to the user instead of improvising a replacement.
 - If the vision API fails, relay the error faithfully; never fabricate image content.
 
-Source repository: https://github.com/Anionex/codex-deepseek-vision
+Source repository: https://github.com/Anionex/codex-vision-proxy
 
-If the tools are not installed, see the installation guide: https://github.com/Anionex/codex-deepseek-vision/blob/main/AGENT_INSTALL.md
+If the tools are not installed, see the installation guide: https://github.com/Anionex/codex-vision-proxy/blob/main/AGENT_INSTALL.md

@@ -1,6 +1,6 @@
 <div align="center">
 
-# codex-deepseek-vision
+# codex-vision-proxy
 
 🌐 **语言 / Language**：**中文** ｜ [**English**](README.md)
 
@@ -108,7 +108,7 @@ x1: 1067, y1: 841, x2: 1108, y2: 881
 安装额外视觉工具包的方式之一，是安装仓库内附带的 `vision-tools` skill：它告诉 Codex `glance`/`ground` 是什么以及怎么用。使用官方 skills CLI 安装：
 
 ```bash
-npx skills add Anionex/codex-deepseek-vision --skill vision-tools -a codex -g --copy -y
+npx skills add Anionex/codex-vision-proxy --skill vision-tools -a codex -g --copy -y
 ```
 
 也可以手动复制：

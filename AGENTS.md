@@ -1,4 +1,4 @@
-# AGENTS.md — codex-deepseek-vision
+# AGENTS.md — codex-vision-proxy
 
 ## 项目目标
 

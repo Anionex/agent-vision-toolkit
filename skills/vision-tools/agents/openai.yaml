@@ -1,4 +1,4 @@
 interface:
-  display_name: "codex-deepseek-vision vision tools"
+  display_name: "codex-vision-proxy vision tools"
   short_description: "Image description, Q&A, OCR, and target location with glance/ground"
   default_prompt: "Use $vision-tools to analyze this image with glance or ground."

@@ -1,6 +1,6 @@
 <div align="center">
 
-# codex-deepseek-vision
+# codex-vision-proxy
 
 🌐 [**中文**](README_CN.md) ｜ **English**
 
@@ -108,7 +108,7 @@ It analyzes one full image per call and outputs the target's pixel coordinates i
 One way to install the extra vision tools into Codex is the bundled `vision-tools` skill, which tells Codex what `glance`/`ground` are and how to use them. Install it with the official skills CLI:
 
 ```bash
-npx skills add Anionex/codex-deepseek-vision --skill vision-tools -a codex -g --copy -y
+npx skills add Anionex/codex-vision-proxy --skill vision-tools -a codex -g --copy -y
 ```
 
 Or copy the folder manually:
