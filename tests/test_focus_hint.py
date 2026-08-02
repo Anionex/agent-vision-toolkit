@@ -70,12 +70,50 @@ def test_prompt_always_asks_for_full_description():
     print("PASS: every hint gets the same describe-and-transcribe instruction")
 
 
-def test_hint_is_truncated():
+def test_hint_is_truncated_keeping_the_tail():
     mod = _load_proxy()
-    prompt = mod._vision_prompt("x" * 5000)
-    assert "x" * mod.FOCUS_HINT_MAX_CHARS in prompt
+    prompt = mod._vision_prompt("HEAD-LOG " + "x" * mod.FOCUS_HINT_MAX_CHARS + " TAIL-QUESTION")
+    assert "TAIL-QUESTION" in prompt, "the question at the end of a long message must survive"
+    assert "HEAD-LOG" not in prompt
     assert "x" * (mod.FOCUS_HINT_MAX_CHARS + 1) not in prompt
-    print("PASS: oversized hints are truncated")
+    print("PASS: oversized hints keep the tail, where the question lives")
+
+
+def test_view_image_uses_assistant_intent():
+    mod = _load_proxy()
+    prompts = _capture(mod)
+    body = {"input": [
+        {"type": "message", "role": "user",
+         "content": [{"type": "input_text", "text": "修复登录页样式"}]},
+        {"type": "message", "role": "assistant",
+         "content": [{"type": "output_text", "text": "我看一下失败截图确认按钮颜色"}]},
+        {"type": "function_call", "name": "view_image", "call_id": "c1",
+         "arguments": "{\"path\": \"/tmp/a.png\"}"},
+        {"type": "function_call_output", "call_id": "c1",
+         "output": [{"type": "input_image", "image_url": "data:image/png;base64,AAA"}]},
+    ]}
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+    assert "确认按钮颜色" in prompts[0], prompts[0]
+    assert "decided to view" in prompts[0]
+    assert "修复登录页样式" not in prompts[0], "assistant intent replaces, not augments, the user text"
+    print("PASS: tool-fetched images ride the assistant's stated intent")
+
+
+def test_new_user_turn_resets_assistant_intent():
+    mod = _load_proxy()
+    prompts = _capture(mod)
+    body = {"input": [
+        {"type": "message", "role": "assistant",
+         "content": [{"type": "output_text", "text": "上一轮的旧意图"}]},
+        {"type": "message", "role": "user",
+         "content": [{"type": "input_text", "text": "看看这个图表的趋势"}]},
+        {"type": "function_call_output", "call_id": "c1",
+         "output": [{"type": "input_image", "image_url": "data:image/png;base64,AAA"}]},
+    ]}
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+    assert "图表的趋势" in prompts[0], prompts[0]
+    assert "旧意图" not in prompts[0], "intent from before the latest user turn is stale"
+    print("PASS: a new user turn invalidates earlier assistant intent")
 
 
 def test_cache_is_per_prompt():
@@ -107,6 +145,8 @@ if __name__ == "__main__":
     test_hint_reaches_vision_prompt()
     test_same_message_text_is_used()
     test_prompt_always_asks_for_full_description()
-    test_hint_is_truncated()
+    test_hint_is_truncated_keeping_the_tail()
+    test_view_image_uses_assistant_intent()
+    test_new_user_turn_resets_assistant_intent()
     test_cache_is_per_prompt()
     test_rewrite_prefix_is_stable()

@@ -25,7 +25,7 @@ def _header_value(headers, name):
 
 _DESC_CACHE = {}
 
-FOCUS_HINT_MAX_CHARS = 2000
+FOCUS_HINT_MAX_CHARS = 500
 
 _ROLE_PROMPT = (
     "You are the eyes of a text-only coding assistant that cannot see images. "
@@ -40,11 +40,18 @@ _DESCRIBE_PROMPT = (
 )
 
 
-def _vision_prompt(hint):
-    hint = (hint or "").strip()[:FOCUS_HINT_MAX_CHARS]
+_HINT_LABELS = {
+    "user": "The user's current request, so you know which details matter most:",
+    "assistant": "Why the coding assistant decided to view this image, so you know which details matter most:",
+}
+
+
+def _vision_prompt(hint, source="user"):
+    # Keep the tail: long messages put the material first and the question last.
+    hint = (hint or "").strip()[-FOCUS_HINT_MAX_CHARS:]
     parts = [_ROLE_PROMPT]
     if hint:
-        parts.append("The user's current request, so you know which details matter most:\n" + hint)
+        parts.append(_HINT_LABELS[source] + "\n" + hint)
     parts.append(_DESCRIBE_PROMPT)
     return "\n\n".join(parts)
 
@@ -81,22 +88,36 @@ async def _rewrite_image_inputs(parsed):
         return False
     jobs = []
     last_user_text = ""
+    last_assistant_text = ""
     for item in inputs:
         if not isinstance(item, dict):
             continue
-        if item.get("role") == "user":
+        role = item.get("role")
+        if role in ("user", "assistant"):
+            wanted = "input_text" if role == "user" else "output_text"
             texts = [value["text"] for value in item.get("content") or []
-                     if isinstance(value, dict) and value.get("type") == "input_text"
+                     if isinstance(value, dict) and value.get("type") == wanted
                      and isinstance(value.get("text"), str)]
             if any(text.strip() for text in texts):
-                last_user_text = "\n".join(texts)
+                if role == "user":
+                    last_user_text = "\n".join(texts)
+                    # A new user turn makes earlier assistant intent stale.
+                    last_assistant_text = ""
+                else:
+                    last_assistant_text = "\n".join(texts)
         for field in ("content", "output"):
             values = item.get(field)
             if not isinstance(values, list):
                 continue
             for index, value in enumerate(values):
                 if isinstance(value, dict) and value.get("type") == "input_image" and isinstance(value.get("image_url"), str):
-                    jobs.append((item, field, index, value["image_url"], _vision_prompt(last_user_text)))
+                    # Pasted images (content) ride the user's request; tool-fetched
+                    # images (output) ride the assistant's stated reason for looking.
+                    if field == "output" and last_assistant_text:
+                        prompt = _vision_prompt(last_assistant_text, "assistant")
+                    else:
+                        prompt = _vision_prompt(last_user_text)
+                    jobs.append((item, field, index, value["image_url"], prompt))
     if not jobs:
         return False
     requests = list(dict.fromkeys((job[3], job[4]) for job in jobs))
