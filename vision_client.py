@@ -92,12 +92,16 @@ def _message_text(message: object) -> str:
     return ""
 
 
-def describe_image(image_url: str, prompt: str | None = None, max_tokens: int = 4096,
+def describe_image(image_url: str | list[str], prompt: str | None = None, max_tokens: int = 4096,
                    apply_lang: bool = True) -> str:
-    """Describe a data/http image URL through an OpenAI-compatible endpoint."""
+    """Describe one data/http image URL (str) or several (list) in a single call."""
     validate_vision_config()
-    if not image_url.startswith(("data:", "http://", "https://")):
-        raise VisionError("Only data URLs or http(s) image URLs are supported")
+    urls = [image_url] if isinstance(image_url, str) else list(image_url)
+    if not urls:
+        raise VisionError("No image was provided")
+    for url in urls:
+        if not url.startswith(("data:", "http://", "https://")):
+            raise VisionError("Only data URLs or http(s) image URLs are supported")
     base_url = _required("VISION_BASE_URL").rstrip("/")
     api_key = _required("VISION_API_KEY")
     text = prompt or DEFAULT_PROMPT
@@ -107,9 +111,8 @@ def describe_image(image_url: str, prompt: str | None = None, max_tokens: int = 
             text = f"{instruction}\n\n{text}"
     payload = {
         "model": _required("VISION_MODEL"),
-        "messages": [{"role": "user", "content": [
-            {"type": "text", "text": text},
-            {"type": "image_url", "image_url": {"url": image_url}},
+        "messages": [{"role": "user", "content": [{"type": "text", "text": text}] + [
+            {"type": "image_url", "image_url": {"url": url}} for url in urls
         ]}],
     }
     if max_tokens is not None:

@@ -40,16 +40,22 @@ def region_data_url(path, region):
     return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
 
 
-def build_prompt(args):
+def build_prompt(args, count):
     if args.ocr is not None:
         extra = f" Additional requirements: {args.ocr}" if args.ocr else ""
+        scope = "these images" if count > 1 else "this image"
         return (
-            "Transcribe every piece of visible text in this image verbatim (titles, body text, labels, watermarks, etc.), "
+            f"Transcribe every piece of visible text in {scope} verbatim (titles, body text, labels, watermarks, etc.), "
             "line by line, without omitting any characters. Do not rewrite, summarize, or translate the text, "
-            "and do not add any preamble, explanation, or extra content." + extra
+            "and do not add any preamble, explanation, or extra content."
+            + (" Label each image's text with its ordinal (Image 1, Image 2, ...)." if count > 1 else "")
+            + extra
         )
     if args.query:
         return args.query
+    if count > 1:
+        return ("Describe each image in detail (label them Image 1, Image 2, ...), "
+                "then point out the notable differences between them.")
     return None
 
 
@@ -58,18 +64,23 @@ def main():
         prog="glance",
         description="Describe, answer questions about, or OCR an image with the configured vision model",
     )
-    parser.add_argument("image", help="path to the image")
+    parser.add_argument("images", nargs="+", metavar="image",
+                        help="path(s) to the image(s); pass several to compare them in one call")
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("-q", "--query", help="ask a question about the image")
+    group.add_argument("-q", "--query", help="ask a question about the image(s)")
     group.add_argument("--ocr", nargs="?", const="", metavar="EXTRA", help="transcribe all visible text verbatim")
     parser.add_argument("--region", metavar="X1,Y1,X2,Y2",
                         help="crop to this pixel box (e.g. from ground) and send only the crop")
     args = parser.parse_args()
     load_default_env()
     try:
+        if args.region and len(args.images) > 1:
+            raise VisionError("--region works with exactly one image")
+        urls = ([region_data_url(args.images[0], args.region)] if args.region
+                else [image_path_to_data_url(path) for path in args.images])
         answer = describe_image(
-            region_data_url(args.image, args.region) if args.region else image_path_to_data_url(args.image),
-            build_prompt(args),
+            urls,
+            build_prompt(args, len(urls)),
             max_tokens=None,  # no output cap; the vision model decides
             apply_lang=args.ocr is None,
         )

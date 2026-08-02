@@ -121,6 +121,13 @@ def main():
         assert Handler.calls == 1
 
         Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
+        vision_client.describe_image(["data:image/png;base64,AAAA", "data:image/png;base64,BBBB"])
+        content = json.loads(Handler.last_body)["messages"][0]["content"]
+        image_parts = [part for part in content if part.get("type") == "image_url"]
+        assert len(image_parts) == 2, "a list of URLs must become one request with all images"
+        assert Handler.calls == 1
+
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         with tempfile.TemporaryDirectory() as raw:
             image = Path(raw) / "fixture.png"
             image.write_bytes(b"\x89PNG\r\n\x1a\nfixture")
@@ -138,6 +145,17 @@ def main():
                 env=isolated_env, cwd=raw, text=True, capture_output=True, check=True,
             )
             assert result.stdout.strip() == "fixture answer"
+
+            Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
+            result = subprocess.run(
+                [str(Path(__file__).resolve().parent.parent / "bin/glance"), str(image), str(image),
+                 "-q", "differences?"],
+                env=isolated_env, cwd=raw, text=True, capture_output=True, check=True,
+            )
+            assert result.stdout.strip() == "fixture answer"
+            content = json.loads(Handler.last_body)["messages"][0]["content"]
+            assert sum(part.get("type") == "image_url" for part in content) == 2, \
+                "glance with two paths must send both images in one call"
     finally:
         server.shutdown()
         os.environ.clear()

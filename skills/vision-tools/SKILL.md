@@ -17,7 +17,13 @@ glance <image>                            # describe the image in detail
 glance <image> -q "<question>"            # ask a question about the image
 glance <image> --ocr                      # verbatim OCR of all visible text
 glance <image> --region X1,Y1,X2,Y2 -q "<question>"  # crop first; ask about the crop only
+glance <img1> <img2> [...] -q "<question>"  # several images in ONE call (compare/diff)
 ```
+
+For comparisons (before/after, two renders, expected vs actual) always pass
+both paths to a single glance call — separate calls cannot see both images at
+once. Paths are space-separated. Without `-q`, multiple images get a
+describe-then-diff answer by default. `--region` accepts exactly one image.
 
 Output language follows the `LANG` setting in the vision config (`zh`/`en`).
 `--region` crops locally and uploads only the crop — use it to zoom into small
