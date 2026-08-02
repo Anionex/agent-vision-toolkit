@@ -11,21 +11,9 @@ The codex-vision-proxy project installs the following CLIs on this machine. They
 - `ground`: locate targets in an image with natural language and get bounding boxes in original pixel coordinates
 - `trace`: local deterministic image-to-SVG tracing for exact shape geometry (no vision API involved)
 
-## How to look: coarse to fine
-
-1. Start with one full-image pass (the proxy description if present,
-   otherwise `glance`) to get the layout and an inventory of what is where.
-2. For any element that matters, locate it with `ground`, then zoom with
-   `glance --region <box> -q "..."` — full-image passes routinely miss
-   small text and icons; a crop puts all the pixels on one detail, so the
-   model sees it at effectively higher resolution.
-3. Never trust vision answers for pixel-level facts (exact colors, small
-   offsets): sample the pixels with code (Pillow) instead. A vision model
-   will confidently report syntax highlighting that a pixel scan proves
-   is not there.
-4. Verify anything you build from an image (HTML, SVG, a layout) by
-   rendering it and pixel-diffing against the original — never by
-   comparing descriptions.
+For multi-step image work (UI restoration, detailed screenshot analysis,
+asset extraction), first read `METHOD.md` next to this file — it holds the
+coarse-to-fine looking method and when to ship vs hand-write traced SVG.
 
 ## glance
 
@@ -110,12 +98,8 @@ Applications (non-exhaustive):
   paths (or skip SVG and compute on pixels directly) rather than asking
   glance for numbers.
 
-Ship the traced SVG as-is for organic or irregular shapes — that is where
-hand-writing loses (see the numbers above). For simple geometry (rects,
-circles, pills) or SVG that will be edited later, use the trace as a
-measurement reference instead: read exact positions, sizes, and radii from
-its paths, hand-write clean primitives from them, then pixel-diff your
-version against the original so the error stays bounded.
+Whether to ship the traced SVG or hand-write from it depends on the shape —
+see `METHOD.md`.
 
 Reusing the output correctly (both traps have burned a real session):
 
