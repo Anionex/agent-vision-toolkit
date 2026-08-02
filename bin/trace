@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""trace: deterministic image-to-SVG tracing for exact shape geometry.
+
+Runs fully local (no vision API, no credentials): coordinates come from the
+actual pixels, so use this instead of asking a vision model for shapes,
+sizes, or outlines. Flat, high-contrast graphics only; text becomes curves.
+"""
+
+import argparse
+from pathlib import Path
+import re
+import sys
+import tempfile
+
+WHITE_FILLS = {"#ffffff", "#fff", "white"}
+
+
+def strip_background(svg):
+    """Drop the leading full-canvas white path vtracer emits for the background."""
+    match = re.search(r"<path [^>]*/>", svg)
+    if match:
+        fill = re.search(r'fill="([^"]+)"', match.group(0))
+        if fill and fill.group(1).strip().lower() in WHITE_FILLS:
+            return svg.replace(match.group(0), "", 1)
+    return svg
+
+
+def truncate_decimals(svg, places=2):
+    return re.sub(r"-?\d+\.\d{3,}", lambda m: f"{float(m.group()):.{places}f}", svg)
+
+
+def prepare_input(path, region, scale):
+    """Crop/upscale with Pillow when requested; return a path vtracer can read."""
+    if not region and scale == 1:
+        return str(path)
+    try:
+        from PIL import Image
+    except ImportError:
+        sys.exit("trace: --region/--scale require Pillow; install the optional dependency pillow first")
+    with Image.open(path) as image:
+        if region:
+            try:
+                x1, y1, x2, y2 = (int(v) for v in region.split(","))
+            except ValueError:
+                sys.exit("trace: --region expects four integers: X1,Y1,X2,Y2 (pixels)")
+            box = (max(0, min(x1, x2)), max(0, min(y1, y2)),
+                   min(image.width, max(x1, x2)), min(image.height, max(y1, y2)))
+            if box[2] <= box[0] or box[3] <= box[1]:
+                sys.exit(f"trace: --region {region} is empty after clamping to {image.width}x{image.height}")
+            image = image.crop(box)
+        if scale != 1:
+            image = image.resize((image.width * scale, image.height * scale), Image.LANCZOS)
+        handle = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        image.save(handle.name)
+        return handle.name
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="trace",
+        description="Trace an image into SVG with exact pixel-derived geometry (local, deterministic)",
+    )
+    parser.add_argument("image", help="path to the image")
+    parser.add_argument("--region", metavar="X1,Y1,X2,Y2",
+                        help="crop to this pixel box first (e.g. a box from ground)")
+    parser.add_argument("--scale", type=int, metavar="N",
+                        help="upscale N times before tracing (default: 2 with --region, else 1)")
+    parser.add_argument("--polygon", action="store_true",
+                        help="polygon mode for boxy diagrams/wireframes (default: spline for curved shapes)")
+    parser.add_argument("--color", action="store_true",
+                        help="keep colors (default: black-and-white, which is far more compact)")
+    parser.add_argument("-o", "--output", help="write the SVG here instead of stdout")
+    args = parser.parse_args()
+    try:
+        import vtracer
+    except ImportError:
+        parser.exit(1, "trace: requires vtracer; install the optional dependency vtracer first\n")
+    source = Path(args.image).expanduser()
+    if not source.is_file():
+        parser.exit(1, f"trace: Image not found: {source}\n")
+    scale = args.scale if args.scale else (2 if args.region else 1)
+    work = prepare_input(source, args.region, scale)
+    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as out:
+        vtracer.convert_image_to_svg_py(
+            work, out.name,
+            colormode="color" if args.color else "binary",
+            filter_speckle=8, corner_threshold=40,
+            mode="polygon" if args.polygon else "spline",
+        )
+        svg = Path(out.name).read_text()
+    svg = truncate_decimals(strip_background(svg))
+    if args.output:
+        Path(args.output).expanduser().write_text(svg)
+        print(f"wrote {args.output} ({len(svg)} bytes, {svg.count('<path')} paths, traced at {scale}x)")
+    else:
+        print(svg)
+
+
+if __name__ == "__main__":
+    main()

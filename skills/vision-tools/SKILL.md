@@ -9,6 +9,7 @@ The codex-vision-proxy project installs the following CLIs on this machine. They
 
 - `glance`: image description, Q&A, and OCR
 - `ground`: locate targets in an image with natural language and get bounding boxes in original pixel coordinates
+- `trace`: local deterministic image-to-SVG tracing for exact shape geometry (no vision API involved)
 
 ## glance
 
@@ -70,23 +71,22 @@ instead of asking a vision model to estimate it. Traced coordinates come
 from the actual pixels; vision-model numbers are confident guesses.
 
 ```bash
-uv run --with vtracer python3 -c "import vtracer; vtracer.convert_image_to_svg_py(
-    '/tmp/region.png', '/tmp/region.svg',
-    colormode='bw', filter_speckle=8, corner_threshold=40, mode='spline')"
+trace <image>                                  # b/w spline SVG to stdout
+trace <image> --polygon                        # boxy diagrams/wireframes: near-plain rects and arrows
+trace <image> --region X1,Y1,X2,Y2 -o out.svg  # crop a ground box first (auto 2x upscale)
 ```
 
-No resident install; crop to the region of interest first (`ground` → Pillow
-crop; 2x upscale helps small shapes). `mode='spline'` for curved shapes,
-`mode='polygon'` for boxy diagrams — polygon output reads as near-plain
-rectangles and arrows.
+Runs fully local — no vision API, no credentials. Background-path removal
+and decimal truncation are built in. Spline (default) suits curved shapes;
+`--polygon` suits boxy diagrams.
 
 Applications (non-exhaustive):
 
 - **Reproduce an icon/logo/line-art as SVG** (UI rebuilds, vector assets):
-  trace → post-process (drop the background path, unify `fill`, truncate
-  decimals) → verify by pixel-diffing the rendered SVG against the original
-  crop, never by eyeballing. Reference: a hand-written lookalike measured
-  26.6% off; tracing measured 1.8%.
+  `trace --region <ground box> -o icon.svg`, then verify by pixel-diffing
+  the rendered SVG against the original crop, never by eyeballing.
+  Reference: a hand-written lookalike measured 26.6% off; tracing measured
+  1.8%.
 - **Understand a diagram / flowchart / wireframe's structure**: bw+polygon
   yields each box and arrow as a compact path with exact position and size —
   layout relations become readable text.
@@ -96,8 +96,9 @@ Applications (non-exhaustive):
 
 Boundaries: flat, high-contrast graphics only. Text becomes curves (pair
 with `--ocr` when the text matters); whole screenshots and photos do not
-trace usefully; aggressive speckle filtering deletes small features — check
-nothing important vanished.
+trace usefully; speckle filtering deletes small features — a "0 paths"
+result means the region binarized to nothing (try `--color`, another
+threshold region, or pre-inverting dark-theme images).
 
 ## Notes
 

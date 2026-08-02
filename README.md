@@ -105,6 +105,15 @@ x1: 1067, y1: 841, x2: 1108, y2: 881
 
 It analyzes one full image per call and outputs the target's pixel coordinates in the original image.
 
+## Optional Tool: trace
+
+`trace` vectorizes an image (or a cropped region) into SVG **locally and deterministically** — coordinates come from the actual pixels, not from a vision model's estimates. Use it for exact shape geometry: reproducing icons/logos as SVG, reading a diagram's layout, or measuring elements. Requires the optional `vtracer` (and `pillow` for `--region`).
+
+```bash
+trace diagram.png --polygon
+trace screenshot.png --region 1563,514,1668,621 -o icon.svg
+```
+
 ## Install the Codex Skill (optional)
 
 One way to install the extra vision tools into Codex is the bundled `vision-tools` skill, which tells Codex what `glance`/`ground` are and how to use them. Install it with the official skills CLI:
@@ -157,6 +166,7 @@ So don't modify Codex's existing auth config, and don't store `DEEPSEEK_API_KEY`
 | `vision_client.py` | Vision API client shared by the proxy and `glance` |
 | `bin/glance` | Optional image description, Q&A, and OCR CLI |
 | `ground.py` / `bin/ground` | Optional image target-grounding CLI |
+| `bin/trace` | Optional local image-to-SVG tracing CLI (exact shape geometry, no vision API) |
 | `AGENT_INSTALL.md` | Installation and verification steps for Codex agents |
 | `tests/test_image_rewrite_shapes.py` | Tests for image structures, concurrency, caching, and failure behavior |
 | `tests/smoke_test_proxy.py` | Tests for proxy pass-through, auth, and streaming protocol |

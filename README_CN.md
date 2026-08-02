@@ -105,6 +105,15 @@ x1: 1067, y1: 841, x2: 1108, y2: 881
 
 每次只分析一张完整图片，并输出目标在原图中的像素坐标。
 
+## 可选工具：trace
+
+`trace` 在**本地确定性地**把图片（或裁剪区域）矢量化为 SVG——坐标来自真实像素，不是视觉模型的估计。用于精确形状几何：图标/logo 还原为 SVG、读取示意图布局、测量元素尺寸。需要可选依赖 `vtracer`（`--region` 另需 `pillow`）。
+
+```bash
+trace diagram.png --polygon
+trace screenshot.png --region 1563,514,1668,621 -o icon.svg
+```
+
 ## 安装 Codex skill（可选）
 
 安装额外视觉工具包的方式之一，是安装仓库内附带的 `vision-tools` skill：它告诉 Codex `glance`/`ground` 是什么以及怎么用。使用官方 skills CLI 安装：
@@ -157,6 +166,7 @@ Codex（携带原有 Authorization）
 | `vision_client.py` | 代理与 `glance` 共用的视觉 API 客户端 |
 | `bin/glance` | 可选的图片描述、问答和 OCR CLI |
 | `ground.py` / `bin/ground` | 可选的图片目标定位 CLI |
+| `bin/trace` | 可选的本地图转 SVG 描摹 CLI（精确形状几何，不调视觉 API） |
 | `AGENT_INSTALL.md` | Codex Agent 的安装与验证步骤 |
 | `tests/test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |
 | `tests/smoke_test_proxy.py` | 代理透传、鉴权和流式协议测试 |
