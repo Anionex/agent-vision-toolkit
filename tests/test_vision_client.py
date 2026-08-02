@@ -43,7 +43,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     with tempfile.TemporaryDirectory() as raw:
-        windows_env = Path(raw) / "codex-deepseek-vision" / "env"
+        windows_env = Path(raw) / "codex-vision-proxy" / "env"
         windows_env.parent.mkdir()
         windows_env.write_text("WINDOWS_ENV_PROBE=loaded\n")
         previous_local_appdata = os.environ.get("LOCALAPPDATA")

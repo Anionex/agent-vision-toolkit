@@ -34,7 +34,7 @@
 ## 修改后的最低验证
 
 ```bash
-python3 -m py_compile deepseek-vision-proxy.py vision_client.py bin/glance
+python3 -m py_compile codex-vision-proxy.py vision_client.py bin/glance
 python3 tests/test_image_rewrite_shapes.py
 python3 tests/smoke_test_proxy.py
 python3 tests/test_vision_client.py

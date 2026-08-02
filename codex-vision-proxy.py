@@ -84,7 +84,7 @@ def _vision_prompt(hint):
 
 
 def _log(message):
-    path = os.environ.get("DS_VISION_PROXY_LOG", "")
+    path = os.environ.get("CODEX_VISION_PROXY_LOG", "")
     if path:
         try:
             if os.path.exists(path) and os.path.getsize(path) > 5 * 1024 * 1024:
@@ -214,7 +214,7 @@ class Proxy:
         self.upstream = upstream.rstrip("/")
         self.codex_header_compat = codex_header_compat
         self.inject_reasoning_summary = inject_reasoning_summary
-        os.environ["DS_VISION_PROXY_LOG"] = log_path
+        os.environ["CODEX_VISION_PROXY_LOG"] = log_path
 
     def _upstream_headers(self, incoming):
         headers = []

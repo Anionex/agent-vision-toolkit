@@ -45,13 +45,13 @@ def load_env_file(path: str | os.PathLike[str] | None) -> None:
 
 
 def load_default_env() -> None:
-    explicit = os.environ.get("CODEX_DEEPSEEK_VISION_ENV")
+    explicit = os.environ.get("CODEX_VISION_PROXY_ENV")
     candidates = [Path(explicit).expanduser()] if explicit else []
     local_appdata = os.environ.get("LOCALAPPDATA")
     if local_appdata:
-        candidates.append(Path(local_appdata) / "codex-deepseek-vision" / "env")
+        candidates.append(Path(local_appdata) / "codex-vision-proxy" / "env")
     candidates.extend([
-        Path.home() / ".config" / "codex-deepseek-vision" / "env",
+        Path.home() / ".config" / "codex-vision-proxy" / "env",
         Path(__file__).resolve().parent / ".env",
         Path.cwd() / ".env",
     ])

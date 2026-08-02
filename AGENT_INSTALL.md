@@ -41,10 +41,10 @@ Codex 配置目录默认位于当前用户主目录下的 `.codex`。如用户�
 
 | 系统 | `INSTALL_DIR` | `ENV_FILE` |
 |---|---|---|
-| macOS / Linux | `~/.local/share/codex-deepseek-vision` | `~/.config/codex-deepseek-vision/env` |
-| Windows | `%LOCALAPPDATA%\codex-deepseek-vision` | `%LOCALAPPDATA%\codex-deepseek-vision\env` |
+| macOS / Linux | `~/.local/share/codex-vision-proxy` | `~/.config/codex-vision-proxy/env` |
+| Windows | `%LOCALAPPDATA%\codex-vision-proxy` | `%LOCALAPPDATA%\codex-vision-proxy\env` |
 
-将 `deepseek-vision-proxy.py` 和 `vision_client.py` 复制到 `INSTALL_DIR`，再把 `.env.example` 复制为 `ENV_FILE`。只填写：
+将 `codex-vision-proxy.py` 和 `vision_client.py` 复制到 `INSTALL_DIR`，再把 `.env.example` 复制为 `ENV_FILE`。只填写：
 
 ```dotenv
 VISION_API_KEY=...
@@ -65,7 +65,7 @@ LANG=zh  # 可选：视觉模型输出语言（zh/en），不填保持默认中�
 macOS / Linux：
 
 ```bash
-python3 <INSTALL_DIR>/deepseek-vision-proxy.py \
+python3 <INSTALL_DIR>/codex-vision-proxy.py \
   --port 19100 \
   --upstream "原始 DeepSeek base_url" \
   --env-file <ENV_FILE>
@@ -74,7 +74,7 @@ python3 <INSTALL_DIR>/deepseek-vision-proxy.py \
 Windows PowerShell：
 
 ```powershell
-py -3 "<INSTALL_DIR>\deepseek-vision-proxy.py" --port 19100 --upstream "原始 DeepSeek base_url" --env-file "<ENV_FILE>"
+py -3 "<INSTALL_DIR>\codex-vision-proxy.py" --port 19100 --upstream "原始 DeepSeek base_url" --env-file "<ENV_FILE>"
 ```
 
 尖括号是占位符，执行前必须替换成真实绝对路径。确认代理监听 `127.0.0.1:19100`。如果端口已被占用，先确认占用者是否为用户已有的相关代理，不得直接终止未知进程。
@@ -117,12 +117,12 @@ base_url = "http://127.0.0.1:19100"
 
 ### macOS
 
-创建 `~/Library/LaunchAgents/com.codex.deepseek-vision-proxy.plist`，使用当前 Python、`INSTALL_DIR`、`ENV_FILE` 和原始上游地址的绝对路径，并设置 `RunAtLoad`、`KeepAlive` 和日志路径。加载：
+创建 `~/Library/LaunchAgents/com.codex.vision-proxy.plist`，使用当前 Python、`INSTALL_DIR`、`ENV_FILE` 和原始上游地址的绝对路径，并设置 `RunAtLoad`、`KeepAlive` 和日志路径。加载：
 
 ```bash
-launchctl bootout "gui/$(id -u)/com.codex.deepseek-vision-proxy" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.codex.deepseek-vision-proxy.plist
-launchctl kickstart -k "gui/$(id -u)/com.codex.deepseek-vision-proxy"
+launchctl bootout "gui/$(id -u)/com.codex.vision-proxy" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.codex.vision-proxy.plist
+launchctl kickstart -k "gui/$(id -u)/com.codex.vision-proxy"
 ```
 
 ### Windows
@@ -131,7 +131,7 @@ launchctl kickstart -k "gui/$(id -u)/com.codex.deepseek-vision-proxy"
 
 ```cmd
 @echo off
-start "Codex DeepSeek Vision" /min py -3 "%LOCALAPPDATA%\codex-deepseek-vision\deepseek-vision-proxy.py" --port 19100 --upstream "原始 DeepSeek base_url" --env-file "%LOCALAPPDATA%\codex-deepseek-vision\env" --log "%LOCALAPPDATA%\codex-deepseek-vision\proxy.log"
+start "Codex Vision Proxy" /min py -3 "%LOCALAPPDATA%\codex-vision-proxy\codex-vision-proxy.py" --port 19100 --upstream "原始 DeepSeek base_url" --env-file "%LOCALAPPDATA%\codex-vision-proxy\env" --log "%LOCALAPPDATA%\codex-vision-proxy\proxy.log"
 ```
 
 Startup 目录由 PowerShell 的 `[Environment]::GetFolderPath("Startup")` 获取。创建后运行一次该 `.cmd`，确认代理启动。不要把 key 写进 `.cmd`。
@@ -147,7 +147,7 @@ Startup 目录由 PowerShell 的 `[Environment]::GetFolderPath("Startup")` 获�
 用当前系统的 Python 命令运行仓库内核心测试：
 
 ```text
-python -m py_compile deepseek-vision-proxy.py vision_client.py bin/glance
+python -m py_compile codex-vision-proxy.py vision_client.py bin/glance
 python tests/test_image_rewrite_shapes.py
 python tests/smoke_test_proxy.py
 python tests/test_vision_client.py
