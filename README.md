@@ -12,6 +12,8 @@ All code has been verified in real Codex + DeepSeek sessions. Use cases include 
 
 > If this project helps you, feel free to star🌟 & follow～ I'll keep sharing more practical tools and tips.
 
+If the agent you're using isn't Codex, you can also try installing the [visual toolkit](#install-the-codex-skill-optional) from this repository — it provides CLIs that let agents interact with images.
+
 ## Real-world Effects
 
 <p align="center">
