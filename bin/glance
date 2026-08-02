@@ -15,6 +15,31 @@ from vision_client import (  # noqa: E402
 )
 
 
+def region_data_url(path, region):
+    try:
+        from PIL import Image
+    except ImportError:
+        raise VisionError("--region requires Pillow; install the optional dependency pillow first")
+    try:
+        x1, y1, x2, y2 = (int(v) for v in region.split(","))
+    except ValueError:
+        raise VisionError("--region expects four integers: X1,Y1,X2,Y2 (pixels)")
+    import base64
+    import io
+    try:
+        with Image.open(Path(path).expanduser()) as image:
+            width, height = image.size
+            box = (max(0, min(x1, x2)), max(0, min(y1, y2)),
+                   min(width, max(x1, x2)), min(height, max(y1, y2)))
+            if box[2] <= box[0] or box[3] <= box[1]:
+                raise VisionError(f"--region {region} is empty after clamping to {width}x{height}")
+            buffer = io.BytesIO()
+            image.crop(box).save(buffer, format="PNG")
+    except (OSError, ValueError) as exc:
+        raise VisionError(f"Cannot read image: {path}") from exc
+    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+
 def build_prompt(args):
     if args.ocr is not None:
         extra = f" Additional requirements: {args.ocr}" if args.ocr else ""
@@ -37,11 +62,13 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-q", "--query", help="ask a question about the image")
     group.add_argument("--ocr", nargs="?", const="", metavar="EXTRA", help="transcribe all visible text verbatim")
+    parser.add_argument("--region", metavar="X1,Y1,X2,Y2",
+                        help="crop to this pixel box (e.g. from ground) and send only the crop")
     args = parser.parse_args()
     load_default_env()
     try:
         answer = describe_image(
-            image_path_to_data_url(args.image),
+            region_data_url(args.image, args.region) if args.region else image_path_to_data_url(args.image),
             build_prompt(args),
             max_tokens=None,  # no output cap; the vision model decides
             apply_lang=args.ocr is None,
