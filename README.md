@@ -37,9 +37,9 @@ If the agent you're using isn't Codex, you can also try installing the [visual t
 - **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
 - **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
 - **Same image, one call**: descriptions are cached per (image, prompt), so the same image appearing repeatedly doesn't re-invoke the vision API; cache hits are nearly zero-latency.
-- **Optional `glance`**: a concise standalone CLI for image Q&A or OCR, offering more flexible image understanding.
-- **Optional `ground`**: locate a target in an image with natural language and get a bounding box in original pixel coordinates.
-- **Optional `trace`**: local, deterministic image-to-SVG tracing for exact shape geometry — no vision API involved.
+- **Optional `glance`**: a concise standalone CLI for image Q&A and OCR — the follow-up channel when a description misses a detail you need.
+- **Optional `ground`**: locate a target in an image with natural language and get a bounding box in original pixel coordinates — for GUI-automation clicks and zoom-in crops.
+- **Optional `trace`**: local, deterministic image-to-SVG tracing, no vision API involved — for reproducing icons/graphics as vectors and measuring exact shape geometry.
 - **More vision tools may be added later**
 
 ## Usage
