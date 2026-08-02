@@ -44,7 +44,23 @@
 
 ## 使用方式
 
-本仓库不提供通用一键安装器。推荐把仓库链接交给 Codex Agent：
+## 一键安装
+
+macOS / Linux：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Anionex/codex-vision-proxy/main/install.sh)
+```
+
+Windows（PowerShell）：
+
+```powershell
+irm https://raw.githubusercontent.com/Anionex/codex-vision-proxy/main/install.ps1 | iex
+```
+
+安装器会自动定位你的 Codex `config.toml` 并备份，写入视觉环境变量，把 provider 的 `base_url` 指向本地代理，为模型追加 `image` 输入模态，注册代理为后台服务（LaunchAgent / systemd 用户服务 / Windows 启动项），并做基础校验。现有 DeepSeek 鉴权与 provider 配置保持不变。无人值守安装可用 `--non-interactive` 配合 `VISION_API_KEY=...`。
+
+手工或非常规配置仍可走下面的 Agent 流程。推荐把仓库链接交给 Codex Agent：
 
 > 我已经在 Codex 中接入并可正常使用 DeepSeek。请先阅读这个仓库的 README，再按照 AGENT_INSTALL.md 根据当前系统部署并验证 `view_image`。
 

@@ -43,7 +43,23 @@ If the agent you're using isn't Codex, you can also try installing the [visual t
 
 ## Usage
 
-This repository doesn't provide a universal one-click installer. The recommended way is to hand the repository link to your Codex agent:
+## Quick Install (one command)
+
+macOS / Linux:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Anionex/codex-vision-proxy/main/install.sh)
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/Anionex/codex-vision-proxy/main/install.ps1 | iex
+```
+
+The installer locates your Codex `config.toml`, backs it up, writes the vision env file, repoints your provider's `base_url` to the local proxy, adds `image` to your model's `input_modalities`, registers the proxy as a background service (LaunchAgent / systemd user service / Windows Startup entry), and runs basic checks. Existing DeepSeek auth and provider settings are preserved. Run with `--non-interactive` and `VISION_API_KEY=...` for unattended installs.
+
+For manual or non-standard setups, the agent-driven route below still works. The recommended way is to hand the repository link to your Codex agent:
 
 > I've already integrated DeepSeek into Codex and it works. Please read this repository's README first, then follow AGENT_INSTALL.md to deploy and verify `view_image` on the current system.
 
