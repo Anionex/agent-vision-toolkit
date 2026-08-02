@@ -1,6 +1,6 @@
 ---
 name: vision-tools
-description: Use the locally installed glance and ground CLIs for image analysis. Use when the user asks to describe, view, answer questions about, or OCR an image, locate an object/region in an image and get pixel coordinates, or mentions glance/ground — and to re-examine an image yourself when a text description of it you were given lacks the detail you need. If the commands are missing, report that the tools are not installed.
+description: Use the locally installed glance and ground CLIs for image analysis. Use when the user asks to describe, view, answer questions about, or OCR an image, locate an object/region in an image and get pixel coordinates, extract exact shape geometry or vectorize graphics (image to SVG), or mentions glance/ground — and to re-examine an image yourself when a text description of it you were given lacks the detail you need. If the commands are missing, report that the tools are not installed.
 ---
 
 # vision-tools
@@ -60,6 +60,44 @@ explicitly), look again yourself:
    two-step is the reliable way to inspect one element closely.
 
 If the file no longer exists (temp files are cleaned up), say so instead of guessing.
+
+## Extracting exact geometry: trace the pixels (image → SVG)
+
+Third deterministic channel, besides `ground` (semantic locating) and plain
+code over pixels: when you need real shape geometry — outlines, positions,
+sizes, spacing, curvature, or a vector reproduction — trace the bitmap
+instead of asking a vision model to estimate it. Traced coordinates come
+from the actual pixels; vision-model numbers are confident guesses.
+
+```bash
+uv run --with vtracer python3 -c "import vtracer; vtracer.convert_image_to_svg_py(
+    '/tmp/region.png', '/tmp/region.svg',
+    colormode='bw', filter_speckle=8, corner_threshold=40, mode='spline')"
+```
+
+No resident install; crop to the region of interest first (`ground` → Pillow
+crop; 2x upscale helps small shapes). `mode='spline'` for curved shapes,
+`mode='polygon'` for boxy diagrams — polygon output reads as near-plain
+rectangles and arrows.
+
+Applications (non-exhaustive):
+
+- **Reproduce an icon/logo/line-art as SVG** (UI rebuilds, vector assets):
+  trace → post-process (drop the background path, unify `fill`, truncate
+  decimals) → verify by pixel-diffing the rendered SVG against the original
+  crop, never by eyeballing. Reference: a hand-written lookalike measured
+  26.6% off; tracing measured 1.8%.
+- **Understand a diagram / flowchart / wireframe's structure**: bw+polygon
+  yields each box and arrow as a compact path with exact position and size —
+  layout relations become readable text.
+- **Measure things**: element sizes, spacing, alignment — parse the traced
+  paths (or skip SVG and compute on pixels directly) rather than asking
+  glance for numbers.
+
+Boundaries: flat, high-contrast graphics only. Text becomes curves (pair
+with `--ocr` when the text matters); whole screenshots and photos do not
+trace usefully; aggressive speckle filtering deletes small features — check
+nothing important vanished.
 
 ## Notes
 
