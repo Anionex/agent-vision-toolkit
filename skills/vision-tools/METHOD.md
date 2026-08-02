@@ -4,7 +4,7 @@ Read this before multi-step image work: UI restoration, detailed screenshot
 analysis, or extracting assets from an image. For single questions about an
 image, just use `glance` — this file is not needed.
 
-## Coarse to fine
+## Coarse to fine (applies to every image task)
 
 1. Start with one full-image pass (the proxy description if present,
    otherwise `glance`) to get the layout and an inventory of what is where.
@@ -20,12 +20,5 @@ image, just use `glance` — this file is not needed.
    rendering it and pixel-diffing against the original — never by
    comparing descriptions.
 
-## Traced SVG: ship it or reference it
-
-Ship the traced SVG as-is for organic or irregular shapes — that is where
-hand-writing loses (a hand-written lookalike measured 26.6% off where the
-trace measured 1.8%). For simple geometry (rects, circles, pills) or SVG
-that will be edited later, use the trace as a measurement reference
-instead: read exact positions, sizes, and radii from its paths, hand-write
-clean primitives from them, then pixel-diff your version against the
-original so the error stays bounded.
+When the task is reproducing the image itself (a page as HTML, a graphic
+as SVG), also read `RESTORE.md`.

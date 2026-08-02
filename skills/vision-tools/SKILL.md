@@ -11,9 +11,10 @@ The codex-vision-proxy project installs the following CLIs on this machine. They
 - `ground`: locate targets in an image with natural language and get bounding boxes in original pixel coordinates
 - `trace`: local deterministic image-to-SVG tracing for exact shape geometry (no vision API involved)
 
-For multi-step image work (UI restoration, detailed screenshot analysis,
-asset extraction), first read `METHOD.md` next to this file — it holds the
-coarse-to-fine looking method and when to ship vs hand-write traced SVG.
+For multi-step image work (detailed screenshot analysis, asset extraction),
+first read `METHOD.md` next to this file — the universal coarse-to-fine
+looking method. When reproducing an image as HTML/SVG, also read
+`RESTORE.md` — restoration-specific guidance.
 
 ## glance
 
@@ -99,7 +100,7 @@ Applications (non-exhaustive):
   glance for numbers.
 
 Whether to ship the traced SVG or hand-write from it depends on the shape —
-see `METHOD.md`.
+see `RESTORE.md`.
 
 Reusing the output correctly (both traps have burned a real session):
 
