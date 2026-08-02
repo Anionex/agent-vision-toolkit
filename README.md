@@ -2,6 +2,8 @@
 
 # codex-vision-proxy
 
+<sub>formerly `codex-deepseek-vision`</sub>
+
 🌐 [**中文**](README_CN.md) ｜ **English**
 
 </div>
@@ -151,7 +153,7 @@ So don't modify Codex's existing auth config, and don't store `DEEPSEEK_API_KEY`
 
 | File | Purpose |
 |---|---|
-| `deepseek-vision-proxy.py` | Local image-rewriting proxy and SSE forwarding |
+| `codex-vision-proxy.py` | Local image-rewriting proxy and SSE forwarding |
 | `vision_client.py` | Vision API client shared by the proxy and `glance` |
 | `bin/glance` | Optional image description, Q&A, and OCR CLI |
 | `ground.py` / `bin/ground` | Optional image target-grounding CLI |

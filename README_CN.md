@@ -2,6 +2,8 @@
 
 # codex-vision-proxy
 
+<sub>曾用名 `codex-deepseek-vision`</sub>
+
 🌐 **语言 / Language**：**中文** ｜ [**English**](README.md)
 
 </div>
@@ -151,7 +153,7 @@ Codex（携带原有 Authorization）
 
 | 文件 | 作用 |
 |---|---|
-| `deepseek-vision-proxy.py` | 本地图片改写代理与 SSE 转发 |
+| `codex-vision-proxy.py` | 本地图片改写代理与 SSE 转发 |
 | `vision_client.py` | 代理与 `glance` 共用的视觉 API 客户端 |
 | `bin/glance` | 可选的图片描述、问答和 OCR CLI |
 | `ground.py` / `bin/ground` | 可选的图片目标定位 CLI |
