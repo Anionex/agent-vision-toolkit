@@ -1,129 +1,140 @@
+<div align="center">
+
 # codex-deepseek-vision
 
-如果你的 Codex 已经接入 DeepSeek ，却烦恼于模型没有多模态，不能看图、每次调用看图都会被系统拦下，本仓库提供了一种方式，可以在不引入额外mcp、skills、cli的情况下，让纯文本模型调用codex内置view image的时候不报错，而是给出图片的详细描述，尽量让纯文本模型的交互体验和多模态模型的交互体验保持一致，免去反复配置的风险。同时也提供可选的视觉工具包，利用多模态模型的能力完成图片问答、ocr、视觉定位等操作。
+🌐 **Language / 语言**：[**中文**](README_CN.md) ｜ **English**
 
-所有代码均已在真实 Codex + DeepSeek 会话中验证过。可用场景包括但不限于：图片问答，截图分析，Computer Use GUI界面操作，多步图像推理
+</div>
 
-> 如果项目对你有用，欢迎 star🌟 & follow～，我会分享更多的实用工具和技巧
-> 
-## 实际效果
+If your Codex is already connected to DeepSeek, but you're frustrated that the model has no multimodal ability — it can't see images, and every attempt to look at an image is blocked by the system — this repository offers a way to let a text-only model call Codex's built-in `view_image` without errors. Instead of failing, it returns a detailed description of the image, keeping the text-only model's experience as close as possible to a multimodal one, without introducing extra MCPs, skills, or CLIs, and without the risk of repeated configuration. It also provides an optional vision toolkit that leverages multimodal models for image Q&A, OCR, visual grounding, and more.
+
+All code has been verified in real Codex + DeepSeek sessions. Use cases include but are not limited to: image Q&A, screenshot analysis, Computer Use GUI operation, and multi-step image reasoning.
+
+> If this project helps you, feel free to star🌟 & follow～ I'll keep sharing more practical tools and tips.
+
+## Real-world Effects
 
 <p align="center">
-  <img src="assets/effect-1.jpg" alt="Codex 里的 DeepSeek 看 UI 图回答风格问题" width="49%">
-  <img src="assets/effect-2.jpg" alt="Codex 里的 DeepSeek 看图排查界面字段不一致 bug" width="49%">
+  <img src="assets/effect-1.jpg" alt="DeepSeek in Codex answering a style question about a UI screenshot" width="49%">
+  <img src="assets/effect-2.jpg" alt="DeepSeek in Codex debugging mismatched UI fields from a screenshot" width="49%">
 </p>
 
-## 亮点
+## Highlights
 
-- **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图
-- **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
-- **同图只调一次**：按图片 sha256 缓存描述，同一张图反复出现不重复调用视觉 API，缓存命中近乎零延迟。
-- **可选 `glance`**：简洁的独立cli工具，用于image qa 或 OCR，以提供更加灵活的图片理解能力。
-- **可选 `ground`**：用自然语言定位图片中的目标，输出原图像素坐标下的边界框。
-- **后续可能加入的更多视觉工具** 
+- **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
+- **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
+- **Same image, one call**: descriptions are cached by image sha256, so the same image appearing repeatedly doesn't re-invoke the vision API; cache hits are nearly zero-latency.
+- **Optional `glance`**: a concise standalone CLI for image Q&A or OCR, offering more flexible image understanding.
+- **Optional `ground`**: locate a target in an image with natural language and get a bounding box in original pixel coordinates.
+- **More vision tools may be added later**
 
-## 使用方式
+## Usage
 
-本仓库不提供通用一键安装器。推荐把仓库链接交给 Codex Agent：
+This repository doesn't provide a universal one-click installer. The recommended way is to hand the repository link to your Codex agent:
 
-> 我已经在 Codex 中接入并可正常使用 DeepSeek。请先阅读这个仓库的 README，再按照 AGENT_INSTALL.md 根据当前系统部署并验证 `view_image`。
+> I've already integrated DeepSeek into Codex and it works. Please read this repository's README first, then follow AGENT_INSTALL.md to deploy and verify `view_image` on the current system.
 
-详细执行步骤见 **[Codex Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启 Codex 后，直接粘贴图片或让 DeepSeek 调用内置 `view_image` 即可。
+Detailed steps are in the **[Codex Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a Codex restart, just paste an image or let DeepSeek call the built-in `view_image`.
 
-## 前置条件
+## Prerequisites
 
-- 已可正常使用 DeepSeek 的 Codex
+- Codex with a working DeepSeek setup
 - Python 3.11+
-- 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API
+- An OpenAI-compatible vision API that supports `/chat/completions` and `image_url`
 
-## 配置
+## Configuration
 
-env 只需配置：
+Only these env vars are required:
 
-| 变量 | 必需 | 说明 |
+| Variable | Required | Description |
 |---|---:|---|
-| `VISION_API_KEY` | 是 | 多模态模型的 API key |
-| `VISION_BASE_URL` | 是 | OpenAI-compatible API 地址 |
-| `VISION_MODEL` | 是 | 多模态模型名 |
+| `VISION_API_KEY` | Yes | API key of the multimodal model |
+| `VISION_BASE_URL` | Yes | OpenAI-compatible API base URL |
+| `VISION_MODEL` | Yes | Multimodal model name |
 
-DeepSeek 的认证继续由 Codex 发送并由代理透传，不需要在 env 中重复保存。
+DeepSeek authentication is still sent by Codex and passed through by the proxy, so there's no need to store it again in the env.
 
-## 可选工具：glance 
+## Optional Tool: glance
 
-`glance` 是独立cli工具。它用于直接对图片发起提问，补充特定细节。
+`glance` is a standalone CLI for asking questions about an image directly, to fill in specific details.
 
-需要全局命令时，可让 Codex 按照安装说明创建 wrapper。得到更简洁的调用形式如下：
-
-```bash
-glance screenshot.png -q "这张图片的主色调是什么？"
-glance screenshot.png --ocr 
-```
-
-回答：
-```
-这张图片的主色调为**白色和浅灰色，局部带淡蓝色。**
-```
-
-```
-用户名
-密码
-登录
-```
-
-## 可选工具：ground
-
-`ground` 是独立cli工具，用于定位图片中的对象或区域：
+For a global command, let Codex create a wrapper following the install guide. The call then becomes:
 
 ```bash
-ground screenshot.png "发送按钮"
+glance screenshot.png -q "What is the dominant color of this image?"
+glance screenshot.png --ocr
+```
+
+Answer:
+
+```
+The dominant colors of this image are **white and light gray, with light blue accents.**
+```
+
+```
+Username
+Password
+Login
+```
+
+## Optional Tool: ground
+
+`ground` is a standalone CLI for locating objects or regions in an image:
+
+```bash
+ground screenshot.png "Send button"
 ```
 
 ```
 x1: 1067, y1: 841, x2: 1108, y2: 881
 ```
 
-每次只分析一张完整图片，并输出目标在原图中的像素坐标。
+It analyzes one full image per call and outputs the target's pixel coordinates in the original image.
 
-## 工作原理
+## How It Works
 
 ```text
-Codex -> 127.0.0.1:19100 -> 用户原有的 DeepSeek 上游
+Codex -> 127.0.0.1:19100 -> your existing DeepSeek upstream
              |
-             +-- 请求含图片时：视觉 API -> 文字描述 -> 替换图片
+             +-- when the request contains images: vision API -> text description -> image replaced
 ```
 
-第一次模型响应只要求 Codex 调用 `view_image`。Codex 在本机执行工具后，第二次请求才携带图片；代理在这个请求方向完成图片转文字。若 catalog 明确声明仅支持 `text`，Codex 的 handler 会先拒绝工具，因此只在这一种情况下给现有条目追加 `image`。
+The first model response only asks Codex to call `view_image`. After Codex executes the tool locally, the second request carries the image; the proxy converts image to text on this request path. If the catalog explicitly declares support for `text` only, Codex's handler rejects the tool first, so `image` is appended to the existing entry only in that case.
 
-## 常见问题
+## FAQ
 
-### `base_url` 指向本地代理后，代理也需要配置 DeepSeek API key 吗？
+### After pointing `base_url` at the local proxy, does the proxy also need a DeepSeek API key?
 
-不需要。访问 DeepSeek 上游的网络请求虽然由 `127.0.0.1:19100` 的代理进程发出，但 DeepSeek API key 仍由 Codex 按原有配置放在 `Authorization` 请求头中，代理会将这个请求头原样转发给 DeepSeek：
+No. Although the network request to the DeepSeek upstream is sent by the proxy process at `127.0.0.1:19100`, the DeepSeek API key is still placed in the `Authorization` header by Codex per your existing configuration, and the proxy forwards that header unchanged to DeepSeek:
 
 ```text
-Codex（携带原有 Authorization）
+Codex (carrying the original Authorization)
   -> 127.0.0.1:19100
-  -> DeepSeek 上游（原样收到 Authorization）
+  -> DeepSeek upstream (receives Authorization unchanged)
 ```
 
-因此不要修改 Codex 原有的认证配置，也不要在代理 env 中重复保存 `DEEPSEEK_API_KEY`。代理 env 只需配置 `VISION_API_KEY`、`VISION_BASE_URL` 和 `VISION_MODEL`。
+So don't modify Codex's existing auth config, and don't store `DEEPSEEK_API_KEY` again in the proxy env. The proxy env only needs `VISION_API_KEY`, `VISION_BASE_URL`, and `VISION_MODEL`.
 
-## 文件清单
+## File Listing
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `deepseek-vision-proxy.py` | 本地图片改写代理与 SSE 转发 |
-| `vision_client.py` | 代理与 `glance` 共用的视觉 API 客户端 |
-| `bin/glance` | 可选的图片描述、问答和 OCR CLI |
-| `ground.py` / `bin/ground` | 可选的图片目标定位 CLI |
-| `AGENT_INSTALL.md` | Codex Agent 的安装与验证步骤 |
-| `test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |
-| `smoke_test_proxy.py` | 代理透传、鉴权和流式协议测试 |
-| `test_vision_client.py` | 视觉客户端重试与 `glance` 测试 |
-| `test_ground.py` | `ground` 坐标解析和共享配置测试 |
+| `deepseek-vision-proxy.py` | Local image-rewriting proxy and SSE forwarding |
+| `vision_client.py` | Vision API client shared by the proxy and `glance` |
+| `bin/glance` | Optional image description, Q&A, and OCR CLI |
+| `ground.py` / `bin/ground` | Optional image target-grounding CLI |
+| `AGENT_INSTALL.md` | Installation and verification steps for Codex agents |
+| `test_image_rewrite_shapes.py` | Tests for image structures, concurrency, caching, and failure behavior |
+| `smoke_test_proxy.py` | Tests for proxy pass-through, auth, and streaming protocol |
+| `test_vision_client.py` | Vision client retry and `glance` tests |
+| `test_ground.py` | `ground` coordinate parsing and shared config tests |
 
-## 限制
+## Limitations
 
-- 这是图片转文字代理，不会把视觉 token 直接交给 DeepSeek。
-- 图片描述质量取决于所配置的视觉模型。
-- 缓存只存在于代理进程内，重启后清空。
+- This is an image-to-text proxy; it doesn't hand vision tokens directly to DeepSeek.
+- Description quality depends on the configured vision model.
+- The cache lives only inside the proxy process and is cleared on restart.
+
+---
+
+Made by [Anionex](https://github.com/Anionex) with codex
