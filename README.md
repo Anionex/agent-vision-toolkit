@@ -124,8 +124,12 @@ Restart Codex afterwards.
 ```text
 Codex -> 127.0.0.1:19100 -> your existing DeepSeek upstream
              |
-             +-- when the request contains images: vision API -> text description -> image replaced
+             +-- when the request contains images:
+                 focus hint (nearest preceding user text)
+                   -> scene-routed vision prompt -> text description -> image replaced
 ```
+
+The vision prompt is not a fixed "describe this image". The proxy forwards the user's request alongside the image as a **focus hint**, so the description covers what was actually asked, and routes the prompt through a scene template picked by hint keywords: error screenshots get verbatim stack traces and line numbers, UI shots get an element list with positions and colors, charts get data points read out, everything else gets a detailed description plus verbatim OCR. Descriptions are cached per (image, prompt); because the hint comes from the text *preceding* the image in the immutable conversation history, the same image is described once and then hits the cache on every later turn.
 
 The first model response only asks Codex to call `view_image`. After Codex executes the tool locally, the second request carries the image; the proxy converts image to text on this request path. If the catalog explicitly declares support for `text` only, Codex's handler rejects the tool first, so `image` is appended to the existing entry only in that case.
 
