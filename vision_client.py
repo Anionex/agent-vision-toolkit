@@ -15,6 +15,11 @@ import urllib.request
 
 DEFAULT_PROMPT = "请详细描述这张图片中的内容。"
 
+LANG_INSTRUCTIONS = {
+    "zh": "请使用简体中文回答。",
+    "en": "Please respond in English.",
+}
+
 
 class VisionError(RuntimeError):
     """A safe, user-facing vision request failure."""
@@ -33,7 +38,9 @@ def load_env_file(path: str | os.PathLike[str] | None) -> None:
         key, _, value = line.partition("=")
         key = key.strip()
         value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
+        # LANG usually already exists as a system locale variable (e.g. en_US.UTF-8);
+        # allow the .env entry to take effect instead of being silently ignored.
+        if key and (key not in os.environ or key == "LANG"):
             os.environ[key] = value
 
 
@@ -85,18 +92,24 @@ def _message_text(message: object) -> str:
     return ""
 
 
-def describe_image(image_url: str, prompt: str | None = None, max_tokens: int | None = None) -> str:
+def describe_image(image_url: str, prompt: str | None = None, max_tokens: int | None = None,
+                   apply_lang: bool = True) -> str:
     """Describe a data/http image URL through an OpenAI-compatible endpoint."""
     validate_vision_config()
     if not image_url.startswith(("data:", "http://", "https://")):
         raise VisionError("只支持 data URL 或 http(s) 图片 URL")
     base_url = _required("VISION_BASE_URL").rstrip("/")
     api_key = _required("VISION_API_KEY")
+    text = prompt or DEFAULT_PROMPT
+    if apply_lang:
+        instruction = LANG_INSTRUCTIONS.get(os.environ.get("LANG", "").strip().lower())
+        if instruction:
+            text = f"{instruction}\n\n{text}"
     payload = {
         "model": _required("VISION_MODEL"),
         "max_tokens": max_tokens or 4096,
         "messages": [{"role": "user", "content": [
-                {"type": "text", "text": prompt or DEFAULT_PROMPT},
+            {"type": "text", "text": text},
             {"type": "image_url", "image_url": {"url": image_url}},
         ]}],
     }

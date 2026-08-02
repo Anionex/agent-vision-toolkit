@@ -51,6 +51,7 @@ Only these env vars are required:
 | `VISION_API_KEY` | Yes | API key of the multimodal model |
 | `VISION_BASE_URL` | Yes | OpenAI-compatible API base URL |
 | `VISION_MODEL` | Yes | Multimodal model name |
+| `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
 
 DeepSeek authentication is still sent by Codex and passed through by the proxy, so there's no need to store it again in the env.
 

@@ -44,6 +44,7 @@ def main():
             image_path_to_data_url(args.image),
             build_prompt(args),
             max_tokens=8192,
+            apply_lang=args.ocr is None,
         )
     except VisionError as exc:
         parser.exit(1, f"glance: {exc}\n")

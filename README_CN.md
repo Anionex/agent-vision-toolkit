@@ -51,6 +51,7 @@ env 只需配置：
 | `VISION_API_KEY` | 是 | 多模态模型的 API key |
 | `VISION_BASE_URL` | 是 | OpenAI-compatible API 地址 |
 | `VISION_MODEL` | 是 | 多模态模型名 |
+| `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
 
 DeepSeek 的认证继续由 Codex 发送并由代理透传，不需要在 env 中重复保存。
 

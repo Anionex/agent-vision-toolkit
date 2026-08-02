@@ -16,11 +16,12 @@ class Handler(BaseHTTPRequestHandler):
     statuses = []
     bodies = []
     calls = 0
+    last_body = b""
 
     def do_POST(self):
         Handler.calls += 1
         length = int(self.headers.get("Content-Length", 0))
-        self.rfile.read(length)
+        Handler.last_body = self.rfile.read(length)
         status = Handler.statuses.pop(0)
         if Handler.bodies:
             body = Handler.bodies.pop(0)
@@ -87,6 +88,34 @@ def main():
         else:
             raise AssertionError("HTTP errors must fail cleanly")
         assert Handler.calls == 1, "400 must not be retried"
+
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
+        os.environ["LANG"] = "en"
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        finally:
+            os.environ.pop("LANG", None)
+        text = json.loads(Handler.last_body)["messages"][0]["content"][0]["text"]
+        assert text.startswith("Please respond in English.")
+        assert Handler.calls == 1
+
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
+        os.environ["LANG"] = "zh"
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        finally:
+            os.environ.pop("LANG", None)
+        text = json.loads(Handler.last_body)["messages"][0]["content"][0]["text"]
+        assert text.startswith("请使用简体中文回答。")
+        assert Handler.calls == 1
+
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
+        os.environ.pop("LANG", None)
+        vision_client.describe_image("data:image/png;base64,AAAA")
+        text = json.loads(Handler.last_body)["messages"][0]["content"][0]["text"]
+        assert "Please respond in English." not in text
+        assert "请使用简体中文回答。" not in text
+        assert Handler.calls == 1
 
         Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         with tempfile.TemporaryDirectory() as raw:
