@@ -163,6 +163,14 @@ So don't modify Codex's existing auth config, and don't store `DEEPSEEK_API_KEY`
 - Description quality depends on the configured vision model.
 - The cache lives only inside the proxy process and is cleared on restart.
 
+## Design References
+
+This project draws on the following work:
+
+- **Describe-then-reason pipeline** — [Prism](https://arxiv.org/abs/2406.14544) (NeurIPS 2024)
+- **Question-aware descriptions** (focus hint) — [PromptCap](https://arxiv.org/abs/2211.09699) (ICCV 2023); Qwen Code visionBridge
+- **Crop and zoom** (`glance --region`) — [V*](https://arxiv.org/abs/2312.14135) (CVPR 2024), [ZoomEye](https://arxiv.org/abs/2411.16044) (EMNLP 2025)
+
 ---
 
 Made by [Anionex](https://github.com/Anionex) with codex

@@ -163,5 +163,13 @@ Codex（携带原有 Authorization）
 - 图片描述质量取决于所配置的视觉模型。
 - 缓存只存在于代理进程内，重启后清空。
 
+## 设计参考
+
+本项目参考了如下工作：
+
+- **"描述 + 推理"两级范式** — [Prism](https://arxiv.org/abs/2406.14544)（NeurIPS 2024）
+- **问题导向描述**（focus hint）— [PromptCap](https://arxiv.org/abs/2211.09699)（ICCV 2023）；Qwen Code visionBridge
+- **裁剪放大**（`glance --region`）— [V*](https://arxiv.org/abs/2312.14135)（CVPR 2024）、[ZoomEye](https://arxiv.org/abs/2411.16044)（EMNLP 2025）
+
 ---
 Made by [Anionex](https://github.com/Anionex) with codex
