@@ -94,11 +94,23 @@ Applications (non-exhaustive):
   paths (or skip SVG and compute on pixels directly) rather than asking
   glance for numbers.
 
+Reusing the output correctly (both traps have burned a real session):
+
+- The SVG has a **transparent background** — composite on white before any
+  pixel diff or visual check (`rsvg-convert -b white`); transparency reads
+  as black in many viewers and will be misdiagnosed as a broken trace.
+- Every `<path>` carries a `transform` attribute. When lifting a path into
+  another SVG, **copy the transform together with `d`** — holes are
+  opposite-winding subpaths and survive standalone extraction, but a
+  dropped transform displaces the shape.
+
 Boundaries: flat, high-contrast graphics only. Text becomes curves (pair
 with `--ocr` when the text matters); whole screenshots and photos do not
 trace usefully; speckle filtering deletes small features — a "0 paths"
 result means the region binarized to nothing (try `--color`, another
-threshold region, or pre-inverting dark-theme images).
+threshold region, or pre-inverting dark-theme images). Low-contrast art
+(watermarks, faint patterns) binarizes away and the trace picks up the
+high-contrast content around it instead.
 
 ## Notes
 
