@@ -93,7 +93,7 @@ async def _rewrite_image_inputs(parsed):
         raise VisionError(
             f"{len(errors)} image(s) failed to describe; original images were not forwarded to the text-only model: {details}"
         )
-    prefix = "[local vision model description] "
+    prefix = "[vision model description] "
     for item, field, index, url in jobs:
         item[field][index] = {"type": "input_text", "text": prefix + descriptions[url]}
     _log(f"[vision-proxy] image rewrite ok images={len(urls)} cache_entries={len(_DESC_CACHE)}")
