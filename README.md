@@ -92,6 +92,22 @@ x1: 1067, y1: 841, x2: 1108, y2: 881
 
 It analyzes one full image per call and outputs the target's pixel coordinates in the original image.
 
+## Install the Codex Skill (optional)
+
+One way to install the extra vision tools into Codex is the bundled `vision-tools` skill, which tells Codex what `glance`/`ground` are and how to use them. Install it with the official skills CLI:
+
+```bash
+npx skills add Anionex/codex-deepseek-vision --skill vision-tools -a codex -g --copy -y
+```
+
+Or copy the folder manually:
+
+```bash
+cp -r skills/vision-tools ~/.codex/skills/
+```
+
+Restart Codex afterwards.
+
 ## How It Works
 
 ```text

@@ -91,6 +91,22 @@ x1: 1067, y1: 841, x2: 1108, y2: 881
 
 每次只分析一张完整图片，并输出目标在原图中的像素坐标。
 
+## 安装 Codex skill（可选）
+
+安装额外视觉工具包的方式之一，是安装仓库内附带的 `vision-tools` skill：它告诉 Codex `glance`/`ground` 是什么以及怎么用。使用官方 skills CLI 安装：
+
+```bash
+npx skills add Anionex/codex-deepseek-vision --skill vision-tools -a codex -g --copy -y
+```
+
+也可以手动复制：
+
+```bash
+cp -r skills/vision-tools ~/.codex/skills/
+```
+
+之后重启 Codex 生效。
+
 ## 工作原理
 
 ```text
