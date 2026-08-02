@@ -2,7 +2,7 @@
 
 # codex-deepseek-vision
 
-🌐 **Language / 语言**：[**中文**](README_CN.md) ｜ **English**
+🌐 [**中文**](README_CN.md) ｜ **English**
 
 </div>
 
@@ -55,7 +55,7 @@ Only these env vars are required:
 
 DeepSeek authentication is still sent by Codex and passed through by the proxy, so there's no need to store it again in the env.
 
-## Optional Tool: glance
+## Optional Tool: glance (Recommended)
 
 `glance` is a standalone CLI for asking questions about an image directly, to fill in specific details.
 
