@@ -72,6 +72,9 @@ def test_mode_routing():
         "还原这个页面布局": "ui",
         "what is the trend in this chart": "chart",
         "look at this photo of my cat": "default",
+        "look at this photograph": "default",
+        "the guide says to build it": "default",
+        "why do these errors appear": "error",
         "": "default",
     }
     for hint, expected in cases.items():

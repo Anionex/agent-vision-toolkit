@@ -9,6 +9,7 @@ from http import HTTPStatus
 import hashlib
 import json
 import os
+import re
 import signal
 import urllib.error
 import urllib.request
@@ -61,16 +62,23 @@ _MODE_KEYWORDS = (
                "报错", "错误", "异常", "堆栈", "崩溃")),
     ("chart", ("chart", "graph", "plot", "trend",
                "图表", "曲线", "柱状", "饼图", "趋势")),
-    ("ui", ("layout", "mockup", "design", "css", "style", " ui", "ui ",
+    ("ui", ("layout", "mockup", "design", "css", "style", "ui",
             "界面", "布局", "设计稿", "还原", "样式", "页面")),
 )
 
 
 def _pick_mode(hint):
-    lowered = f" {hint.lower()} "
+    lowered = hint.lower()
     for mode, keywords in _MODE_KEYWORDS:
-        if any(keyword in lowered for keyword in keywords):
-            return mode
+        for keyword in keywords:
+            # ASCII keywords match on a word boundary so "photograph" never
+            # hits "graph"; CJK keywords have no word boundaries and stay
+            # substring matches.
+            if keyword.isascii():
+                if re.search(r"\b" + keyword, lowered):
+                    return mode
+            elif keyword in lowered:
+                return mode
     return "default"
 
 
