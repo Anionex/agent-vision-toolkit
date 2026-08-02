@@ -129,7 +129,9 @@ def locate(image_path: Path, target: str) -> list[Match]:
             width, height = image.size
     except (OSError, ValueError) as exc:
         raise GroundError(f"Cannot read image: {image_path}") from exc
-    response = describe_image(image_path_to_data_url(image_path), build_prompt(target), max_tokens=2048)
+    # 8192 leaves room for exhaustive targets ("every UI element"): a dense
+    # screen can emit dozens of boxes and 2048 truncated the JSON mid-array.
+    response = describe_image(image_path_to_data_url(image_path), build_prompt(target), max_tokens=8192)
     return parse_matches(response, width, height, target)
 
 

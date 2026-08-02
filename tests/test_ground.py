@@ -47,7 +47,7 @@ def test_shared_vision_request():
     assert result == [ground.Match("whole image", (0, 0, 16, 12))]
     assert seen["image_url"].startswith("data:image/png;base64,")
     assert "page" in seen["prompt"]
-    assert seen["max_tokens"] == 2048
+    assert seen["max_tokens"] == 8192
 
 
 def test_output_format():
