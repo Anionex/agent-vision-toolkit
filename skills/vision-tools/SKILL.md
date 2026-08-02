@@ -23,6 +23,13 @@ Output language follows the `LANG` setting in the vision config (`zh`/`en`).
 `--region` crops locally and uploads only the crop — use it to zoom into small
 text or icons that a full-image pass missed (requires the optional `pillow`).
 
+**Never use glance for precise numeric values** — coordinates, offsets,
+pixel distances, measurements. Free-text vision answers estimate numbers and
+the estimates look confident. For anything numeric: use `ground` first
+(its coordinates are calibrated to the original image), and if that is not
+enough, compute from the image with code (e.g. Pillow pixel math) instead of
+asking glance.
+
 ## ground
 
 ```bash
@@ -40,9 +47,11 @@ and the image's file path is visible in the conversation (pasted images live
 at a `codex-clipboard-*.png` temp path; `view_image` calls name their path
 explicitly), look again yourself:
 
-1. `glance <path> -q "<the specific detail you need>"` — targeted follow-up question.
+1. `glance <path> -q "<the specific detail you need>"` — targeted follow-up
+   question (qualitative details only, never numbers).
 2. `ground <path> "<target>"` then `glance <path> --region <that box> -q "..."` —
-   locate, zoom in, and read small text or fine detail.
+   locate first, then zoom in to read small text or fine detail. This
+   two-step is the reliable way to inspect one element closely.
 
 If the file no longer exists (temp files are cleaned up), say so instead of guessing.
 
