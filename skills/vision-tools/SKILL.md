@@ -1,6 +1,6 @@
 ---
 name: vision-tools
-description: Use the locally installed glance and ground CLIs for image analysis. Use when the user asks to describe, view, answer questions about, or OCR an image, locate an object/region in an image and get pixel coordinates, or mentions glance/ground — and to re-examine an image when a proxy-provided "[vision model description ...]" lacks the detail you need. If the commands are missing, report that the tools are not installed.
+description: Use the locally installed glance and ground CLIs for image analysis. Use when the user asks to describe, view, answer questions about, or OCR an image, locate an object/region in an image and get pixel coordinates, or mentions glance/ground — and to re-examine an image yourself when a text description of it you were given lacks the detail you need. If the commands are missing, report that the tools are not installed.
 ---
 
 # vision-tools
@@ -33,11 +33,12 @@ Output format: `x1: .., y1: .., x2: .., y2: ..` (pixel coordinates in the origin
 
 ## Re-examining an image (follow-up looks)
 
-Image content in this conversation may arrive as text starting with
-`[vision model description ...]` — a one-shot transcription made by a vision
-model on your behalf. If it lacks a detail you need and the image's file path
-is visible in the conversation (pasted images live at a `codex-clipboard-*.png`
-temp path; `view_image` calls name their path explicitly), look again yourself:
+Sometimes an image reaches you only as a text description — for example a line
+starting with `[vision model description]` if the optional proxy is installed,
+or a summary someone else wrote. If that description lacks a detail you need
+and the image's file path is visible in the conversation (pasted images live
+at a `codex-clipboard-*.png` temp path; `view_image` calls name their path
+explicitly), look again yourself:
 
 1. `glance <path> -q "<the specific detail you need>"` — targeted follow-up question.
 2. `ground <path> "<target>"` then `glance <path> --region <that box> -q "..."` —
