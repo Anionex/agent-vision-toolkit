@@ -10,9 +10,9 @@ If your Codex is already connected to DeepSeek, but you're frustrated that the m
 
 All code has been verified in real Codex + DeepSeek sessions. Use cases include but are not limited to: image Q&A, screenshot analysis, Computer Use GUI operation, and multi-step image reasoning.
 
-> If this project helps you, feel free to star🌟 & follow～ I'll keep sharing more practical tools and tips.
-
 If the agent you're using isn't Codex, you can also try installing the [visual toolkit](#install-the-codex-skill-optional) from this repository — it provides CLIs that let agents interact with images.
+
+> If this project helps you, feel free to star🌟 & follow～ I'll keep sharing more practical tools and tips.
 
 ## Real-world Effects
 

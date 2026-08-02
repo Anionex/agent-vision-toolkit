@@ -10,10 +10,10 @@
 
 所有代码均已在真实 Codex + DeepSeek 会话中验证过。可用场景包括但不限于：图片问答，截图分析，Computer Use GUI界面操作，多步图像推理
 
+如果你正在用的 agent 不是 Codex，也可以尝试一下安装项目里的 [visual toolkit](#安装-codex-skill可选)，提供了 cli 让 agent 与图片交互
+
 > 如果项目对你有用，欢迎 star🌟 & follow～，我会分享更多的实用工具和技巧
 > 
-
-如果你正在用的 agent 不是 Codex，也可以尝试一下安装项目里的 [visual toolkit](#安装-codex-skill可选)，提供了 cli 让 agent 与图片交互
 
 ## 实际效果
 
