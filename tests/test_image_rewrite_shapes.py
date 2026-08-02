@@ -15,12 +15,15 @@ concurrently (~1 vision-call duration), not serially (N durations).
 import asyncio
 import importlib.util
 import os
+import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _load_proxy():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "deepseek-vision-proxy.py")
+                        os.pardir, "deepseek-vision-proxy.py")
     spec = importlib.util.spec_from_file_location("ds_proxy_mod", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

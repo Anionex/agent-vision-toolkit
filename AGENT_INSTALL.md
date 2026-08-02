@@ -148,9 +148,9 @@ Startup 目录由 PowerShell 的 `[Environment]::GetFolderPath("Startup")` 获�
 
 ```text
 python -m py_compile deepseek-vision-proxy.py vision_client.py bin/glance
-python test_image_rewrite_shapes.py
-python smoke_test_proxy.py
-python test_vision_client.py
+python tests/test_image_rewrite_shapes.py
+python tests/smoke_test_proxy.py
+python tests/test_vision_client.py
 ```
 
 检查端口：

@@ -35,13 +35,13 @@
 
 ```bash
 python3 -m py_compile deepseek-vision-proxy.py vision_client.py bin/glance
-python3 test_image_rewrite_shapes.py
-python3 smoke_test_proxy.py
-python3 test_vision_client.py
+python3 tests/test_image_rewrite_shapes.py
+python3 tests/smoke_test_proxy.py
+python3 tests/test_vision_client.py
 git diff --check
 ```
 
-修改 `ground.py` 或 `bin/ground` 时，另运行 `python3 test_ground.py`（需要 Pillow）。
+修改 `ground.py` 或 `bin/ground` 时，另运行 `python3 tests/test_ground.py`（需要 Pillow）。
 
 还需确认：
 

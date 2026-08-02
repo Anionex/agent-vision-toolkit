@@ -140,10 +140,10 @@ Codex（携带原有 Authorization）
 | `bin/glance` | 可选的图片描述、问答和 OCR CLI |
 | `ground.py` / `bin/ground` | 可选的图片目标定位 CLI |
 | `AGENT_INSTALL.md` | Codex Agent 的安装与验证步骤 |
-| `test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |
-| `smoke_test_proxy.py` | 代理透传、鉴权和流式协议测试 |
-| `test_vision_client.py` | 视觉客户端重试与 `glance` 测试 |
-| `test_ground.py` | `ground` 坐标解析和共享配置测试 |
+| `tests/test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |
+| `tests/smoke_test_proxy.py` | 代理透传、鉴权和流式协议测试 |
+| `tests/test_vision_client.py` | 视觉客户端重试与 `glance` 测试 |
+| `tests/test_ground.py` | `ground` 坐标解析和共享配置测试 |
 
 ## 限制
 

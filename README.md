@@ -141,10 +141,10 @@ So don't modify Codex's existing auth config, and don't store `DEEPSEEK_API_KEY`
 | `bin/glance` | Optional image description, Q&A, and OCR CLI |
 | `ground.py` / `bin/ground` | Optional image target-grounding CLI |
 | `AGENT_INSTALL.md` | Installation and verification steps for Codex agents |
-| `test_image_rewrite_shapes.py` | Tests for image structures, concurrency, caching, and failure behavior |
-| `smoke_test_proxy.py` | Tests for proxy pass-through, auth, and streaming protocol |
-| `test_vision_client.py` | Vision client retry and `glance` tests |
-| `test_ground.py` | `ground` coordinate parsing and shared config tests |
+| `tests/test_image_rewrite_shapes.py` | Tests for image structures, concurrency, caching, and failure behavior |
+| `tests/smoke_test_proxy.py` | Tests for proxy pass-through, auth, and streaming protocol |
+| `tests/test_vision_client.py` | Vision client retry and `glance` tests |
+| `tests/test_ground.py` | `ground` coordinate parsing and shared config tests |
 
 ## Limitations
 

@@ -6,8 +6,11 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import threading
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import vision_client
 
@@ -123,7 +126,7 @@ def main():
             image.write_bytes(b"\x89PNG\r\n\x1a\nfixture")
             isolated_env = dict(environment, HOME=raw)
             result = subprocess.run(
-                [str(Path(__file__).parent / "bin/glance"), str(image), "-q", "图里有什么？"],
+                [str(Path(__file__).resolve().parent.parent / "bin/glance"), str(image), "-q", "图里有什么？"],
                 env=isolated_env, text=True, capture_output=True, check=True,
             )
             assert result.stdout.strip() == "fixture answer"
