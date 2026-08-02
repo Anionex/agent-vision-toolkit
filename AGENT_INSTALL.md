@@ -176,7 +176,7 @@ python test_vision_client.py
 - macOS / Linux：创建 shell wrapper。
 - Windows：创建转发全部参数的 `.cmd` wrapper。
 
-wrapper 必须使用当前系统的绝对 Python 和脚本路径，不得覆盖用户已有的同名命令。
+wrapper 必须使用当前系统的绝对 Python 和脚本路径，并放入用户 PATH 中的可写目录（如 macOS / Linux 的 `~/.local/bin`，Windows 的 `%LOCALAPPDATA%\Microsoft\WindowsApps`；若目录不在 PATH，将其加入用户级 PATH），不得覆盖用户已有的同名命令。完成后新开终端即可直接运行 `glance <图片> [选项]`，无需激活任何虚拟环境。
 
 ## 可选：ground
 
@@ -186,7 +186,7 @@ wrapper 必须使用当前系统的绝对 Python 和脚本路径，不得覆盖�
 
 1. 将 `ground.py` 和 `bin/ground` 复制到 `INSTALL_DIR` 对应位置。
 2. 用 `uv` 在 `INSTALL_DIR/.venv-ground` 创建隔离环境，只安装额外依赖 `pillow`。
-3. 创建调用该环境 Python 和 `bin/ground` 的 shell 或 `.cmd` wrapper；不得覆盖用户已有的同名命令。
+3. 创建调用该环境 Python 和 `bin/ground` 的 shell 或 `.cmd` wrapper，放入用户 PATH 中的可写目录（同 glance，如 `~/.local/bin`；若不在 PATH，将其加入用户级 PATH）；不得覆盖用户已有的同名命令。完成后新开终端即可直接运行 `ground <图片> "<目标描述>"`。
 4. 验证：`ground /path/to/image.png "目标描述"`。
 
 ## 可选兼容功能
