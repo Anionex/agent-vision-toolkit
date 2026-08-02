@@ -121,9 +121,10 @@ def main():
         with tempfile.TemporaryDirectory() as raw:
             image = Path(raw) / "fixture.png"
             image.write_bytes(b"\x89PNG\r\n\x1a\nfixture")
+            isolated_env = dict(environment, HOME=raw)
             result = subprocess.run(
                 [str(Path(__file__).parent / "bin/glance"), str(image), "-q", "图里有什么？"],
-                env=environment, text=True, capture_output=True, check=True,
+                env=isolated_env, text=True, capture_output=True, check=True,
             )
             assert result.stdout.strip() == "fixture answer"
     finally:

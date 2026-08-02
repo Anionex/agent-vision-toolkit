@@ -38,9 +38,9 @@ def load_env_file(path: str | os.PathLike[str] | None) -> None:
         key, _, value = line.partition("=")
         key = key.strip()
         value = value.strip().strip('"').strip("'")
-        # LANG usually already exists as a system locale variable (e.g. en_US.UTF-8);
-        # allow the .env entry to take effect instead of being silently ignored.
-        if key and (key not in os.environ or key == "LANG"):
+        # The env file is the user's explicit configuration: whatever it sets wins,
+        # even when the same variable already exists in the system environment.
+        if key:
             os.environ[key] = value
 
 
