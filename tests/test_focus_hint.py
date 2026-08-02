@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Unit test: vision prompts are focus-hint aware and mode-routed.
+"""Unit test: vision prompts are focus-hint aware.
 
 The proxy passes the nearest preceding user text to the vision model so the
-description covers what the user actually asked about, picks a scene-specific
-instruction (error / ui / chart / default) from that hint, and caches per
+description covers what the user actually asked about, and caches per
 (image, prompt) so different hints never reuse a mismatched description.
 """
 
@@ -64,24 +63,11 @@ def test_same_message_text_is_used():
     print("PASS: hint works when text follows the image inside one message")
 
 
-def test_mode_routing():
+def test_prompt_always_asks_for_full_description():
     mod = _load_proxy()
-    cases = {
-        "fix this error for me": "error",
-        "这个报错是什么原因": "error",
-        "还原这个页面布局": "ui",
-        "what is the trend in this chart": "chart",
-        "look at this photo of my cat": "default",
-        "look at this photograph": "default",
-        "the guide says to build it": "default",
-        "why do these errors appear": "error",
-        "": "default",
-    }
-    for hint, expected in cases.items():
-        got = mod._pick_mode(hint)
-        assert got == expected, f"{hint!r}: expected {expected}, got {got}"
-        assert mod._MODE_PROMPTS[expected] in mod._vision_prompt(hint)
-    print("PASS: hints route to error/ui/chart/default modes")
+    for hint in ("这个报错是什么原因", "还原这个页面布局", ""):
+        assert mod._DESCRIBE_PROMPT in mod._vision_prompt(hint)
+    print("PASS: every hint gets the same describe-and-transcribe instruction")
 
 
 def test_hint_is_truncated():
@@ -120,7 +106,7 @@ def test_rewrite_prefix_is_stable():
 if __name__ == "__main__":
     test_hint_reaches_vision_prompt()
     test_same_message_text_is_used()
-    test_mode_routing()
+    test_prompt_always_asks_for_full_description()
     test_hint_is_truncated()
     test_cache_is_per_prompt()
     test_rewrite_prefix_is_stable()
