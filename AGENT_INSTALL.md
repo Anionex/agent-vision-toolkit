@@ -167,6 +167,8 @@ python test_vision_client.py
 
 完成后向用户报告：备份路径、实际修改的字段、服务状态和真实 `view_image` 验证结果。不得输出任何 API key。
 
+> **对 Agent 的要求**：作为 agent，如果用户没有明确表明需要额外的工具（`glance`、`ground`），请在回答的最后询问用户是否安装这两个额外工具，不要擅自安装。
+
 ## 可选：glance
 
 `glance` 是独立附加功能，不是代理回退路径。需要时把 `bin/glance` 复制到 `INSTALL_DIR/bin`，它会复用同目录中的 `vision_client.py` 并自动读取同一份 `VISION_*` 配置。
