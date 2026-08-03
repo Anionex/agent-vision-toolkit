@@ -18,7 +18,9 @@ image, just use `glance` — this file is not needed.
    highlighting in a monochrome code block.
 4. Verify anything you build from an image (HTML, SVG, a layout) by
    rendering it and pixel-diffing against the original — never by
-   comparing descriptions.
+   comparing descriptions. `scripts/pixel_diff.py <original> <rebuilt>`
+   does the comparison and ranks the worst regions, so you get a number
+   and a place to look instead of an impression.
 
 When the task is reproducing the image itself (a page as HTML, a graphic
 as SVG), also read `RESTORE.md`.

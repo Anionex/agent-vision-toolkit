@@ -34,14 +34,22 @@
 ## 修改后的最低验证
 
 ```bash
-python3 -m py_compile codex-vision-proxy.py vision_client.py bin/glance bin/trace
+python3 -m py_compile codex-vision-proxy.py vision_client.py ground.py detect.py bin/glance bin/trace
 python3 tests/test_image_rewrite_shapes.py
+python3 tests/test_focus_hint.py
 python3 tests/smoke_test_proxy.py
 python3 tests/test_vision_client.py
 git diff --check
 ```
 
-修改 `ground.py` 或 `bin/ground` 时，另运行 `python3 tests/test_ground.py`（需要 Pillow）。
+按改动范围追加对应测试：
+
+| 改动 | 追加命令 | 依赖 |
+|---|---|---|
+| `ground.py` / `bin/ground` | `python3 tests/test_ground.py` | Pillow |
+| `detect.py` / `bin/detect` | `python3 tests/test_detect.py` | Pillow |
+| `bin/glance` | `python3 tests/test_glance_region.py` | Pillow |
+| `bin/trace` | `python3 tests/test_trace.py` | vtracer（缺失时自动跳过 CLI 用例） |
 
 还需确认：
 

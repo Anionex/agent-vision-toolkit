@@ -47,6 +47,17 @@ ground <image> "<target>" --region X1,Y1,X2,Y2
 Output: `x1: .., y1: .., x2: .., y2: ..` in original-image pixels — with
 `--region` too (crop hits are mapped back). Multiple matches come numbered.
 
+The box is a handle, not just an answer — it feeds the next call:
+
+```bash
+$ ground screenshot.png "the send button"
+x1: 1067, y1: 841, x2: 1108, y2: 881
+$ glance screenshot.png --region 1067,841,1108,881 -q "is it enabled or greyed out?"
+```
+
+That two-step is how you inspect anything too small to survive a
+full-image pass.
+
 ## detect — inventory the elements
 
 ```bash
@@ -92,6 +103,10 @@ guessing.
   coarse-to-fine looking method.
 - `RESTORE.md` — read when reproducing an image as HTML/SVG: inventory
   workflow, trace usage in practice, verification.
+- `scripts/pixel_diff.py <original> <rebuilt>` — the verification step for
+  anything you build from an image. Prints an overall difference percentage
+  plus the worst regions as `x1: ..` boxes you can feed back into
+  `glance --region`. Paths here are relative to this skill's own directory.
 
 ## Notes
 

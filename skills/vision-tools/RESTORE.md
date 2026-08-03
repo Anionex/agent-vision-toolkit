@@ -26,8 +26,8 @@ bounded.
 ## trace in practice
 
 - **Icon / logo / line-art to SVG**: `trace --region <ground box> -o icon.svg`,
-  then verify by pixel-diffing the rendered SVG against the original crop,
-  never by eyeballing.
+  then verify by rendering the SVG and running `scripts/pixel_diff.py`
+  against the original crop, never by eyeballing.
 - **Diagram / flowchart / wireframe structure**: `--polygon` yields each box
   and arrow as a compact path with exact position and size — layout
   relations become readable text.
@@ -53,6 +53,17 @@ instead.
 
 ## Verify the result
 
-Render what you built (Playwright for HTML, rsvg-convert for SVG) and
-pixel-diff against the original screenshot, region by region. Iterate on
-the largest diffs first. Never sign off from a description comparison.
+Render what you built (Playwright for HTML, rsvg-convert for SVG), then:
+
+```bash
+python3 scripts/pixel_diff.py <original.png> <rendered.png>
+```
+
+It prints an overall difference percentage and the worst regions as
+`x1: .., y1: ..` boxes — the same form `glance --region` and
+`detect --region` take, so the top offender goes straight back into a
+zoom call. Fix the largest diff, re-render, re-run; the number should
+drop each round. Never sign off from a description comparison.
+
+The script composites transparency on white for you, which is the trap
+below — but if you diff by hand for any reason, do it yourself.
