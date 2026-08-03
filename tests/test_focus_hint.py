@@ -116,6 +116,46 @@ def test_new_user_turn_resets_assistant_intent():
     print("PASS: a new user turn invalidates earlier assistant intent")
 
 
+def test_silent_paste_falls_back_to_previous_user_text():
+    mod = _load_proxy()
+    prompts = _capture(mod)
+    body = {"input": [
+        {"type": "message", "role": "user",
+         "content": [{"type": "input_text", "text": "帮我还原这个页面"}]},
+        {"type": "message", "role": "user",
+         "content": [
+             {"type": "input_text", "text": '<image name=[Image #1] path="/tmp/codex-clipboard-x.png">'},
+             {"type": "input_image", "image_url": "data:image/png;base64,AAA"},
+             {"type": "input_text", "text": "</image>"},
+         ]},
+    ]}
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+    assert "还原这个页面" in prompts[0], prompts[0]
+    assert "<image name=" not in prompts[0], "path markup must never masquerade as the user's request"
+    print("PASS: a silent paste inherits the previous user message, not the path markup")
+
+
+def test_injected_context_never_becomes_a_hint():
+    mod = _load_proxy()
+    prompts = _capture(mod)
+    body = {"input": [
+        {"type": "message", "role": "user",
+         "content": [{"type": "input_text", "text": "# AGENTS.md instructions for /home/u\n- always do X"}]},
+        {"type": "message", "role": "user",
+         "content": [{"type": "input_text", "text": "<environment_context>\n<cwd>/home/u</cwd>\n</environment_context>"}]},
+        {"type": "message", "role": "user",
+         "content": [
+             {"type": "input_text", "text": '<image name=[Image #1] path="/tmp/codex-clipboard-x.png">'},
+             {"type": "input_image", "image_url": "data:image/png;base64,AAA"},
+             {"type": "input_text", "text": "</image>"},
+         ]},
+    ]}
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+    assert "AGENTS.md" not in prompts[0] and "environment_context" not in prompts[0], prompts[0]
+    assert "know which details matter most" not in prompts[0], "with no real user text the hint block must be omitted"
+    print("PASS: injected instruction blocks never masquerade as the user's request")
+
+
 def test_cache_is_per_prompt():
     mod = _load_proxy()
     calls = []
@@ -148,5 +188,7 @@ if __name__ == "__main__":
     test_hint_is_truncated_keeping_the_tail()
     test_view_image_uses_assistant_intent()
     test_new_user_turn_resets_assistant_intent()
+    test_silent_paste_falls_back_to_previous_user_text()
+    test_injected_context_never_becomes_a_hint()
     test_cache_is_per_prompt()
     test_rewrite_prefix_is_stable()

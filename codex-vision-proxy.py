@@ -40,6 +40,15 @@ _DESCRIBE_PROMPT = (
 )
 
 
+# Codex-injected user-role blocks that are never "the user's current request".
+_INJECTED_PREFIXES = ("<environment_context>", "<user_instructions>", "# AGENTS.md instructions")
+
+
+def _is_image_wrapper(text):
+    stripped = text.strip()
+    return stripped.startswith("<image ") or stripped == "</image>"
+
+
 _HINT_LABELS = {
     "user": "The user's current request, so you know which details matter most:",
     "assistant": "Why the coding assistant decided to view this image, so you know which details matter most:",
@@ -98,6 +107,10 @@ async def _rewrite_image_inputs(parsed):
             texts = [value["text"] for value in item.get("content") or []
                      if isinstance(value, dict) and value.get("type") == wanted
                      and isinstance(value.get("text"), str)]
+            if role == "user":
+                texts = [text for text in texts if not _is_image_wrapper(text)]
+                if texts and texts[0].lstrip().startswith(_INJECTED_PREFIXES):
+                    texts = []
             if any(text.strip() for text in texts):
                 if role == "user":
                     last_user_text = "\n".join(texts)
