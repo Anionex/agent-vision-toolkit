@@ -12,7 +12,7 @@ If your Codex is already connected to DeepSeek, but you're frustrated that the m
 
 All code has been verified in real Codex + DeepSeek sessions. Use cases include but are not limited to: image Q&A, screenshot analysis, Computer Use GUI operation, and multi-step image reasoning.
 
-Not just "a caption from a multimodal model": the description is shaped by what the current turn is asking, and it comes with tools for locating, inventorying, and measuring — see [Highlights](#highlights).
+This repository isn't just handing the image to a multimodal model and passing a generic description back; the targeting of that description, multi-image concurrency, and cross-turn caching are all handled, as detailed in the highlights below.
 
 If the agent you're using isn't Codex, you can also try installing the [visual toolkit](#install-the-vision-tools-skill-optional) from this repository — it provides CLIs that let agents interact with images.
 
@@ -36,21 +36,12 @@ If the agent you're using isn't Codex, you can also try installing the [visual t
 
 ## Highlights
 
-A naive bridge sends a fixed "describe this image" to a vision model and pastes the caption back. The goal here is different: make a text-only model see well enough to actually do the visual task.
-
-- **Question-aware descriptions, not generic captions.** Every image carries a *focus hint*: a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking. So the description covers the detail this turn needs, instead of prose about the wallpaper.
-- **The vision model is an eye, not a brain.** It transcribes and describes; it never answers the request itself, so your coding model reasons on the image rather than on someone else's conclusion.
-- **Never reasons about an image it didn't get.** If an image can't be described the request fails outright — no silent placeholder, no raw image handed to a text-only model.
-- **Both image shapes**: pasted images (`message.content`) and `view_image` results (`function_call_output.output`).
-- **N images ≈ 1 image of latency, and the same image is described once.** Images run concurrently; descriptions are cached per (image, prompt), and because both hint sources sit in immutable history the pair repeats, so later turns of a multi-step task hit the cache.
-
-**Description alone is lossy** — prose can't give you a click coordinate or exact geometry. Optional standalone CLIs cover the rest, usable by any text-only agent:
-
+- **Descriptions target the current question**: every image gets a focus hint — a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking — so the description covers the details this turn actually needs instead of being a generic caption.
+- **The vision model only looks, it doesn't reason for you**: it transcribes and describes the image and never answers the question directly; the conclusions still come from your coding model working on the description.
+- **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
+- **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
+- **Same image, one call**: descriptions are cached per (image, prompt), and both hint sources sit in the immutable conversation history, so the pair repeats and later turns of a multi-step task hit the cache at nearly zero latency.
 - **Optional `glance`**: a concise standalone CLI for image Q&A and OCR — the follow-up channel when a description misses a detail you need.
-- **Optional `ground`**: locate a target in an image with natural language and get a bounding box in original pixel coordinates — for GUI-automation clicks and zoom-in crops.
-- **Optional `detect`**: inventory the elements of a screen or region in one call — the scaffold for rebuilding a UI from a screenshot.
-- **Optional `trace`**: local, deterministic image-to-SVG tracing, no vision API involved — for reproducing icons/graphics as vectors and measuring exact shape geometry.
-- **More vision tools may be added later**
 - **Optional `ground`**: locate a target in an image with natural language and get a bounding box in original pixel coordinates — for GUI-automation clicks and zoom-in crops.
 - **Optional `detect`**: inventory the elements of a screen or region in one call — the scaffold for rebuilding a UI from a screenshot.
 - **Optional `trace`**: local, deterministic image-to-SVG tracing, no vision API involved — for reproducing icons/graphics as vectors and measuring exact shape geometry.
