@@ -37,10 +37,8 @@ If the agent you're using isn't Codex, you can also try installing the [visual t
 ## Highlights
 
 - **Descriptions target the current question**: every image gets a focus hint — a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking — so the description covers the details this turn actually needs instead of being a generic caption.
-- **The vision model only looks, it doesn't reason for you**: it transcribes and describes the image and never answers the question directly; the conclusions still come from your coding model working on the description.
 - **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
 - **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
-- **Same image, one call**: descriptions are cached per (image, prompt), and both hint sources sit in the immutable conversation history, so the pair repeats and later turns of a multi-step task hit the cache at nearly zero latency.
 - **Optional `glance`**: a concise standalone CLI for image Q&A and OCR — the follow-up channel when a description misses a detail you need.
 - **Optional `ground`**: locate a target in an image with natural language and get a bounding box in original pixel coordinates — for GUI-automation clicks and zoom-in crops.
 - **Optional `detect`**: inventory the elements of a screen or region in one call — the scaffold for rebuilding a UI from a screenshot.
