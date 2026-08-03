@@ -1,150 +1,107 @@
 ---
 name: vision-tools
-description: Use the locally installed glance, ground, detect, and trace CLIs for image analysis. Use when the user asks to describe, view, answer questions about, or OCR an image, locate an object/region in an image and get pixel coordinates, inventory the elements of a screenshot, extract exact shape geometry or vectorize graphics (image to SVG), or mentions glance/ground/detect/trace — and to re-examine an image yourself when a text description of it you were given lacks the detail you need. If the commands are missing, report that the tools are not installed.
+description: Local vision CLIs — glance (ask/describe/OCR an image), ground (locate a target, pixel box), detect (element inventory), trace (image-to-SVG geometry). Use whenever a task involves an image, answering questions about it, reading its text, finding or measuring elements in it, comparing images, or rebuilding it as HTML/SVG — and to re-examine an image yourself when a text description of it you were given (e.g. a "[vision model description]" line) lacks a detail you need. If the commands are missing, report that instead of improvising.
 ---
 
 # vision-tools
 
-The codex-vision-proxy project installs the following CLIs on this machine. They share the same vision config as the proxy (`VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL` / `LANG`) — no extra credentials needed:
+Four local CLIs that give a text-only agent eyes. They share the proxy's
+vision config (`VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL` /
+`LANG`) — no extra credentials.
 
-- `glance`: image description, Q&A, and OCR
-- `ground`: locate targets in an image with natural language and get bounding boxes in original pixel coordinates
-- `detect`: inventory the elements of an image (or a region) as a numbered list with text and boxes
-- `trace`: local deterministic image-to-SVG tracing for exact shape geometry (no vision API involved)
+Pick the tool by the question you are answering:
 
-For multi-step image work (detailed screenshot analysis, asset extraction),
-first read `METHOD.md` next to this file — the universal coarse-to-fine
-looking method. When reproducing an image as HTML/SVG, also read
-`RESTORE.md` — restoration-specific guidance.
+| Question | Tool |
+|---|---|
+| "What does this image show / say?" | `glance` |
+| "Where is X?" — one target, one pixel box | `ground` |
+| "What is here?" — inventory of elements | `detect` |
+| "What is the exact shape?" — vector outlines | `trace` |
+| Any exact number (color, offset, size) | `ground`, or code over pixels — **never `glance`** |
 
-## glance
+The last row drives the others: vision-model prose estimates numbers
+confidently but unreliably; `ground`'s boxes are calibrated to the original
+image, and pixel code (Pillow) is exact.
+
+## glance — ask about an image
 
 ```bash
-glance <image>                            # describe the image in detail
-glance <image> -q "<question>"            # ask a question about the image
-glance <image> --ocr                      # verbatim OCR of all visible text
-glance <image> --region X1,Y1,X2,Y2 -q "<question>"  # crop first; ask about the crop only
-glance <img1> <img2> [...] -q "<question>"  # several images in ONE call (compare/diff)
+glance <image>                                 # detailed description
+glance <image> -q "<question>"                 # targeted question (qualitative only)
+glance <image> --ocr                           # verbatim OCR
+glance <image> --region X1,Y1,X2,Y2 -q "..."   # zoom into a crop
+glance <img1> <img2> -q "..."                  # compare in ONE call
 ```
 
-For comparisons (before/after, two renders, expected vs actual) always pass
-both paths to a single glance call — separate calls cannot see both images at
-once. Paths are space-separated. Without `-q`, multiple images get a
-describe-then-diff answer by default. `--region` accepts exactly one image.
+Comparisons (before/after, expected vs actual) must pass all paths to a
+single call — separate calls cannot see both images. `--region` uploads
+only the crop, so small text and icons become readable.
 
-Output language follows the `LANG` setting in the vision config (`zh`/`en`).
-`--region` crops locally and uploads only the crop — use it to zoom into small
-text or icons that a full-image pass missed (requires the optional `pillow`).
-
-**Never use glance for precise numeric values** — coordinates, offsets,
-pixel distances, measurements. Free-text vision answers estimate numbers and
-the estimates look confident. For anything numeric: use `ground` first
-(its coordinates are calibrated to the original image), and if that is not
-enough, compute from the image with code (e.g. Pillow pixel math) instead of
-asking glance.
-
-## ground
+## ground — locate one target
 
 ```bash
 ground <image> "<target description>"
-ground <image> "<target>" --region X1,Y1,X2,Y2   # search only this box
+ground <image> "<target>" --region X1,Y1,X2,Y2
 ```
 
-Output format: `x1: .., y1: .., x2: .., y2: ..` (pixel coordinates in the
-original image — with `--region` too; crop hits are mapped back for you).
-Multiple matches print as numbered lines with a position word and label.
-ground answers "where is X"; to list what is there, use `detect`.
+Output: `x1: .., y1: .., x2: .., y2: ..` in original-image pixels — with
+`--region` too (crop hits are mapped back). Multiple matches come numbered.
 
-## detect
+## detect — inventory the elements
 
 ```bash
-detect <image>                        # inventory every UI element
-detect <image> "buttons"              # one category only ("icons", "links", ...)
-detect <image> --region X1,Y1,X2,Y2   # inventory inside one box
+detect <image>                        # every UI element
+detect <image> "buttons"              # one category only
+detect <image> --region X1,Y1,X2,Y2   # inside one box
 ```
 
-One call returns a numbered inventory with exact visible text and pixel
-boxes (original-image coordinates, with `--region` too). A full-screen
-pass is a fast first draft, not a guarantee — element counts vary run to
-run on dense screens. For completeness, work region by region: detect the
-layout blocks first, then `detect --region` each block you care about.
+Numbered list with exact visible text and boxes. A full-screen pass is a
+fast first draft — element counts vary run to run on dense screens. For
+completeness, detect the layout blocks first, then `detect --region` each
+block.
 
-## Re-examining an image (follow-up looks)
-
-Sometimes an image reaches you only as a text description — for example a line
-starting with `[vision model description]` if the optional proxy is installed,
-or a summary someone else wrote. If that description lacks a detail you need
-and the image's file path is visible in the conversation (pasted images live
-at a `codex-clipboard-*.png` temp path; `view_image` calls name their path
-explicitly), look again yourself:
-
-1. `glance <path> -q "<the specific detail you need>"` — targeted follow-up
-   question (qualitative details only, never numbers).
-2. `ground <path> "<target>"` then `glance <path> --region <that box> -q "..."` —
-   locate first, then zoom in to read small text or fine detail. This
-   two-step is the reliable way to inspect one element closely.
-
-If the file no longer exists (temp files are cleaned up), say so instead of guessing.
-
-## Extracting exact geometry: trace the pixels (image → SVG)
-
-Third deterministic channel, besides `ground` (semantic locating) and plain
-code over pixels: when you need real shape geometry — outlines, positions,
-sizes, spacing, curvature, or a vector reproduction — trace the bitmap
-instead of asking a vision model to estimate it. Traced coordinates come
-from the actual pixels; vision-model numbers are confident guesses.
+## trace — exact shape geometry (local, no vision API)
 
 ```bash
 trace <image>                                  # b/w spline SVG to stdout
-trace <image> --polygon                        # boxy diagrams/wireframes: near-plain rects and arrows
-trace <image> --region X1,Y1,X2,Y2 -o out.svg  # crop a ground box first (auto 2x upscale)
+trace <image> --polygon                        # boxy diagrams/wireframes
+trace <image> --region X1,Y1,X2,Y2 -o out.svg  # crop first (auto 2x upscale)
 ```
 
-Runs fully local — no vision API, no credentials. Background-path removal
-and decimal truncation are built in. Spline (default) suits curved shapes;
-`--polygon` suits boxy diagrams.
+Coordinates come from the actual pixels, not a model's estimate. Flat,
+high-contrast graphics only; text becomes curves (pair with `--ocr` when
+the text matters). Before shipping or reusing a traced SVG, read
+`RESTORE.md` — it holds the reuse traps and the ship-vs-hand-write call.
 
-Applications (non-exhaustive):
+## When you have a description instead of the image
 
-- **Reproduce an icon/logo/line-art as SVG** (UI rebuilds, vector assets):
-  `trace --region <ground box> -o icon.svg`, then verify by pixel-diffing
-  the rendered SVG against the original crop, never by eyeballing.
-  Reference: a hand-written lookalike measured 26.6% off; tracing measured
-  1.8%.
-- **Understand a diagram / flowchart / wireframe's structure**: bw+polygon
-  yields each box and arrow as a compact path with exact position and size —
-  layout relations become readable text.
-- **Measure things**: element sizes, spacing, alignment — parse the traced
-  paths (or skip SVG and compute on pixels directly) rather than asking
-  glance for numbers.
+A line starting with `[vision model description]` means the proxy replaced
+an image with text; pasted images live at a `codex-clipboard-*.png` path
+visible in the conversation, and `view_image` calls name their path. If the
+description lacks a detail you need, look again yourself:
 
-Whether to ship the traced SVG or hand-write from it depends on the shape —
-see `RESTORE.md`.
+1. `glance <path> -q "<the specific detail>"` — one qualitative follow-up.
+2. `ground <path> "<target>"` then `glance <path> --region <that box> -q "..."` —
+   locate, then zoom. The reliable way to inspect one element closely.
 
-Reusing the output correctly (both traps have burned a real session):
+If the file no longer exists (temp files get cleaned), say so instead of
+guessing.
 
-- The SVG has a **transparent background** — composite on white before any
-  pixel diff or visual check (`rsvg-convert -b white`); transparency reads
-  as black in many viewers and will be misdiagnosed as a broken trace.
-- Every `<path>` carries a `transform` attribute. When lifting a path into
-  another SVG, **copy the transform together with `d`** — holes are
-  opposite-winding subpaths and survive standalone extraction, but a
-  dropped transform displaces the shape.
+## Going deeper
 
-Boundaries: flat, high-contrast graphics only. Text becomes curves (pair
-with `--ocr` when the text matters); whole screenshots and photos do not
-trace usefully; speckle filtering deletes small features — a "0 paths"
-result means the region binarized to nothing (try `--color`, another
-threshold region, or pre-inverting dark-theme images). Low-contrast art
-(watermarks, faint patterns) binarizes away and the trace picks up the
-high-contrast content around it instead.
+- `METHOD.md` — read before any multi-step image work: the universal
+  coarse-to-fine looking method.
+- `RESTORE.md` — read when reproducing an image as HTML/SVG: inventory
+  workflow, trace usage in practice, verification.
 
 ## Notes
 
 - Only PNG / JPEG / GIF / WebP images are supported.
-- If `glance`/`ground` are not found, the optional tools were not installed — report this to the user instead of improvising a replacement.
-- If the vision API fails, relay the error faithfully; never fabricate image content.
+- If a command is not found, the optional tools were not installed — report
+  this to the user instead of improvising a replacement.
+- If the vision API fails, relay the error faithfully; never fabricate
+  image content.
 
 Source repository: https://github.com/Anionex/codex-vision-proxy
 
-If the tools are not installed, see the installation guide: https://github.com/Anionex/codex-vision-proxy/blob/main/AGENT_INSTALL.md
+Installation guide: https://github.com/Anionex/codex-vision-proxy/blob/main/AGENT_INSTALL.md
