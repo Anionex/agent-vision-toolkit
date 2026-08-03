@@ -8,11 +8,25 @@
 
 </div>
 
-If your Codex is already connected to DeepSeek, but you're frustrated that the model has no multimodal ability — it can't see images, and every attempt to look at an image is blocked by the system — this repository offers a way to let a text-only model call Codex's built-in `view_image` without errors. Instead of failing, it returns a detailed description of the image, keeping the text-only model's experience as close as possible to a multimodal one, without introducing extra MCPs, skills, or CLIs, and without the risk of repeated configuration. It also provides an optional vision toolkit that leverages multimodal models for image Q&A, OCR, visual grounding, and more.
+If your Codex is already connected to DeepSeek, but you're frustrated that the model has no multimodal ability — it can't see images, and every attempt to look at an image is blocked by the system — this repository offers a way to let a text-only model call Codex's built-in `view_image` without errors. Instead of failing, it returns a task-aware description shaped by the agent's original viewing intent, keeping the text-only model's experience as close as possible to a multimodal one, without introducing extra MCPs, skills, or CLIs, and without the risk of repeated configuration. It also provides an optional vision toolkit that leverages multimodal models for image Q&A, OCR, visual grounding, and more.
 
 All code has been verified in real Codex + DeepSeek sessions. Use cases include but are not limited to: image Q&A, screenshot analysis, Computer Use GUI operation, and multi-step image reasoning.
 
-This repository isn't just handing the image to a multimodal model and passing a generic description back; the targeting of that description, multi-image concurrency, and cross-turn caching are all handled, as detailed in the highlights below.
+Most vision wrappers simply turn an image into a generic description and leave the text model to recover the original task afterward.
+
+`codex-vision-proxy` preserves **why the agent is looking**. It extracts the viewing intent from the user message or the assistant's stated reason for calling `view_image`, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step—not a generic caption.
+
+<p align="center">
+  <img src="assets/focus-hint-comparison.png"
+       alt="Generic image descriptions compared with task-aware vision using a focus hint"
+       width="100%">
+</p>
+
+<p align="center">
+  <sub>Same image, same vision model, one call each. The hint adds no visual facts—it only tells the vision model what matters.</sub>
+</p>
+
+Multi-image concurrency and cross-turn caching further reduce latency and repeated vision calls, as detailed in the highlights below.
 
 If the agent you're using isn't Codex, you can also try installing the [visual toolkit](#install-the-vision-tools-skill-optional) from this repository — it provides CLIs that let agents interact with images.
 
@@ -166,17 +180,6 @@ Codex -> 127.0.0.1:19100 -> your existing DeepSeek upstream
 The vision prompt is not a fixed "describe this image". The proxy attaches a **focus hint** so the description covers what actually matters right now: a pasted image carries the user's request, while an image fetched via `view_image` carries the assistant's own stated reason for looking (falling back to the user text when the tool was called silently). Descriptions are cached per (image, prompt); both hint sources sit in the immutable conversation history, so the same image is described once and then hits the cache on every later turn.
 
 The first model response only asks Codex to call `view_image`. After Codex executes the tool locally, the second request carries the image; the proxy converts image to text on this request path. If the catalog explicitly declares support for `text` only, Codex's handler rejects the tool first, so `image` is appended to the existing entry only in that case.
-
-### Why the hint matters
-
-A fixed "describe this image" prompt — what an image-to-text bridge normally sends — doesn't just lose focus. It invites the model to fill in blanks. Same image, same vision model, one call each:
-
-The picture is a grid of icons paired with their traced output. Several traces came out broken, and one cell is empty — that trace produced nothing at all.
-
-- **Fixed prompt**: calls the right-hand column "larger, clearer versions", then describes the empty cell as *"faint grey dashed lines forming the partial outline of a box"*. Nothing is there.
-- **With focus hint** — the assistant had just said it wanted to see which icons were broken: opens with *"several of the traced icons are severely broken"*, labels every pair `Reference` / `Traced (Broken)`, and reports the empty cell as having no traced counterpart.
-
-The hint is a task frame, not an emphasis knob. Asked to compare pairs, the model has to answer "where is the other half?", so a gap surfaces as a gap. Asked only to describe, it narrates the picture — and patches gaps with whatever is nearby.
 
 ## FAQ
 
