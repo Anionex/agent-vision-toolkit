@@ -8,7 +8,7 @@
 
 </div>
 
-如果你的 Codex 已经接入 DeepSeek ，却烦恼于模型没有多模态，不能看图、每次调用看图都会被系统拦下，本仓库提供了一种方式，可以在不引入额外mcp、skills、cli的情况下，让纯文本模型调用codex内置view image的时候不报错，而是给出一段由 agent 看图动机塑造的、贴合当前任务的描述，尽量让纯文本模型的交互体验和多模态模型的交互体验保持一致，免去反复配置的风险。同时也提供可选的视觉工具包，利用多模态模型的能力完成图片问答、ocr、视觉定位等操作。
+如果你的 Codex 已经接入了 DeepSeek V4 这类纯文本模型，却烦恼于它不能看图、每次调用看图都会被系统拦下，本仓库提供了一种方式，可以在不引入额外mcp、skills、cli的情况下，让纯文本模型调用codex内置view image的时候不报错，而是给出一段由 agent 看图动机塑造的、贴合当前任务的描述，尽量让纯文本模型的交互体验和多模态模型的交互体验保持一致，免去反复配置的风险。同时也提供可选的视觉工具包，利用多模态模型的能力完成图片问答、ocr、视觉定位等操作。
 
 所有代码均已在真实 Codex + DeepSeek 会话中验证过。可用场景包括但不限于：图片问答，截图分析，Computer Use GUI界面操作，多步图像推理
 
@@ -60,13 +60,13 @@
 
 本仓库不提供通用一键安装器。推荐把仓库链接交给 Codex Agent：
 
-> 我已经在 Codex 中接入并可正常使用 DeepSeek。请先阅读这个仓库的 README，再按照 AGENT_INSTALL.md 根据当前系统部署并验证 `view_image`。
+> 我已经在 Codex 中接入并可正常使用一个纯文本模型。请先阅读这个仓库的 README，再按照 AGENT_INSTALL.md 根据当前系统部署并验证 `view_image`。
 
-详细执行步骤见 **[Codex Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启 Codex 后，直接粘贴图片或让 DeepSeek 调用内置 `view_image` 即可。
+详细执行步骤见 **[Codex Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启 Codex 后，直接粘贴图片或让模型调用内置 `view_image` 即可。
 
 ## 前置条件
 
-- 已可正常使用 DeepSeek 的 Codex
+- 已接入纯文本模型（如 DeepSeek V4）并可正常使用的 Codex
 - Python 3.11+
 - 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API
 
@@ -81,7 +81,7 @@ env 只需配置：
 | `VISION_MODEL` | 是 | 多模态模型名 |
 | `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
 
-DeepSeek 的认证继续由 Codex 发送并由代理透传，不需要在 env 中重复保存。
+上游模型的认证继续由 Codex 发送并由代理透传，不需要在 env 中重复保存。
 
 ## 可选工具：glance 
 
@@ -165,7 +165,7 @@ cp -r skills/vision-tools ~/.codex/skills/
 ## 工作原理
 
 ```text
-Codex -> 127.0.0.1:19100 -> 用户原有的 DeepSeek 上游
+Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
              |
              +-- 请求含图片时：
                  focus hint（用户的请求，或模型调用 view_image 时自述的动机）
@@ -178,17 +178,17 @@ Codex -> 127.0.0.1:19100 -> 用户原有的 DeepSeek 上游
 
 ## 常见问题
 
-### `base_url` 指向本地代理后，代理也需要配置 DeepSeek API key 吗？
+### `base_url` 指向本地代理后，代理也需要配置上游模型的 API key 吗？
 
-不需要。访问 DeepSeek 上游的网络请求虽然由 `127.0.0.1:19100` 的代理进程发出，但 DeepSeek API key 仍由 Codex 按原有配置放在 `Authorization` 请求头中，代理会将这个请求头原样转发给 DeepSeek：
+不需要。访问上游的网络请求虽然由 `127.0.0.1:19100` 的代理进程发出，但上游的 API key 仍由 Codex 按原有配置放在 `Authorization` 请求头中，代理会将这个请求头原样转发出去：
 
 ```text
 Codex（携带原有 Authorization）
   -> 127.0.0.1:19100
-  -> DeepSeek 上游（原样收到 Authorization）
+  -> 纯文本模型上游（原样收到 Authorization）
 ```
 
-因此不要修改 Codex 原有的认证配置，也不要在代理 env 中重复保存 `DEEPSEEK_API_KEY`。代理 env 只需配置 `VISION_API_KEY`、`VISION_BASE_URL` 和 `VISION_MODEL`。
+因此不要修改 Codex 原有的认证配置，也不要在代理 env 中重复保存上游的 API key。代理 env 只需配置 `VISION_API_KEY`、`VISION_BASE_URL` 和 `VISION_MODEL`。
 
 ## 文件清单
 
@@ -208,7 +208,7 @@ Codex（携带原有 Authorization）
 
 ## 限制
 
-- 这是图片转文字代理，不会把视觉 token 直接交给 DeepSeek。
+- 这是图片转文字代理，不会把视觉 token 直接交给纯文本模型。
 - 图片描述质量取决于所配置的视觉模型。
 - 缓存只存在于代理进程内，重启后清空。
 

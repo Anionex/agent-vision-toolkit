@@ -8,7 +8,7 @@
 
 </div>
 
-If your Codex is already connected to DeepSeek, but you're frustrated that the model has no multimodal ability — it can't see images, and every attempt to look at an image is blocked by the system — this repository offers a way to let a text-only model call Codex's built-in `view_image` without errors. Instead of failing, it returns a task-aware description shaped by the agent's original viewing intent, keeping the text-only model's experience as close as possible to a multimodal one, without introducing extra MCPs, skills, or CLIs, and without the risk of repeated configuration. It also provides an optional vision toolkit that leverages multimodal models for image Q&A, OCR, visual grounding, and more.
+If your Codex is already connected to a text-only model like DeepSeek V4, but you're frustrated that it can't see images — every attempt to look at one is blocked by the system — this repository offers a way to let a text-only model call Codex's built-in `view_image` without errors. Instead of failing, it returns a task-aware description shaped by the agent's original viewing intent, keeping the text-only model's experience as close as possible to a multimodal one, without introducing extra MCPs, skills, or CLIs, and without the risk of repeated configuration. It also provides an optional vision toolkit that leverages multimodal models for image Q&A, OCR, visual grounding, and more.
 
 All code has been verified in real Codex + DeepSeek sessions. Use cases include but are not limited to: image Q&A, screenshot analysis, Computer Use GUI operation, and multi-step image reasoning.
 
@@ -57,13 +57,13 @@ If the agent you're using isn't Codex, you can also try installing the [visual t
 
 This repository doesn't provide a universal one-click installer. The recommended way is to hand the repository link to your Codex agent:
 
-> I've already integrated DeepSeek into Codex and it works. Please read this repository's README first, then follow AGENT_INSTALL.md to deploy and verify `view_image` on the current system.
+> I've already got a text-only model working in Codex. Please read this repository's README first, then follow AGENT_INSTALL.md to deploy and verify `view_image` on the current system.
 
-Detailed steps are in the **[Codex Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a Codex restart, just paste an image or let DeepSeek call the built-in `view_image`.
+Detailed steps are in the **[Codex Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a Codex restart, just paste an image or let the model call the built-in `view_image`.
 
 ## Prerequisites
 
-- Codex with a working DeepSeek setup
+- Codex already working with a text-only model (e.g. DeepSeek V4)
 - Python 3.11+
 - An OpenAI-compatible vision API that supports `/chat/completions` and `image_url`
 
@@ -78,7 +78,7 @@ Only these env vars are required:
 | `VISION_MODEL` | Yes | Multimodal model name |
 | `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
 
-DeepSeek authentication is still sent by Codex and passed through by the proxy, so there's no need to store it again in the env.
+Upstream authentication is still sent by Codex and passed through by the proxy, so there's no need to store it again in the env.
 
 ## Optional Tool: glance (Recommended)
 
@@ -163,7 +163,7 @@ Restart Codex afterwards.
 ## How It Works
 
 ```text
-Codex -> 127.0.0.1:19100 -> your existing DeepSeek upstream
+Codex -> 127.0.0.1:19100 -> your existing text-only upstream
              |
              +-- when the request contains images:
                  focus hint (the user's request, or the assistant's
@@ -177,17 +177,17 @@ The first model response only asks Codex to call `view_image`. After Codex execu
 
 ## FAQ
 
-### After pointing `base_url` at the local proxy, does the proxy also need a DeepSeek API key?
+### After pointing `base_url` at the local proxy, does the proxy also need the upstream model's API key?
 
-No. Although the network request to the DeepSeek upstream is sent by the proxy process at `127.0.0.1:19100`, the DeepSeek API key is still placed in the `Authorization` header by Codex per your existing configuration, and the proxy forwards that header unchanged to DeepSeek:
+No. Although the network request to the upstream is sent by the proxy process at `127.0.0.1:19100`, the upstream API key is still placed in the `Authorization` header by Codex per your existing configuration, and the proxy forwards that header unchanged:
 
 ```text
 Codex (carrying the original Authorization)
   -> 127.0.0.1:19100
-  -> DeepSeek upstream (receives Authorization unchanged)
+  -> text-only upstream (receives Authorization unchanged)
 ```
 
-So don't modify Codex's existing auth config, and don't store `DEEPSEEK_API_KEY` again in the proxy env. The proxy env only needs `VISION_API_KEY`, `VISION_BASE_URL`, and `VISION_MODEL`.
+So don't modify Codex's existing auth config, and don't store the upstream API key again in the proxy env. The proxy env only needs `VISION_API_KEY`, `VISION_BASE_URL`, and `VISION_MODEL`.
 
 ## File Listing
 
@@ -208,7 +208,7 @@ So don't modify Codex's existing auth config, and don't store `DEEPSEEK_API_KEY`
 
 ## Limitations
 
-- This is an image-to-text proxy; it doesn't hand vision tokens directly to DeepSeek.
+- This is an image-to-text proxy; it doesn't hand vision tokens directly to the text model.
 - Description quality depends on the configured vision model.
 - The cache lives only inside the proxy process and is cleared on restart.
 
