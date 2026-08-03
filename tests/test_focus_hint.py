@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Unit test: vision prompts are focus-hint aware.
 
-The proxy passes the nearest preceding user text to the vision model so the
-description covers what the user actually asked about, and caches per
-(image, prompt) so different hints never reuse a mismatched description.
+The proxy passes the nearest preceding user text — or, for tool-fetched images,
+the closing paragraph of the assistant's last reasoning or message — to the
+vision model so the description covers what was actually being asked, and caches
+per (image, prompt) so different hints never reuse a mismatched description.
 """
 
 import asyncio
@@ -157,6 +158,43 @@ def test_injected_context_never_becomes_a_hint():
     print("PASS: injected instruction blocks never masquerade as the user's request")
 
 
+def test_reasoning_is_an_intent_source():
+    mod = _load_proxy()
+    prompts = _capture(mod)
+    body = {"input": [
+        {"type": "message", "role": "user",
+         "content": [{"type": "input_text", "text": "修复登录页样式"}]},
+        {"type": "reasoning",
+         "content": [{"type": "reasoning_text", "text": "先看失败截图确认按钮颜色。"}]},
+        {"type": "function_call", "name": "view_image", "call_id": "c1",
+         "arguments": "{\"path\": \"/tmp/a.png\"}"},
+        {"type": "function_call_output", "call_id": "c1",
+         "output": [{"type": "input_image", "image_url": "data:image/png;base64,AAA"}]},
+    ]}
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+    assert "确认按钮颜色" in prompts[0], prompts[0]
+    assert "decided to view" in prompts[0], "reasoning is assistant intent, not user text"
+    print("PASS: reasoning counts as the assistant's stated intent")
+
+
+def test_only_the_last_paragraph_of_the_intent_is_used():
+    mod = _load_proxy()
+    prompts = _capture(mod)
+    body = {"input": [
+        {"type": "reasoning", "content": [{"type": "reasoning_text", "text":
+            "翻了一遍 build 日志，全是无关的 webpack 警告。\n\n"
+            "又怀疑是 CSS 变量没生效，读了 theme.css，没问题。\n\n"
+            "看截图里按钮的实际颜色。"}]},
+        {"type": "function_call_output", "call_id": "c1",
+         "output": [{"type": "input_image", "image_url": "data:image/png;base64,AAA"}]},
+    ]}
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+    assert "按钮的实际颜色" in prompts[0], prompts[0]
+    assert "webpack" not in prompts[0], "the work that led to the look would bury the target"
+    assert "theme.css" not in prompts[0]
+    print("PASS: only the closing paragraph of a long reasoning becomes the hint")
+
+
 def test_cache_is_per_prompt():
     mod = _load_proxy()
     calls = []
@@ -191,5 +229,7 @@ if __name__ == "__main__":
     test_new_user_turn_resets_assistant_intent()
     test_silent_paste_gets_no_hint()
     test_injected_context_never_becomes_a_hint()
+    test_reasoning_is_an_intent_source()
+    test_only_the_last_paragraph_of_the_intent_is_used()
     test_cache_is_per_prompt()
     test_rewrite_prefix_is_stable()

@@ -9,6 +9,7 @@ from http import HTTPStatus
 import hashlib
 import json
 import os
+import re
 import signal
 import urllib.error
 import urllib.request
@@ -53,6 +54,17 @@ _HINT_LABELS = {
     "user": "The user's current request, so you know which details matter most:",
     "assistant": "Why the coding assistant decided to view this image, so you know which details matter most:",
 }
+
+
+def _last_paragraph(text):
+    """The assistant says what it is about to look at in its closing paragraph.
+
+    Everything above it is the work that led there — file listings, byte dumps,
+    abandoned theories — which as a hint would bury the one line that names the
+    target. Reasoning runs to thousands of characters; the closing line is tens.
+    """
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", text or "") if part.strip()]
+    return paragraphs[-1] if paragraphs else ""
 
 
 def _vision_prompt(hint, source="user"):
@@ -103,7 +115,16 @@ async def _rewrite_image_inputs(parsed):
             continue
         role = item.get("role")
         item_user_text = ""
-        if role in ("user", "assistant"):
+        if item.get("type") == "reasoning":
+            # Reasoning arrives in plaintext and is often the last thing the
+            # assistant produces before a tool call, so it carries the intent
+            # whenever no message was addressed to the user.
+            texts = [value["text"] for value in item.get("content") or []
+                     if isinstance(value, dict) and value.get("type") == "reasoning_text"
+                     and isinstance(value.get("text"), str)]
+            if any(text.strip() for text in texts):
+                last_assistant_text = "\n".join(texts)
+        elif role in ("user", "assistant"):
             wanted = "input_text" if role == "user" else "output_text"
             texts = [value["text"] for value in item.get("content") or []
                      if isinstance(value, dict) and value.get("type") == wanted
@@ -132,7 +153,7 @@ async def _rewrite_image_inputs(parsed):
                     # images ride the assistant's stated reason for looking,
                     # falling back to the request that drove the turn.
                     if field == "output":
-                        hint, source = ((last_assistant_text, "assistant") if last_assistant_text
+                        hint, source = ((_last_paragraph(last_assistant_text), "assistant") if last_assistant_text
                                         else (last_user_text, "user"))
                     else:
                         hint, source = item_user_text, "user"
