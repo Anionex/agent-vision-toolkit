@@ -1,6 +1,6 @@
 ---
 name: vision-tools
-description: Use the locally installed glance and ground CLIs for image analysis. Use when the user asks to describe, view, answer questions about, or OCR an image, locate an object/region in an image and get pixel coordinates, extract exact shape geometry or vectorize graphics (image to SVG), or mentions glance/ground — and to re-examine an image yourself when a text description of it you were given lacks the detail you need. If the commands are missing, report that the tools are not installed.
+description: Use the locally installed glance, ground, detect, and trace CLIs for image analysis. Use when the user asks to describe, view, answer questions about, or OCR an image, locate an object/region in an image and get pixel coordinates, inventory the elements of a screenshot, extract exact shape geometry or vectorize graphics (image to SVG), or mentions glance/ground/detect/trace — and to re-examine an image yourself when a text description of it you were given lacks the detail you need. If the commands are missing, report that the tools are not installed.
 ---
 
 # vision-tools
@@ -9,6 +9,7 @@ The codex-vision-proxy project installs the following CLIs on this machine. They
 
 - `glance`: image description, Q&A, and OCR
 - `ground`: locate targets in an image with natural language and get bounding boxes in original pixel coordinates
+- `detect`: inventory the elements of an image (or a region) as a numbered list with text and boxes
 - `trace`: local deterministic image-to-SVG tracing for exact shape geometry (no vision API involved)
 
 For multi-step image work (detailed screenshot analysis, asset extraction),
@@ -46,19 +47,27 @@ asking glance.
 
 ```bash
 ground <image> "<target description>"
+ground <image> "<target>" --region X1,Y1,X2,Y2   # search only this box
 ```
 
-Output format: `x1: .., y1: .., x2: .., y2: ..` (pixel coordinates in the original image).
+Output format: `x1: .., y1: .., x2: .., y2: ..` (pixel coordinates in the
+original image — with `--region` too; crop hits are mapped back for you).
+Multiple matches print as numbered lines with a position word and label.
+ground answers "where is X"; to list what is there, use `detect`.
 
-The target can be exhaustive — a category or a whole-screen inventory in
-one call, instead of dozens of single-target calls:
+## detect
 
 ```bash
-ground page.png "every distinct UI element: buttons, links, inputs, icons, labels, headings — include the exact visible text in each label"
+detect <image>                        # inventory every UI element
+detect <image> "buttons"              # one category only ("icons", "links", ...)
+detect <image> --region X1,Y1,X2,Y2   # inventory inside one box
 ```
 
-Multiple matches print as numbered lines with a position word and label:
-`4. top-left refresh button x1: 152, y1: 15, x2: 168, y2: 28`.
+One call returns a numbered inventory with exact visible text and pixel
+boxes (original-image coordinates, with `--region` too). A full-screen
+pass is a fast first draft, not a guarantee — element counts vary run to
+run on dense screens. For completeness, work region by region: detect the
+layout blocks first, then `detect --region` each block you care about.
 
 ## Re-examining an image (follow-up looks)
 

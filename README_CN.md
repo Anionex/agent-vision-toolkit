@@ -40,6 +40,7 @@
 - **同图只调一次**：按（图片, prompt）缓存描述，同一张图反复出现不重复调用视觉 API，缓存命中近乎零延迟。
 - **可选 `glance`**：简洁的独立 CLI，图片问答和 OCR——描述里缺了你要的细节时，用它追问补充。
 - **可选 `ground`**：用自然语言定位图片中的目标，输出原图像素坐标下的边界框——用于 GUI 自动化点击和局部放大裁剪。
+- **可选 `detect`**：一次调用盘点整屏或区域内的元素清单——从截图还原 UI 时的脚手架。
 - **可选 `trace`**：本地确定性图转 SVG 描摹，不经过视觉 API——用于把图标/图形还原成矢量、精确测量形状几何。
 - **后续可能加入的更多视觉工具** 
 
@@ -104,7 +105,25 @@ ground screenshot.png "发送按钮"
 x1: 1067, y1: 841, x2: 1108, y2: 881
 ```
 
-每次只分析一张完整图片，并输出目标在原图中的像素坐标。target 也可以是穷举式的——`ground page.png "每一个 UI 元素，带上可见文字"` 一次调用返回整屏元素的编号清单。
+每次只分析一张完整图片，并输出目标在原图中的像素坐标。加 `--region X1,Y1,X2,Y2` 可只在该框内查找，输出仍是原图坐标。
+
+## 可选工具：detect
+
+`detect` 是独立 CLI，盘点图片（或指定区域）中的元素——输出编号清单，带逐字可见文字和像素框：
+
+```bash
+detect page.png
+detect page.png "buttons"
+detect page.png --region 238,600,953,671
+```
+
+```
+1. bottom-left Do anything x1: 253, y1: 601, x2: 328, y2: 609
+2. bottom-left + x1: 254, y1: 650, x2: 268, y2: 665
+3. bottom-right stop button x1: 924, y1: 645, x2: 952, y2: 670
+```
+
+整屏一遍是快速初稿；密集页面要完整清单时，按区域逐块盘点。
 
 ## 可选工具：trace
 
@@ -167,6 +186,7 @@ Codex（携带原有 Authorization）
 | `vision_client.py` | 代理与 `glance` 共用的视觉 API 客户端 |
 | `bin/glance` | 可选的图片描述、问答和 OCR CLI |
 | `ground.py` / `bin/ground` | 可选的图片目标定位 CLI |
+| `detect.py` / `bin/detect` | 可选的元素盘点 CLI（与 ground 共用实现） |
 | `bin/trace` | 可选的本地图转 SVG 描摹 CLI（精确形状几何，不调视觉 API） |
 | `AGENT_INSTALL.md` | Codex Agent 的安装与验证步骤 |
 | `tests/test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |

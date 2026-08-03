@@ -147,7 +147,7 @@ Startup 目录由 PowerShell 的 `[Environment]::GetFolderPath("Startup")` 获�
 用当前系统的 Python 命令运行仓库内核心测试：
 
 ```text
-python -m py_compile codex-vision-proxy.py vision_client.py bin/glance bin/trace
+python -m py_compile codex-vision-proxy.py vision_client.py bin/glance bin/trace ground.py detect.py
 python tests/test_image_rewrite_shapes.py
 python tests/smoke_test_proxy.py
 python tests/test_vision_client.py
@@ -167,7 +167,7 @@ python tests/test_vision_client.py
 
 完成后向用户报告：备份路径、实际修改的字段、服务状态和真实 `view_image` 验证结果。不得输出任何 API key。
 
-> **对 Agent 的要求**：作为 agent，如果用户没有明确表明需要额外的工具（`glance`、`ground`、`trace`），请在回答的最后询问用户是否安装这些额外工具，不要擅自安装。
+> **对 Agent 的要求**：作为 agent，如果用户没有明确表明需要额外的工具（`glance`、`ground`、`detect`、`trace`），请在回答的最后询问用户是否安装这些额外工具，不要擅自安装。
 
 ## 可选：glance
 
@@ -188,6 +188,16 @@ wrapper 必须使用当前系统的绝对 Python 和脚本路径，并放入用�
 2. 用 `uv` 在 `INSTALL_DIR/.venv-ground` 创建隔离环境，只安装额外依赖 `pillow`。
 3. 创建调用该环境 Python 和 `bin/ground` 的 shell 或 `.cmd` wrapper，放入用户 PATH 中的可写目录（同 glance，如 `~/.local/bin`；若不在 PATH，将其加入用户级 PATH）；不得覆盖用户已有的同名命令。完成后新开终端即可直接运行 `ground <图片> "<目标描述>"`。
 4. 验证：`ground /path/to/image.png "目标描述"`。
+
+## 可选：detect
+
+`detect` 盘点图片（或指定区域）中的元素并输出编号清单和原图像素坐标。它与 `ground` 共用实现和 `.venv-ground` 环境。
+
+用户需要时：
+
+1. 将 `detect.py` 和 `bin/detect` 复制到 `INSTALL_DIR` 对应位置（依赖已随 ground 安装的 `ground.py` 与 `pillow`）。
+2. 按 ground 相同方式创建 wrapper 放入 PATH；不得覆盖用户已有的同名命令。
+3. 验证：`detect /path/to/screenshot.png` 应输出编号元素清单。
 
 ## 可选：trace
 

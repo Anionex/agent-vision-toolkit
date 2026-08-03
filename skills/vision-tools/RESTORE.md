@@ -4,13 +4,14 @@ Read this only when the task is reproducing what an image shows — a page
 as HTML, an icon or diagram as SVG. The universal looking method in
 `METHOD.md` still applies; this file adds the restoration-specific calls.
 
-## Inventory first: one exhaustive ground call
+## Inventory first: detect, then refine by region
 
-Start with one exhaustive `ground` call for the whole element inventory
-(see the ground section in SKILL.md) rather than locating elements one by
-one — a real restoration session spent most of its time on dozens of
-single-target calls that one call replaces. Then refine per element:
-zoom with `glance --region`, sample colors with Pillow.
+Start with one full-screen `detect` call for the element inventory rather
+than locating elements one by one — a real restoration session spent most
+of its time on dozens of single-target calls that one call replaces. A
+full-screen pass under-reports on dense screens, so treat it as the
+scaffold: `detect --region` each layout block for a complete local list,
+then zoom with `glance --region` and sample colors with Pillow.
 
 ## Traced SVG: ship it or reference it
 

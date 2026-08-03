@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import io
 import json
 import re
 import sys
@@ -120,19 +122,47 @@ def parse_matches(text: str, width: int, height: int, target: str) -> list[Match
     return matches
 
 
-def locate(image_path: Path, target: str) -> list[Match]:
+def _parse_region(region: str, width: int, height: int) -> tuple[int, int, int, int]:
+    try:
+        x1, y1, x2, y2 = (int(value) for value in region.split(","))
+    except ValueError:
+        raise GroundError("--region expects four integers: X1,Y1,X2,Y2 (pixels)") from None
+    box = (max(0, min(x1, x2)), max(0, min(y1, y2)),
+           min(width, max(x1, x2)), min(height, max(y1, y2)))
+    if box[2] <= box[0] or box[3] <= box[1]:
+        raise GroundError(f"--region {region} is empty after clamping to {width}x{height}")
+    return box
+
+
+def locate(image_path: Path, target: str, region: str | None = None) -> list[Match]:
     if Image is None:
         raise GroundError("ground requires Pillow; install the optional dependency pillow first")
     load_default_env()
+    box = None
     try:
         with Image.open(image_path) as image:
             width, height = image.size
+            if region:
+                box = _parse_region(region, width, height)
+                buffer = io.BytesIO()
+                image.crop(box).save(buffer, format="PNG")
+                url = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
     except (OSError, ValueError) as exc:
         raise GroundError(f"Cannot read image: {image_path}") from exc
+    if box is None:
+        url = image_path_to_data_url(image_path)
+        width_used, height_used = width, height
+    else:
+        width_used, height_used = box[2] - box[0], box[3] - box[1]
     # 8192 leaves room for exhaustive targets ("every UI element"): a dense
     # screen can emit dozens of boxes and 2048 truncated the JSON mid-array.
-    response = describe_image(image_path_to_data_url(image_path), build_prompt(target), max_tokens=8192)
-    return parse_matches(response, width, height, target)
+    response = describe_image(url, build_prompt(target), max_tokens=8192)
+    matches = parse_matches(response, width_used, height_used, target)
+    if box is None:
+        return matches
+    # Matches were parsed in crop coordinates; report them in the original image.
+    return [Match(m.label, (m.bbox[0] + box[0], m.bbox[1] + box[1],
+                            m.bbox[2] + box[0], m.bbox[3] + box[1])) for m in matches]
 
 
 def _position(box: tuple[int, int, int, int], width: int, height: int) -> str:
@@ -167,9 +197,11 @@ def main() -> None:
     )
     parser.add_argument("image", type=Path, help="path to the image")
     parser.add_argument("target", help="target object or region to locate")
+    parser.add_argument("--region", metavar="X1,Y1,X2,Y2",
+                        help="search only this pixel box; output stays in original-image coordinates")
     args = parser.parse_args()
     try:
-        matches = locate(args.image.expanduser(), args.target)
+        matches = locate(args.image.expanduser(), args.target, region=args.region)
         if Image is None:
             raise GroundError("ground requires Pillow; install the optional dependency pillow first")
         with Image.open(args.image.expanduser()) as image:

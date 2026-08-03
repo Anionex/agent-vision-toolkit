@@ -39,6 +39,7 @@ If the agent you're using isn't Codex, you can also try installing the [visual t
 - **Same image, one call**: descriptions are cached per (image, prompt), so the same image appearing repeatedly doesn't re-invoke the vision API; cache hits are nearly zero-latency.
 - **Optional `glance`**: a concise standalone CLI for image Q&A and OCR — the follow-up channel when a description misses a detail you need.
 - **Optional `ground`**: locate a target in an image with natural language and get a bounding box in original pixel coordinates — for GUI-automation clicks and zoom-in crops.
+- **Optional `detect`**: inventory the elements of a screen or region in one call — the scaffold for rebuilding a UI from a screenshot.
 - **Optional `trace`**: local, deterministic image-to-SVG tracing, no vision API involved — for reproducing icons/graphics as vectors and measuring exact shape geometry.
 - **More vision tools may be added later**
 
@@ -104,7 +105,25 @@ ground screenshot.png "Send button"
 x1: 1067, y1: 841, x2: 1108, y2: 881
 ```
 
-It analyzes one full image per call and outputs the target's pixel coordinates in the original image. The target can also be exhaustive — `ground page.png "every distinct UI element with its exact text"` returns a numbered inventory of the whole screen in a single call.
+It analyzes one full image per call and outputs the target's pixel coordinates in the original image. With `--region X1,Y1,X2,Y2` it searches only that box and still reports original-image coordinates.
+
+## Optional Tool: detect
+
+`detect` is a standalone CLI that inventories the elements of an image (or a region) — a numbered list with exact visible text and pixel boxes:
+
+```bash
+detect page.png
+detect page.png "buttons"
+detect page.png --region 238,600,953,671
+```
+
+```
+1. bottom-left Do anything x1: 253, y1: 601, x2: 328, y2: 609
+2. bottom-left + x1: 254, y1: 650, x2: 268, y2: 665
+3. bottom-right stop button x1: 924, y1: 645, x2: 952, y2: 670
+```
+
+A full-screen pass is a fast first draft; for completeness on dense screens, inventory region by region.
 
 ## Optional Tool: trace
 
@@ -168,12 +187,14 @@ So don't modify Codex's existing auth config, and don't store `DEEPSEEK_API_KEY`
 | `vision_client.py` | Vision API client shared by the proxy and `glance` |
 | `bin/glance` | Optional image description, Q&A, and OCR CLI |
 | `ground.py` / `bin/ground` | Optional image target-grounding CLI |
+| `detect.py` / `bin/detect` | Optional element-inventory CLI (shares the ground machinery) |
 | `bin/trace` | Optional local image-to-SVG tracing CLI (exact shape geometry, no vision API) |
 | `AGENT_INSTALL.md` | Installation and verification steps for Codex agents |
 | `tests/test_image_rewrite_shapes.py` | Tests for image structures, concurrency, caching, and failure behavior |
 | `tests/smoke_test_proxy.py` | Tests for proxy pass-through, auth, and streaming protocol |
 | `tests/test_vision_client.py` | Vision client retry and `glance` tests |
 | `tests/test_ground.py` | `ground` coordinate parsing and shared config tests |
+| `tests/test_detect.py` | `detect` inventory and region coordinate-mapping tests |
 
 ## Limitations
 
