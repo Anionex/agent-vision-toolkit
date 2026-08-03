@@ -2,7 +2,7 @@
 
 # codex-vision-proxy
 
-<sub>formerly `codex-deepseek-vision`</sub>
+**What it thinks is what it sees — a way to make a text-only model "see" images with its mind's eye, a vision toolkit, and a drop-in setup for Codex.**
 
 🌐 [**中文**](README_CN.md) ｜ **English**
 
@@ -14,19 +14,13 @@ All code has been verified in real Codex + DeepSeek sessions. Use cases include 
 
 Most vision wrappers simply turn an image into a generic description and leave the text model to recover the original task afterward.
 
-`codex-vision-proxy` preserves **why the agent is looking**. It extracts the viewing intent from the user message or the assistant's stated reason for calling `view_image`, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step—not a generic caption.
+`codex-vision-proxy` preserves **why the agent is looking**. It extracts the viewing intent from the user message or the assistant's stated reason for calling `view_image`, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step—not a generic "detailed description."
 
 <p align="center">
   <img src="assets/focus-hint-comparison.png"
        alt="Generic image descriptions compared with task-aware vision using a focus hint"
        width="100%">
 </p>
-
-<p align="center">
-  <sub>Same image, same vision model, one call each. The hint adds no visual facts—it only tells the vision model what matters.</sub>
-</p>
-
-Multi-image concurrency and cross-turn caching further reduce latency and repeated vision calls, as detailed in the highlights below.
 
 If the agent you're using isn't Codex, you can also try installing the [visual toolkit](#install-the-vision-tools-skill-optional) from this repository — it provides CLIs that let agents interact with images.
 
@@ -217,14 +211,6 @@ So don't modify Codex's existing auth config, and don't store `DEEPSEEK_API_KEY`
 - This is an image-to-text proxy; it doesn't hand vision tokens directly to DeepSeek.
 - Description quality depends on the configured vision model.
 - The cache lives only inside the proxy process and is cleared on restart.
-
-## Design References
-
-This project draws on the following work:
-
-- **Describe-then-reason pipeline** — [Prism](https://arxiv.org/abs/2406.14544) (NeurIPS 2024)
-- **Question-aware descriptions** (focus hint) — [PromptCap](https://arxiv.org/abs/2211.09699) (ICCV 2023); Qwen Code visionBridge
-- **Crop and zoom** (`glance --region`) — [V*](https://arxiv.org/abs/2312.14135) (CVPR 2024), [ZoomEye](https://arxiv.org/abs/2411.16044) (EMNLP 2025)
 
 ---
 

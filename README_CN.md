@@ -2,9 +2,9 @@
 
 # codex-vision-proxy
 
-<sub>曾用名 `codex-deepseek-vision`</sub>
+**所想即所见——一个让纯文本模型“用意念”看图的方法和视觉工具包，以及无缝接入 Codex 的现成方案。**
 
-🌐 **语言 / Language**：**中文** ｜ [**English**](README.md)
+🌐 **中文** ｜ [**English**](README.md)
 
 </div>
 
@@ -14,19 +14,13 @@
 
 大多数视觉转接方案只是把图片变成一段通用描述，之后再让纯文本模型自己去把原本的任务找回来。
 
-`codex-vision-proxy` 保留的是 **agent 为什么要看这张图**。它从用户消息、或模型调用 `view_image` 时自述的理由中提取出看图动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容——而不是一段通用 caption。
+`codex-vision-proxy` 保留的是 **agent 为什么要看这张图**。它从用户消息、或模型调用 `view_image` 时自述的理由中提取出看图动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容，而不是一段通用的“详细描述”。
 
 <p align="center">
   <img src="assets/focus-hint-comparison.png"
        alt="通用图片描述与带 focus hint 的任务感知视觉的对比"
        width="100%">
 </p>
-
-<p align="center">
-  <sub>同一张图、同一个视觉模型，各调一次。hint 没有增加任何画面信息——它只是告诉视觉模型此刻什么重要。</sub>
-</p>
-
-多图并发和跨轮缓存进一步降低了延迟和重复的视觉调用，具体见下面的亮点。
 
 如果你正在用的 agent 不是 Codex，也可以尝试一下安装项目里的 [visual toolkit](#安装-vision-tools-skill可选)，提供了 cli 让 agent 与图片交互
 
@@ -218,13 +212,6 @@ Codex（携带原有 Authorization）
 - 图片描述质量取决于所配置的视觉模型。
 - 缓存只存在于代理进程内，重启后清空。
 
-## 设计参考
-
-本项目参考了如下工作：
-
-- **"描述 + 推理"两级范式** — [Prism](https://arxiv.org/abs/2406.14544)（NeurIPS 2024）
-- **问题导向描述**（focus hint）— [PromptCap](https://arxiv.org/abs/2211.09699)（ICCV 2023）；Qwen Code visionBridge
-- **裁剪放大**（`glance --region`）— [V*](https://arxiv.org/abs/2312.14135)（CVPR 2024）、[ZoomEye](https://arxiv.org/abs/2411.16044)（EMNLP 2025）
 
 ---
 Made by [Anionex](https://github.com/Anionex) with codex
