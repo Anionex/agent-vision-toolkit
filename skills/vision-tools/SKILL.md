@@ -33,9 +33,16 @@ glance <image> --region X1,Y1,X2,Y2 -q "..."   # zoom into a crop
 glance <img1> <img2> -q "..."                  # compare in ONE call
 ```
 
-Comparisons (before/after, expected vs actual) must pass all paths to a
-single call — separate calls cannot see both images. `--region` uploads
-only the crop, so small text and icons become readable.
+When you do compare with `glance`, pass all paths to one call — separate
+calls cannot see both images, so two descriptions compared afterwards are
+two hallucination surfaces, not a comparison. `--region` uploads only the
+crop, so small text and icons become readable.
+
+But "what changed between these two?" is not a glance question. A one-word
+badge or an 18px shift is a rounding error to a vision model and exact to
+`scripts/pixel_diff.py`, which reports where the pixels differ and by how
+much. Diff first to get the box, then `glance --region` that box to read
+what the change actually is.
 
 ## ground — locate one target
 
@@ -103,10 +110,11 @@ guessing.
   coarse-to-fine looking method.
 - `RESTORE.md` — read when reproducing an image as HTML/SVG: inventory
   workflow, trace usage in practice, verification.
-- `scripts/pixel_diff.py <original> <rebuilt>` — the verification step for
-  anything you build from an image. Prints an overall difference percentage
-  plus the worst regions as `x1: ..` boxes you can feed back into
-  `glance --region`. Paths here are relative to this skill's own directory.
+- `scripts/pixel_diff.py <a> <b>` — compare two images exactly. Any
+  before/after, design-vs-rebuild, or expected-vs-actual question starts
+  here. Prints an overall difference percentage plus the worst regions as
+  `x1: ..` boxes you can feed straight into `glance --region`. Paths here
+  are relative to this skill's own directory.
 
 ## Notes
 
