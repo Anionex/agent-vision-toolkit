@@ -55,7 +55,8 @@ def test_shapes():
     assert rb, "shape B (function_call_output.output) was not rewritten"
     assert not rc, "text-only body must stay untouched"
     out = body_b["input"][1]["output"]
-    assert out[0]["type"] == "input_text" and "TEST-DESC" in out[0]["text"], out
+    assert out[0]["text"].startswith("[vision proxy]"), out
+    assert out[1]["type"] == "input_text" and "TEST-DESC" in out[1]["text"], out
     print("PASS: shapes A (content) and B (output) rewritten; text-only untouched")
 
 
@@ -84,7 +85,8 @@ def test_parallel():
         assert changed, "3 images were not rewritten"
         assert dt < 1.1, f"not parallel: 3x0.4s serial would be ~1.2s, got {dt:.2f}s"
         texts = [c["text"] for c in body["input"][1]["content"]]
-        assert all(t.startswith("[vision model description] SLOW-DESC") for t in texts)
+        assert texts[0].startswith("[vision proxy]"), texts[0]
+        assert all(t.startswith("[vision model description] SLOW-DESC") for t in texts[1:])
         print(f"PASS: 3 images described in parallel ({dt:.2f}s vs ~1.2s serial)")
     finally:
         mod._image_desc_from_url = real_desc
@@ -126,8 +128,34 @@ def test_failure_reason_is_included():
     print("PASS: failure reason is included in the raised error")
 
 
+def test_channel_note_lands_once_on_the_first_image():
+    mod = _load_proxy()
+    data = "data:image/png;base64,AAA"
+    # A view_image result arrives before any pasted image: the note belongs to it,
+    # because a session that never pastes still needs to learn how the channel works.
+    body = {"input": [
+        {"type": "function_call_output", "call_id": "c1",
+         "output": [{"type": "input_image", "image_url": data}]},
+        {"type": "message", "role": "user",
+         "content": [{"type": "input_text", "text": "and this one"},
+                     {"type": "input_image", "image_url": "data:image/png;base64,BBB"}]},
+    ]}
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+
+    first = body["input"][0]["output"]
+    assert first[0]["text"].startswith("[vision proxy]"), first
+    assert first[1]["text"].startswith("[vision model description] "), first
+
+    notes = [block["text"] for item in body["input"]
+             for block in (item.get("content") or item.get("output") or [])
+             if block.get("text", "").startswith("[vision proxy]")]
+    assert len(notes) == 1, f"the note must appear once per conversation, got {len(notes)}"
+    print("PASS: channel note lands once, on the conversation's first image")
+
+
 if __name__ == "__main__":
     test_shapes()
     test_parallel()
     test_failure_is_not_forwarded()
     test_failure_reason_is_included()
+    test_channel_note_lands_once_on_the_first_image()

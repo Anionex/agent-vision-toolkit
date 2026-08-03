@@ -215,7 +215,7 @@ def test_rewrite_prefix_is_stable():
         "type": "message", "role": "user",
         "content": [{"type": "input_image", "image_url": "data:image/png;base64,AAA"}]}]}
     assert asyncio.run(mod._rewrite_image_inputs(body))
-    text = body["input"][0]["content"][0]["text"]
+    text = body["input"][0]["content"][1]["text"]  # [0] is the one-time channel note
     assert text.startswith("[vision model description] "), text
     print("PASS: rewritten text keeps the lightweight description prefix")
 

@@ -40,6 +40,19 @@ _DESCRIBE_PROMPT = (
     "and transcribe all visible text verbatim."
 )
 
+# The coding model never sees a raw image, so it cannot discover on its own that
+# the reason it states before calling view_image is what the next description is
+# written to answer. Without that, it calls view_image having said nothing ("let
+# me look at the image") and pays for a second generic description of a file it
+# already has one for.
+_CHANNEL_NOTE = (
+    "[vision proxy] Images reach you as text here: a vision model reads the file "
+    "and writes a description — you never receive visual tokens, and `view_image` "
+    "returns a description as well. Each one is written to answer the stated reason "
+    "for looking. Whenever a description misses what you need, say what you are "
+    "looking for and call `view_image`: the next one is written to answer that."
+)
+
 
 # Codex-injected user-role blocks that are never "the user's current request".
 _INJECTED_PREFIXES = ("<environment_context>", "<user_instructions>", "# AGENTS.md instructions")
@@ -187,6 +200,12 @@ async def _rewrite_image_inputs(parsed):
     prefix = "[vision model description] "
     for item, field, index, url, prompt in jobs:
         item[field][index] = {"type": "input_text", "text": prefix + descriptions[(url, prompt)]}
+    # Explain the channel once, at the conversation's first image whichever path
+    # it arrived on. The history is append-only, so "first" keeps pointing at the
+    # same block on every later turn: the note is replayed, never repeated, and
+    # the vision prompt is untouched so no cache key moves.
+    first_item, first_field, first_index = jobs[0][:3]
+    first_item[first_field].insert(first_index, {"type": "input_text", "text": _CHANNEL_NOTE})
     _log(f"[vision-proxy] image rewrite ok images={len(requests)} cache_entries={len(_DESC_CACHE)}")
     return True
 
