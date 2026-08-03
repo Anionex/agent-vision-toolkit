@@ -50,6 +50,16 @@ ground <image> "<target description>"
 
 Output format: `x1: .., y1: .., x2: .., y2: ..` (pixel coordinates in the original image).
 
+The target can be exhaustive — a category or a whole-screen inventory in
+one call, instead of dozens of single-target calls:
+
+```bash
+ground page.png "every distinct UI element: buttons, links, inputs, icons, labels, headings — include the exact visible text in each label"
+```
+
+Multiple matches print as numbered lines with a position word and label:
+`4. top-left refresh button x1: 152, y1: 15, x2: 168, y2: 28`.
+
 ## Re-examining an image (follow-up looks)
 
 Sometimes an image reaches you only as a text description — for example a line

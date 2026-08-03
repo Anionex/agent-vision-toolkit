@@ -104,7 +104,7 @@ ground screenshot.png "Send button"
 x1: 1067, y1: 841, x2: 1108, y2: 881
 ```
 
-It analyzes one full image per call and outputs the target's pixel coordinates in the original image.
+It analyzes one full image per call and outputs the target's pixel coordinates in the original image. The target can also be exhaustive — `ground page.png "every distinct UI element with its exact text"` returns a numbered inventory of the whole screen in a single call.
 
 ## Optional Tool: trace
 

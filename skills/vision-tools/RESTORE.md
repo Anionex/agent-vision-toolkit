@@ -4,6 +4,14 @@ Read this only when the task is reproducing what an image shows — a page
 as HTML, an icon or diagram as SVG. The universal looking method in
 `METHOD.md` still applies; this file adds the restoration-specific calls.
 
+## Inventory first: one exhaustive ground call
+
+Start with one exhaustive `ground` call for the whole element inventory
+(see the ground section in SKILL.md) rather than locating elements one by
+one — a real restoration session spent most of its time on dozens of
+single-target calls that one call replaces. Then refine per element:
+zoom with `glance --region`, sample colors with Pillow.
+
 ## Traced SVG: ship it or reference it
 
 Ship the traced SVG as-is for organic or irregular shapes — that is where
