@@ -241,10 +241,6 @@ class Proxy:
         self.upstream = upstream.rstrip("/")
         self.codex_header_compat = codex_header_compat
         self.inject_reasoning_summary = inject_reasoning_summary
-        self.inflight = 0
-        self.idle = asyncio.Event()
-        self.idle.set()
-        self.server = None
         os.environ["CODEX_VISION_PROXY_LOG"] = log_path
 
     def _upstream_headers(self, incoming):
@@ -262,8 +258,6 @@ class Proxy:
         return headers
 
     async def handle(self, reader, writer):
-        self.inflight += 1
-        self.idle.clear()
         response = None
         response_started = False
         try:
@@ -318,9 +312,6 @@ class Proxy:
                 await writer.wait_closed()
             except Exception:
                 pass
-            self.inflight -= 1
-            if not self.inflight:
-                self.idle.set()
 
     async def _open_upstream(self, method, path, body, headers):
         request = urllib.request.Request(self.upstream + path, data=body or None, method=method)
@@ -394,7 +385,6 @@ class Proxy:
 
     async def serve(self):
         server = await asyncio.start_server(self.handle, "127.0.0.1", self.port)
-        self.server = server
         _log(f"[vision-proxy] listening on 127.0.0.1:{self.port} -> {self.upstream}")
         async with server:
             await server.serve_forever()
@@ -418,40 +408,16 @@ async def main():
             parser.error(str(exc))
     proxy = Proxy(args.port, args.upstream, args.log, args.codex_header_compat, args.inject_reasoning_summary)
     stopped = asyncio.Event()
-    reloading = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:
             loop.add_signal_handler(sig, stopped.set)
         except NotImplementedError:
             pass
-    # SIGHUP swaps in edited code and a re-read env file without breaking the turn
-    # in flight: stop accepting, let running requests finish, then re-exec. execv
-    # keeps the pid, so launchd/systemd see a process that never went away.
-    if hasattr(signal, "SIGHUP"):
-        try:
-            loop.add_signal_handler(signal.SIGHUP, reloading.set)
-        except NotImplementedError:
-            pass
     task = asyncio.create_task(proxy.serve())
-    waiters = [asyncio.ensure_future(event.wait()) for event in (stopped, reloading)]
-    await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
-    for waiter in waiters:
-        waiter.cancel()
-    if reloading.is_set():
-        # Close the listener ourselves rather than leaning on Server.wait_closed(),
-        # which only began waiting for live handlers in Python 3.12.1 — older system
-        # Pythons would exec straight through a half-sent stream.
-        if proxy.server is not None:
-            proxy.server.close()
-        if proxy.inflight:
-            _log(f"[vision-proxy] reload pending, draining {proxy.inflight} request(s)")
-            await proxy.idle.wait()
+    await stopped.wait()
     task.cancel()
-    await asyncio.gather(task, *waiters, return_exceptions=True)
-    if reloading.is_set():
-        _log("[vision-proxy] reloading")
-        os.execv(os.sys.executable, [os.sys.executable, os.path.abspath(__file__), *os.sys.argv[1:]])
+    await asyncio.gather(task, return_exceptions=True)
 
 
 if __name__ == "__main__":

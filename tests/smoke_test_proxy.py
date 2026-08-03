@@ -8,14 +8,12 @@ that carries Codex identity signals, and checks:
   - model names pass through unchanged except for the gpt-5.2 display alias
   - a text-only request body passes through byte-for-byte
   - the response body streams through successfully
-  - SIGHUP reloads in place without truncating a request in flight
 """
 
 import http.client
 import importlib.util
 import json
 import os
-import signal
 import subprocess
 import sys
 import time
@@ -187,33 +185,6 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
         assert broken_response.status == 200
         assert b"HTTP/1.1 502" not in broken_body
         print("PARTIAL STREAM PASS: an upstream disconnect does not append a second HTTP response")
-
-        if hasattr(signal, "SIGHUP"):
-            # The upstream holds this stream open for 0.6s, so the signal lands
-            # while the request is genuinely in flight.
-            slow = http.client.HTTPConnection("127.0.0.1", 19101, timeout=10)
-            slow.request("POST", "/responses", body=body, headers={"Content-Type": "application/json"})
-            time.sleep(0.2)
-            pr.send_signal(signal.SIGHUP)
-            slow_body = slow.getresponse().read()
-            slow.close()
-            assert slow_body == FIRST + SECOND, slow_body
-            deadline = time.monotonic() + 10
-            while True:
-                try:
-                    after = http.client.HTTPConnection("127.0.0.1", 19101, timeout=5)
-                    after.request("POST", "/responses", body=body, headers={"Content-Type": "application/json"})
-                    assert after.getresponse().read() == FIRST + SECOND
-                    after.close()
-                    break
-                except OSError:
-                    if time.monotonic() > deadline:
-                        raise
-                    time.sleep(0.2)
-            assert pr.poll() is None, "execv reloads in place, so the pid must survive"
-            assert "draining 1 request(s)" in open(log).read(), (
-                "the stream must be held open by our own drain, not by the Python version")
-            print("RELOAD PASS: SIGHUP finishes the request in flight, then re-execs in place")
     finally:
         conn.close()
         up.terminate()

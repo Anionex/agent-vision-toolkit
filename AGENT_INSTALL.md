@@ -142,10 +142,6 @@ Startup 目录由 PowerShell 的 `[Environment]::GetFolderPath("Startup")` 获�
 
 不需要迁移旧服务、事务式安装或复杂自动回滚。失败时保留备份并修正明确的问题。
 
-### 更新代码或 env 之后
-
-macOS / Linux 上 `kill -HUP <pid>`：代理停止接受新连接，等手上的请求跑完，再原地 exec 自己。pid 不变，进程管理器不会察觉，正在进行的那一轮 Codex 也不会被掐断。先跑第 6 步的测试再发信号——代理带着语法错误 exec 就直接退出了。Windows 没有 SIGHUP，重新运行 `.cmd` 启动项即可。
-
 ## 6. 验证
 
 用当前系统的 Python 命令运行仓库内核心测试：
