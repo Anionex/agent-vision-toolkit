@@ -181,12 +181,11 @@ anything multi-step, work outside-in:
 ## Use cases
 
 Each file below is one job, start to finish: when it applies, the call
-sequence, and how to tell you got it right. Read the one that matches;
-skip the rest.
+sequence, and how to tell you got it right.
 
-| You are doing this | Read |
-|---|---|
-| Rebuilding what an image shows — a page as HTML, an icon or diagram as SVG, extracting a visual component | `references/restore.md` |
+When you are rebuilding what an image shows — a page as HTML, an icon or
+diagram as SVG, extracting a visual component — please read
+`references/restore.md`.
 
 ## Notes
 
