@@ -17,11 +17,21 @@ Pick the tool by the question you are answering:
 | "Where is X?" — one target, one pixel box | `ground` |
 | "What is here?" — inventory of elements | `detect` |
 | "What is the exact shape?" — vector outlines | `trace` |
-| Any exact number (color, offset, size) | `ground`, or code over pixels — **never `glance`** |
+| Any exact number (color, offset, size) | code over pixels (Pillow), or `trace` for geometry — **not `glance`, and not `ground`** |
 
-The last row drives the others: vision-model prose estimates numbers
-confidently but unreliably; `ground`'s boxes are calibrated to the original
-image, and pixel code (Pillow) is exact.
+The last row is the one that decides the others, and the dividing line is
+not which CLI you call — it is whether the number came from a model or
+from the pixels. `ground` runs the same vision model `glance` does; it
+just returns a box. That box arrives on a 0-1000 grid and is then scaled
+to your image, so its resolution tops out at image-width/1000 — 1px on a
+1000px screenshot, ~4px on a 4K one — with the model's own error stacked
+on top. Measured against a solid rectangle on a flat background, the
+easiest case there is, it still lands a pixel off on some edges.
+
+So `ground` gives you a handle, not a measurement: good enough to crop
+with, to click, to know where to sample. When the number itself is the
+answer — a hex value, a 2px misalignment, a font size — read it off the
+pixels with Pillow, or off `trace`, which is local and deterministic.
 
 ## glance — ask about an image
 
