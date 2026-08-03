@@ -17,7 +17,7 @@
 `codex-vision-proxy` 保留的是 **agent 为什么要看这张图**。它从用户消息、或模型调用 `view_image` 时自述的理由中提取出看图动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容，而不是一段通用的“详细描述”。
 
 <p align="center">
-  <img src="assets/focus-hint-comparison.png"
+  <img src="assets/focus-hint-comparison-cn.png"
        alt="通用图片描述与带 focus hint 的任务感知视觉的对比"
        width="100%">
 </p>
