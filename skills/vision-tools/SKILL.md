@@ -1,11 +1,11 @@
 ---
 name: vision-tools
-description: Local vision CLIs — glance (ask/describe/OCR an image), ground (locate a target, pixel box), detect (element inventory), trace (image-to-SVG geometry). Use whenever a task involves an image, answering questions about it, reading its text, finding or measuring elements in it, comparing images, or rebuilding it as HTML/SVG — and to re-examine an image yourself when a text description of it you were given (e.g. a "[vision model description]" line) lacks a detail you need. If the commands are missing, report that instead of improvising.
+description: Local vision CLIs — glance (ask/describe/OCR an image), ground (locate a target, pixel box), detect (element inventory), trace (image-to-SVG geometry). Use whenever a task involves an image, answering questions about it, reading its text, finding or measuring elements in it, comparing images, or rebuilding it as HTML/SVG — and to re-examine an image yourself when a text description of it you were given lacks a detail you need. If the commands are missing, report that instead of improvising.
 ---
 
 # vision-tools
 
-Four local CLIs that give a text-only agent eyes. They share the proxy's
+Four local CLIs that give a text-only agent eyes. They read one shared
 vision config (`VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL` /
 `LANG`) — no extra credentials.
 
@@ -75,10 +75,9 @@ the text matters). Before shipping or reusing a traced SVG, read
 
 ## When you have a description instead of the image
 
-A line starting with `[vision model description]` means the proxy replaced
-an image with text; pasted images live at a `codex-clipboard-*.png` path
-visible in the conversation, and `view_image` calls name their path. If the
-description lacks a detail you need, look again yourself:
+If an image reached you only as text — a description written by a person,
+a tool, or another model — and the image's file path is visible in the
+conversation, do not reason past a missing detail. Look again yourself:
 
 1. `glance <path> -q "<the specific detail>"` — one qualitative follow-up.
 2. `ground <path> "<target>"` then `glance <path> --region <that box> -q "..."` —
