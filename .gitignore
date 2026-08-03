@@ -5,3 +5,4 @@ __pycache__/
 # 本机 agent 指令文件，只存在于本地，不上推 GitHub
 AGENTS.md
 CLAUDE.md
+research/_work/
