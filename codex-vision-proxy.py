@@ -102,6 +102,7 @@ async def _rewrite_image_inputs(parsed):
         if not isinstance(item, dict):
             continue
         role = item.get("role")
+        item_user_text = ""
         if role in ("user", "assistant"):
             wanted = "input_text" if role == "user" else "output_text"
             texts = [value["text"] for value in item.get("content") or []
@@ -113,7 +114,8 @@ async def _rewrite_image_inputs(parsed):
                     texts = []
             if any(text.strip() for text in texts):
                 if role == "user":
-                    last_user_text = "\n".join(texts)
+                    item_user_text = "\n".join(texts)
+                    last_user_text = item_user_text
                     # A new user turn makes earlier assistant intent stale.
                     last_assistant_text = ""
                 else:
@@ -124,13 +126,17 @@ async def _rewrite_image_inputs(parsed):
                 continue
             for index, value in enumerate(values):
                 if isinstance(value, dict) and value.get("type") == "input_image" and isinstance(value.get("image_url"), str):
-                    # Pasted images (content) ride the user's request; tool-fetched
-                    # images (output) ride the assistant's stated reason for looking.
-                    if field == "output" and last_assistant_text:
-                        prompt = _vision_prompt(last_assistant_text, "assistant")
+                    # Pasted images ride only their own message's text: a silent
+                    # paste is ambiguous (answering the agent, or a new topic?),
+                    # so no earlier text may masquerade as its intent. Tool-fetched
+                    # images ride the assistant's stated reason for looking,
+                    # falling back to the request that drove the turn.
+                    if field == "output":
+                        hint, source = ((last_assistant_text, "assistant") if last_assistant_text
+                                        else (last_user_text, "user"))
                     else:
-                        prompt = _vision_prompt(last_user_text)
-                    jobs.append((item, field, index, value["image_url"], prompt))
+                        hint, source = item_user_text, "user"
+                    jobs.append((item, field, index, value["image_url"], _vision_prompt(hint, source)))
     if not jobs:
         return False
     requests = list(dict.fromkeys((job[3], job[4]) for job in jobs))

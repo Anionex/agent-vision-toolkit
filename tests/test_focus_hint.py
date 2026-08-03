@@ -116,7 +116,7 @@ def test_new_user_turn_resets_assistant_intent():
     print("PASS: a new user turn invalidates earlier assistant intent")
 
 
-def test_silent_paste_falls_back_to_previous_user_text():
+def test_silent_paste_gets_no_hint():
     mod = _load_proxy()
     prompts = _capture(mod)
     body = {"input": [
@@ -130,9 +130,10 @@ def test_silent_paste_falls_back_to_previous_user_text():
          ]},
     ]}
     assert asyncio.run(mod._rewrite_image_inputs(body))
-    assert "还原这个页面" in prompts[0], prompts[0]
-    assert "<image name=" not in prompts[0], "path markup must never masquerade as the user's request"
-    print("PASS: a silent paste inherits the previous user message, not the path markup")
+    assert "know which details matter most" not in prompts[0], (
+        "a silent paste is ambiguous - no earlier text may masquerade as its intent")
+    assert "<image name=" not in prompts[0]
+    print("PASS: a silent paste gets a plain describe prompt, no borrowed hint")
 
 
 def test_injected_context_never_becomes_a_hint():
@@ -188,7 +189,7 @@ if __name__ == "__main__":
     test_hint_is_truncated_keeping_the_tail()
     test_view_image_uses_assistant_intent()
     test_new_user_turn_resets_assistant_intent()
-    test_silent_paste_falls_back_to_previous_user_text()
+    test_silent_paste_gets_no_hint()
     test_injected_context_never_becomes_a_hint()
     test_cache_is_per_prompt()
     test_rewrite_prefix_is_stable()
