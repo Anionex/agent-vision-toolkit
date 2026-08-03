@@ -89,7 +89,8 @@ trace <image> --region X1,Y1,X2,Y2 -o out.svg  # crop first (auto 2x upscale)
 Coordinates come from the actual pixels, not a model's estimate. Flat,
 high-contrast graphics only; text becomes curves (pair with `--ocr` when
 the text matters). Before shipping or reusing a traced SVG, read
-`RESTORE.md` — it holds the reuse traps and the ship-vs-hand-write call.
+`references/restore.md` — it holds the reuse traps and the
+ship-vs-hand-write call.
 
 ## When you have a description instead of the image
 
@@ -104,17 +105,51 @@ conversation, do not reason past a missing detail. Look again yourself:
 If the file no longer exists (temp files get cleaned), say so instead of
 guessing.
 
-## Going deeper
+## Coarse to fine — the method behind every task above
 
-- `METHOD.md` — read before any multi-step image work: the universal
-  coarse-to-fine looking method.
-- `RESTORE.md` — read when reproducing an image as HTML/SVG: inventory
-  workflow, trace usage in practice, verification.
-- `scripts/pixel_diff.py <a> <b>` — compare two images exactly. Any
-  before/after, design-vs-rebuild, or expected-vs-actual question starts
-  here. Prints an overall difference percentage plus the worst regions as
-  `x1: ..` boxes you can feed straight into `glance --region`. Paths here
-  are relative to this skill's own directory.
+For a single question about an image, `glance` is the whole answer. For
+anything multi-step, work outside-in:
+
+1. One full-image pass (`glance`, or a description you already have) for
+   the layout and an inventory of what is where.
+2. For any element that matters, `ground` it, then zoom with
+   `glance --region <box> -q "..."`. Full-image passes routinely miss small
+   text and icons; a crop puts all the pixels on one detail, so the model
+   sees it at effectively higher resolution.
+3. Never take a vision answer for a pixel-level fact — exact colors, small
+   offsets, sizes. Sample the pixels with code instead. Vision models
+   confidently report styling that is not there: coloured syntax
+   highlighting in a monochrome code block, a border that does not exist.
+
+## Use cases
+
+Each file below is one job, start to finish: when it applies, the call
+sequence, and how to tell you got it right. Read the one that matches;
+skip the rest.
+
+| You are doing this | Read |
+|---|---|
+| Rebuilding what an image shows — a page as HTML, an icon or diagram as SVG, extracting a visual component | `references/restore.md` |
+
+## Bundled script
+
+`scripts/pixel_diff.py <a> <b>` — compare two images exactly. Any
+before/after, design-vs-rebuild, or expected-vs-actual question starts
+here. Prints an overall difference percentage plus the worst regions as
+`x1: ..` boxes you can feed straight into `glance --region`. Paths here
+are relative to this skill's own directory.
+
+Two rules about reading that output, both about not stopping early:
+
+- **A low percentage does not mean a single defect.** The ranking is where
+  to start looking, not the list of what is wrong. One cell can hold two
+  faults at once — a wrong fill colour is loud enough to hide an 18px
+  shift underneath it. Having explained the top region, check whether it
+  also moved, resized, or changed shape, and keep working down the
+  remaining ranked regions until they come back clean.
+- **Never conclude from a description comparison.** Your prose description
+  of A against your prose description of B tells you nothing — both came
+  from the same model, so its blind spots cancel out instead of showing up.
 
 ## Notes
 
