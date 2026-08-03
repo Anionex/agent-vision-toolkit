@@ -9,6 +9,7 @@ import json
 import mimetypes
 import os
 from pathlib import Path
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -139,11 +140,13 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
             body = exc.read().decode(errors="replace")[:400].replace(api_key, "<redacted>")
             body = body.replace("\r", " ").replace("\n", " ")
             if exc.code in {429, 500, 502, 503, 504} and attempt < retries:
+                print(f"vision: HTTP {exc.code}, retrying ({attempt + 1}/{retries})", file=sys.stderr)
                 time.sleep(min(2 ** attempt, 4))
                 continue
             raise VisionError(f"Vision API HTTP {exc.code}: {body}") from exc
         except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as exc:
             if attempt < retries:
+                print(f"vision: {type(exc).__name__}, retrying ({attempt + 1}/{retries})", file=sys.stderr)
                 time.sleep(min(2 ** attempt, 4))
                 continue
             reason = getattr(exc, "reason", str(exc))
