@@ -14,6 +14,11 @@ import tempfile
 
 WHITE_FILLS = {"#ffffff", "#fff", "white"}
 
+# Speckle filtering drops components under a fixed pixel area, so a 30px icon
+# binarizes to nothing at 1x while the same icon enlarged traces cleanly.
+# Enlarge anything smaller than this; full-size screenshots already clear it.
+TARGET_MIN_SIDE = 256
+
 
 def strip_background(svg):
     """Drop the leading full-canvas white path vtracer emits for the background."""
@@ -30,13 +35,18 @@ def truncate_decimals(svg, places=2):
 
 
 def prepare_input(path, region, scale):
-    """Crop/upscale with Pillow when requested; return a path vtracer can read."""
-    if not region and scale == 1:
-        return str(path)
+    """Crop/upscale with Pillow when asked; return the path vtracer reads and the scale used.
+
+    `scale` may be None, meaning "pick one from the size": small shapes are
+    enlarged until they survive speckle filtering. Without Pillow we cannot
+    measure the image, so that choice falls back to no upscale.
+    """
     try:
         from PIL import Image
     except ImportError:
-        sys.exit("trace: --region/--scale require Pillow; install the optional dependency pillow first")
+        if region or (scale or 1) != 1:
+            sys.exit("trace: --region/--scale require Pillow; install the optional dependency pillow first")
+        return str(path), 1
     with Image.open(path) as image:
         if region:
             try:
@@ -48,11 +58,16 @@ def prepare_input(path, region, scale):
             if box[2] <= box[0] or box[3] <= box[1]:
                 sys.exit(f"trace: --region {region} is empty after clamping to {image.width}x{image.height}")
             image = image.crop(box)
+        if scale is None:
+            shortest = max(min(image.width, image.height), 1)
+            scale = max(2 if region else 1, -(-TARGET_MIN_SIDE // shortest))
+        if not region and scale == 1:
+            return str(path), 1
         if scale != 1:
             image = image.resize((image.width * scale, image.height * scale), Image.LANCZOS)
         handle = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
         image.save(handle.name)
-        return handle.name
+        return handle.name, scale
 
 
 def main():
@@ -64,7 +79,8 @@ def main():
     parser.add_argument("--region", metavar="X1,Y1,X2,Y2",
                         help="crop to this pixel box first (e.g. a box from ground)")
     parser.add_argument("--scale", type=int, metavar="N",
-                        help="upscale N times before tracing (default: 2 with --region, else 1)")
+                        help="upscale N times before tracing (default: enough to clear "
+                             f"{TARGET_MIN_SIDE}px on the shorter side, so small icons survive)")
     parser.add_argument("--polygon", action="store_true",
                         help="polygon mode for boxy diagrams/wireframes (default: spline for curved shapes)")
     parser.add_argument("--color", action="store_true",
@@ -78,8 +94,7 @@ def main():
     source = Path(args.image).expanduser()
     if not source.is_file():
         parser.exit(1, f"trace: Image not found: {source}\n")
-    scale = args.scale if args.scale else (2 if args.region else 1)
-    work = prepare_input(source, args.region, scale)
+    work, scale = prepare_input(source, args.region, args.scale)
     with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as out:
         vtracer.convert_image_to_svg_py(
             work, out.name,
@@ -89,9 +104,17 @@ def main():
         )
         svg = Path(out.name).read_text()
     svg = truncate_decimals(strip_background(svg))
+    paths = svg.count("<path")
+    if not paths:
+        # This is where an agent decides the tool cannot see the shape and goes
+        # back to guessing. Name the recoveries instead, cheapest first.
+        print("trace: 0 paths - nothing survived binarization. Try a larger --scale, "
+              "--region to crop closer to the shape, or pre-invert a light-on-dark image. "
+              "--color is a last resort: on an anti-aliased image it splits every gray "
+              "level into its own path.", file=sys.stderr)
     if args.output:
         Path(args.output).expanduser().write_text(svg)
-        print(f"wrote {args.output} ({len(svg)} bytes, {svg.count('<path')} paths, traced at {scale}x)")
+        print(f"wrote {args.output} ({len(svg)} bytes, {paths} paths, traced at {scale}x)")
     else:
         print(svg)
 

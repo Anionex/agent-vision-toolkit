@@ -60,6 +60,36 @@ def main():
         assert "paths" in result.stdout
         print("PASS: trace CLI produces cleaned SVG")
 
+        # Speckle filtering drops components under a fixed pixel area, so the
+        # details of a small icon binarize to nothing at 1x. Left there an agent
+        # concludes "trace cannot see this" and falls back to guessing the
+        # shape, so the default has to enlarge the image first.
+        icon = os.path.join(raw, "icon.png")
+        small = Image.new("RGB", (24, 24), "white")
+        for x in range(10, 12):
+            for y in range(10, 12):
+                small.putpixel((x, y), (0, 0, 0))
+        small.save(icon)
+        icon_svg = os.path.join(raw, "icon.svg")
+        auto = subprocess.run([sys.executable, cli, icon, "--polygon", "-o", icon_svg],
+                              text=True, capture_output=True, check=True)
+        assert "traced at 1x" not in auto.stdout, auto.stdout
+        assert "0 paths" not in auto.stdout, "a small icon must survive the default trace"
+        assert "<path" in open(icon_svg).read()
+
+        forced = subprocess.run([sys.executable, cli, icon, "--scale", "1", "--polygon",
+                                 "-o", icon_svg], text=True, capture_output=True, check=True)
+        assert "0 paths" in forced.stdout
+        assert "--scale" in forced.stderr, "an empty trace must name its recoveries, not dead-end"
+        print("PASS: small icons are upscaled by default; an empty trace explains the way out")
+
+        wide = os.path.join(raw, "wide.png")
+        image.resize((1200, 600), Image.NEAREST).save(wide)
+        big = subprocess.run([sys.executable, cli, wide, "-o", out],
+                             text=True, capture_output=True, check=True)
+        assert "traced at 1x" in big.stdout, "images already past the threshold must not be resized"
+        print("PASS: full-size images still trace at 1x")
+
 
 if __name__ == "__main__":
     main()
