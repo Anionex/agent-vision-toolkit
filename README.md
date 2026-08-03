@@ -167,6 +167,17 @@ The vision prompt is not a fixed "describe this image". The proxy attaches a **f
 
 The first model response only asks Codex to call `view_image`. After Codex executes the tool locally, the second request carries the image; the proxy converts image to text on this request path. If the catalog explicitly declares support for `text` only, Codex's handler rejects the tool first, so `image` is appended to the existing entry only in that case.
 
+### Why the hint matters
+
+A fixed "describe this image" prompt — what an image-to-text bridge normally sends — doesn't just lose focus. It invites the model to fill in blanks. Same image, same vision model, one call each:
+
+The picture is a grid of icons paired with their traced output. Several traces came out broken, and one cell is empty — that trace produced nothing at all.
+
+- **Fixed prompt**: calls the right-hand column "larger, clearer versions", then describes the empty cell as *"faint grey dashed lines forming the partial outline of a box"*. Nothing is there.
+- **With focus hint** — the assistant had just said it wanted to see which icons were broken: opens with *"several of the traced icons are severely broken"*, labels every pair `Reference` / `Traced (Broken)`, and reports the empty cell as having no traced counterpart.
+
+The hint is a task frame, not an emphasis knob. Asked to compare pairs, the model has to answer "where is the other half?", so a gap surfaces as a gap. Asked only to describe, it narrates the picture — and patches gaps with whatever is nearby.
+
 ## FAQ
 
 ### After pointing `base_url` at the local proxy, does the proxy also need a DeepSeek API key?
