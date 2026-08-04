@@ -14,12 +14,15 @@ All code has been verified in real Codex + DeepSeek sessions. Use cases include 
 
 Most vision wrappers simply turn an image into a generic description and leave the text model to recover the original task afterward.
 
-`codex-vision-proxy` preserves **why the agent is looking**. It extracts the viewing intent from the user message or the assistant's stated reason for calling `view_image`, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step—not a generic "detailed description."
+`codex-vision-proxy` preserves **why the agent is looking**. It extracts the viewing intent from the user message or the assistant's stated reason for calling `view_image`, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step—not a generic "detailed description." Lower cost, higher accuracy, and faster response times.
 
 <p align="center">
-  <img src="assets/focus-hint-comparison.png"
-       alt="Generic image descriptions compared with task-aware vision using a focus hint"
-       width="100%">
+  <img src="assets/focus-hint-comparison-1.png"
+       alt="Generic image descriptions compared with task-aware vision using a focus hint - Part 1"
+       width="49%">
+  <img src="assets/focus-hint-comparison-2.png"
+       alt="Generic image descriptions compared with task-aware vision using a focus hint - Part 2"
+       width="49%">
 </p>
 
 If the agent you're using isn't Codex, you can also try installing the [visual toolkit](#install-the-vision-tools-skill-optional) from this repository — it provides CLIs that let agents interact with images.

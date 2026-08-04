@@ -14,12 +14,15 @@
 
 大多数视觉转接方案只是把图片变成一段通用描述，之后再让纯文本模型自己去把原本的任务找回来。
 
-`codex-vision-proxy` 保留的是 **agent 为什么要看这张图**。它从用户消息、或模型调用 `view_image` 时自述的理由中提取出看图动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容，而不是一段通用的“详细描述”。
+`codex-vision-proxy` 保留的是 **agent 为什么要看这张图**。它从用户消息、或模型调用 `view_image` 时自述的理由中提取出看图动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容，而不是一段通用的“详细描述”。更低成本，更高的准确率，更快的响应速度。
 
 <p align="center">
-  <img src="assets/focus-hint-comparison-cn.png"
-       alt="通用图片描述与带 focus hint 的任务感知视觉的对比"
-       width="100%">
+  <img src="assets/focus-hint-comparison-cn-1.png"
+       alt="通用图片描述与带 focus hint 的任务感知视觉的对比 - 上半部分"
+       width="49%">
+  <img src="assets/focus-hint-comparison-cn-2.png"
+       alt="通用图片描述与带 focus hint 的任务感知视觉的对比 - 下半部分"
+       width="49%">
 </p>
 
 如果你正在用的 agent 不是 Codex，也可以尝试一下安装项目里的 [visual toolkit](#安装-vision-tools-skill可选)，提供了 cli 让 agent 与图片交互
