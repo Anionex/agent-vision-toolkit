@@ -185,6 +185,58 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
         assert broken_response.status == 200
         assert b"HTTP/1.1 502" not in broken_body
         print("PARTIAL STREAM PASS: an upstream disconnect does not append a second HTTP response")
+
+        # ---- other dialects: text-only bodies pass through byte-for-byte ----
+        def roundtrip(path, dialect_body, extra_headers):
+            conn2 = http.client.HTTPConnection("127.0.0.1", 19101, timeout=5)
+            conn2.request("POST", path, body=dialect_body,
+                          headers={"Content-Type": "application/json", **extra_headers})
+            resp2 = conn2.getresponse()
+            resp2.read()
+            conn2.close()
+            return resp2.status, open("/tmp/up_body.json", "rb").read(), json.load(open("/tmp/up_headers.json"))
+
+        anth_body = ('{"model":"user-configured-model","max_tokens":100,"system":"s",'
+                     '"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}')
+        status, raw, ups2 = roundtrip("/v1/messages", anth_body, {"x-api-key": "existing-anthropic-key"})
+        assert status == 200 and raw == anth_body.encode(), (status, raw)
+        assert next((v for k, v in ups2.items() if k.lower() == "x-api-key"), None) == "existing-anthropic-key"
+        chat_body = '{"model":"user-configured-model","messages":[{"role":"user","content":"hello"}]}'
+        status, raw, _ = roundtrip("/v1/chat/completions", chat_body, {"Authorization": "Bearer chat-key"})
+        assert status == 200 and raw == chat_body.encode(), (status, raw)
+        print("DIALECT PASS: anthropic and chat text-only bodies pass through byte-for-byte")
+
+        # ---- fail-closed: image bodies without vision config must 502, never forward ----
+        env2 = {k: v for k, v in os.environ.items() if not k.startswith("VISION_")}
+        pr2 = subprocess.Popen(
+            [py, proxy_script, "--port", "19102", "--upstream", "http://127.0.0.1:19999",
+             "--log", "/tmp/ds_proxy_test2.log", "--skip-vision-config-check"],
+            stdout=open("/tmp/ds_proxy_proc2.log", "w"), stderr=subprocess.STDOUT, env=env2,
+        )
+        time.sleep(1.2)
+        try:
+            open("/tmp/up_body.json", "wb").close()
+            for path, image_body in (
+                ("/v1/messages",
+                 '{"model":"m","messages":[{"role":"user","content":[{"type":"image",'
+                 '"source":{"type":"base64","media_type":"image/png","data":"AAAA"}}]}]}'),
+                ("/v1/chat/completions",
+                 '{"model":"m","messages":[{"role":"user","content":[{"type":"image_url",'
+                 '"image_url":{"url":"data:image/png;base64,AAAA"}}]}]}'),
+                ("/responses",
+                 '{"model":"m","input":[{"type":"message","role":"user",'
+                 '"content":[{"type":"input_image","image_url":"data:image/png;base64,AAAA"}]}]}'),
+            ):
+                conn3 = http.client.HTTPConnection("127.0.0.1", 19102, timeout=5)
+                conn3.request("POST", path, body=image_body, headers={"Content-Type": "application/json"})
+                resp3 = conn3.getresponse()
+                resp3.read()
+                conn3.close()
+                assert resp3.status == 502, (path, resp3.status)
+            assert open("/tmp/up_body.json", "rb").read() == b"", "an image body leaked upstream"
+            print("FAIL-CLOSED PASS: image bodies in all three dialects 502 without a vision config")
+        finally:
+            pr2.terminate()
     finally:
         conn.close()
         up.terminate()

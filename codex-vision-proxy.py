@@ -285,6 +285,68 @@ def _collect_anthropic_jobs(parsed):
     return jobs
 
 
+# Chat-Completions hosts wrap environment state in user-role blocks too
+# (Cline/Roo append <environment_details> to every turn).
+_CHAT_INJECTED_PREFIXES = ("<environment_details>", "<environment_context>")
+
+
+def _chat_image_url(block):
+    image_url = block.get("image_url")
+    if isinstance(image_url, dict) and isinstance(image_url.get("url"), str):
+        return image_url["url"]
+    if isinstance(image_url, str):
+        return image_url
+    return None
+
+
+def _collect_chat_jobs(parsed):
+    """OpenAI Chat Completions (Cline, Roo, Aider, ...): messages[] with image_url blocks."""
+    jobs = []
+    last_user_text = ""
+    last_assistant_text = ""
+    for message in parsed["messages"]:
+        if not isinstance(message, dict):
+            continue
+        role = message.get("role")
+        content = message.get("content")
+        blocks = content if isinstance(content, list) else []
+        if isinstance(content, str):
+            texts = [content]
+        else:
+            texts = [block["text"] for block in blocks
+                     if isinstance(block, dict) and block.get("type") == "text"
+                     and isinstance(block.get("text"), str)]
+        item_user_text = ""
+        if role == "user":
+            texts = [text for text in texts
+                     if not text.lstrip().startswith(_CHAT_INJECTED_PREFIXES)]
+            if any(text.strip() for text in texts):
+                item_user_text = "\n".join(texts)
+                last_user_text = item_user_text
+                # A new user turn makes earlier assistant intent stale. Tool
+                # results arrive as role="tool" messages, so they never pass
+                # through this branch.
+                last_assistant_text = ""
+        elif role == "assistant":
+            if any(text.strip() for text in texts):
+                last_assistant_text = "\n".join(texts)
+        for index, block in enumerate(blocks):
+            if not (isinstance(block, dict) and block.get("type") == "image_url"):
+                continue
+            url = _chat_image_url(block)
+            if not url:
+                continue
+            if role == "user":
+                hint, source = item_user_text, "user"
+            else:
+                # A tool-fetched image rides the assistant's stated reason for
+                # looking, falling back to the request that drove the turn.
+                hint, source = ((_last_paragraph(last_assistant_text), "assistant") if last_assistant_text
+                                else (last_user_text, "user"))
+            jobs.append((blocks, index, url, _vision_prompt(hint, source)))
+    return jobs
+
+
 def _detect_format(parsed):
     if isinstance(parsed.get("input"), list):
         return "responses"
@@ -301,6 +363,8 @@ def _detect_format(parsed):
             if not isinstance(block, dict):
                 continue
             kind = block.get("type")
+            if kind == "image_url":
+                return "chat"
             if kind == "image":
                 return "anthropic"
             if kind == "tool_result":
@@ -314,6 +378,7 @@ def _detect_format(parsed):
 _FORMATS = {
     "responses": (_collect_responses_jobs, lambda text: {"type": "input_text", "text": text}, _CHANNEL_NOTE),
     "anthropic": (_collect_anthropic_jobs, lambda text: {"type": "text", "text": text}, _ANTHROPIC_CHANNEL_NOTE),
+    "chat": (_collect_chat_jobs, lambda text: {"type": "text", "text": text}, _CHAT_CHANNEL_NOTE),
 }
 
 
