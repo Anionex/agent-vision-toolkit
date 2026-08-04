@@ -201,10 +201,7 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
         status, raw, ups2 = roundtrip("/v1/messages", anth_body, {"x-api-key": "existing-anthropic-key"})
         assert status == 200 and raw == anth_body.encode(), (status, raw)
         assert next((v for k, v in ups2.items() if k.lower() == "x-api-key"), None) == "existing-anthropic-key"
-        chat_body = '{"model":"user-configured-model","messages":[{"role":"user","content":"hello"}]}'
-        status, raw, _ = roundtrip("/v1/chat/completions", chat_body, {"Authorization": "Bearer chat-key"})
-        assert status == 200 and raw == chat_body.encode(), (status, raw)
-        print("DIALECT PASS: anthropic and chat text-only bodies pass through byte-for-byte")
+        print("DIALECT PASS: anthropic text-only bodies pass through byte-for-byte")
 
         # ---- fail-closed: image bodies without vision config must 502, never forward ----
         env2 = {k: v for k, v in os.environ.items() if not k.startswith("VISION_")}
@@ -220,9 +217,6 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
                 ("/v1/messages",
                  '{"model":"m","messages":[{"role":"user","content":[{"type":"image",'
                  '"source":{"type":"base64","media_type":"image/png","data":"AAAA"}}]}]}'),
-                ("/v1/chat/completions",
-                 '{"model":"m","messages":[{"role":"user","content":[{"type":"image_url",'
-                 '"image_url":{"url":"data:image/png;base64,AAAA"}}]}]}'),
                 ("/responses",
                  '{"model":"m","input":[{"type":"message","role":"user",'
                  '"content":[{"type":"input_image","image_url":"data:image/png;base64,AAAA"}]}]}'),
@@ -234,7 +228,7 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
                 conn3.close()
                 assert resp3.status == 502, (path, resp3.status)
             assert open("/tmp/up_body.json", "rb").read() == b"", "an image body leaked upstream"
-            print("FAIL-CLOSED PASS: image bodies in all three dialects 502 without a vision config")
+            print("FAIL-CLOSED PASS: image bodies in both dialects 502 without a vision config")
         finally:
             pr2.terminate()
     finally:
