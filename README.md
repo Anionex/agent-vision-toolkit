@@ -2,7 +2,7 @@
 
 # codex-vision-proxy
 
-**What it thinks is what it sees — a way to make a text-only model "see" images with its mind's eye, a vision toolkit, and a drop-in setup for Codex.**
+**What it thinks is what it sees — a way to make a text-only model "see" images with its mind's eye, a vision toolkit, and drop-in setups for Codex, Claude Code, Pi, Oh My Pi, and OpenCode.**
 
 🌐 [**中文**](README_CN.md) ｜ **English**
 
@@ -10,7 +10,19 @@
 
 If your Codex is already connected to a text-only model like DeepSeek V4, but you're frustrated that it can't see images — every attempt to look at one is blocked by the system — this repository offers a way to let a text-only model call Codex's built-in `view_image` without errors. Instead of failing, it returns a task-aware description shaped by the agent's original viewing intent, keeping the text-only model's experience as close as possible to a multimodal one, without introducing extra MCPs, skills, or CLIs, and without the risk of repeated configuration. It also provides an optional vision toolkit that leverages multimodal models for image Q&A, OCR, visual grounding, and more.
 
-All code has been verified in real Codex + DeepSeek sessions. Use cases include but are not limited to: image Q&A, screenshot analysis, Computer Use GUI operation, and multi-step image reasoning.
+All code has been verified in real Codex + DeepSeek sessions, and the same pipeline has been live-verified end-to-end in Claude Code, Pi, Oh My Pi, and OpenCode. Use cases include but are not limited to: image Q&A, screenshot analysis, Computer Use GUI operation, and multi-step image reasoning.
+
+## Supported Agents
+
+| Agent | How | Status |
+|---|---|---|
+| **Codex** | transparent local proxy (Responses API) | ✅ verified |
+| **Claude Code** | the same proxy — point `ANTHROPIC_BASE_URL` at it | ✅ verified |
+| **Pi / Oh My Pi** | one-file native extension ([`extensions/pi/`](extensions/pi/)) | ✅ verified |
+| **OpenCode** | one-file native plugin ([`extensions/opencode/`](extensions/opencode/)) | ✅ verified |
+| Any agent with a shell | CLI toolkit (`glance` / `ground` / `detect` / `trace`) + skill | ✅ |
+
+All entry points share the same describe layer — the focus hint, the verbatim-transcription contract, the re-query channel note, and the per-(image, prompt) cache — and the same three `VISION_*` env vars.
 
 Most vision wrappers simply turn an image into a generic description and leave the text model to recover the original task afterward.
 
@@ -25,7 +37,7 @@ Most vision wrappers simply turn an image into a generic description and leave t
        width="49%">
 </p>
 
-If the agent you're using isn't Codex, you can also try installing the [visual toolkit](#install-the-vision-tools-skill-optional) from this repository — it provides CLIs that let agents interact with images.
+If the agent you're using isn't Codex: Claude Code can point `ANTHROPIC_BASE_URL` at the same proxy, Pi / Oh My Pi / OpenCode get the same describe layer as single-file [native extensions](extensions/), and any agent with a shell can install the [visual toolkit](#install-the-vision-tools-skill-optional) — CLIs that let agents interact with images.
 
 > If this project helps you, feel free to star🌟 & follow～ I'll keep sharing more practical tools and tips.
 
@@ -176,6 +188,8 @@ Codex -> 127.0.0.1:19100 -> your existing text-only upstream
 
 The vision prompt is not a fixed "describe this image". The proxy attaches a **focus hint** so the description covers what actually matters right now: a pasted image carries the user's request, while an image fetched via `view_image` carries the assistant's own stated reason for looking (falling back to the user text when the tool was called silently). Descriptions are cached per (image, prompt); both hint sources sit in the immutable conversation history, so the same image is described once and then hits the cache on every later turn.
 
+The proxy identifies the request dialect from the body shape alone — OpenAI Responses (Codex) or Anthropic Messages (Claude Code) — so one instance serves both, with no per-host configuration. For Claude Code the two image paths are pastes and `Read` on an image file; the hint policy is the same.
+
 The first model response only asks Codex to call `view_image`. After Codex executes the tool locally, the second request carries the image; the proxy converts image to text on this request path. If the catalog explicitly declares support for `text` only, Codex's handler rejects the tool first, so `image` is appended to the existing entry only in that case.
 
 ## FAQ
@@ -202,8 +216,12 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 | `ground.py` / `bin/ground` | Optional image target-grounding CLI |
 | `detect.py` / `bin/detect` | Optional element-inventory CLI (shares the ground machinery) |
 | `bin/trace` | Optional local image-to-SVG tracing CLI (exact shape geometry, no vision API) |
+| `extensions/pi/vision.ts` | Single-file native extension for Pi and Oh My Pi |
+| `extensions/opencode/vision.ts` | Single-file native plugin for OpenCode |
 | `AGENT_INSTALL.md` | Installation and verification steps for Codex agents |
 | `tests/test_image_rewrite_shapes.py` | Tests for image structures, concurrency, caching, and failure behavior |
+| `tests/test_anthropic_rewrite.py` | Tests for the Anthropic Messages (Claude Code) rewrite path |
+| `tests/test_extensions.mjs` | Tests for the Pi / Oh My Pi / OpenCode extensions (node or bun) |
 | `tests/smoke_test_proxy.py` | Tests for proxy pass-through, auth, and streaming protocol |
 | `tests/test_vision_client.py` | Vision client retry and `glance` tests |
 | `tests/test_ground.py` | `ground` coordinate parsing and shared config tests |

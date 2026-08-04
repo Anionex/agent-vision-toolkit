@@ -2,7 +2,7 @@
 
 # codex-vision-proxy
 
-**所想即所见——一个让纯文本模型“用意念”看图的方法和视觉工具包，以及无缝接入 Codex 的现成方案。**
+**所想即所见——一个让纯文本模型“用意念”看图的方法和视觉工具包，以及无缝接入 Codex、Claude Code、Pi、Oh My Pi、OpenCode 的现成方案。**
 
 🌐 **中文** ｜ [**English**](README.md)
 
@@ -10,7 +10,19 @@
 
 如果你的 Codex 已经接入了 DeepSeek V4 这类纯文本模型，却烦恼于它不能看图、每次调用看图都会被系统拦下，本仓库提供了一种方式，可以在不引入额外mcp、skills、cli的情况下，让纯文本模型调用codex内置view image的时候不报错，而是给出一段由 agent 看图动机塑造的、贴合当前任务的描述，尽量让纯文本模型的交互体验和多模态模型的交互体验保持一致，免去反复配置的风险。同时也提供可选的视觉工具包，利用多模态模型的能力完成图片问答、ocr、视觉定位等操作。
 
-所有代码均已在真实 Codex + DeepSeek 会话中验证过。可用场景包括但不限于：图片问答，截图分析，Computer Use GUI界面操作，多步图像推理
+所有代码均已在真实 Codex + DeepSeek 会话中验证过，同一套管线也在 Claude Code、Pi、Oh My Pi、OpenCode 中完成了真机端到端验证。可用场景包括但不限于：图片问答，截图分析，Computer Use GUI界面操作，多步图像推理
+
+## 支持的 Agent
+
+| Agent | 接入方式 | 状态 |
+|---|---|---|
+| **Codex** | 透明本地代理（Responses API） | ✅ 已验证 |
+| **Claude Code** | 同一个代理——把 `ANTHROPIC_BASE_URL` 指向它 | ✅ 已验证 |
+| **Pi / Oh My Pi** | 单文件原生 extension（[`extensions/pi/`](extensions/pi/)） | ✅ 已验证 |
+| **OpenCode** | 单文件原生 plugin（[`extensions/opencode/`](extensions/opencode/)） | ✅ 已验证 |
+| 任何有 shell 的 agent | CLI 工具包（`glance` / `ground` / `detect` / `trace`）+ skill | ✅ |
+
+所有入口共享同一套描述层——focus hint、逐字转写约定、重查 channel note、（图片, prompt）缓存——以及同样的三个 `VISION_*` 环境变量。
 
 大多数视觉转接方案只是把图片变成一段通用描述，之后再让纯文本模型自己去把原本的任务找回来。
 
@@ -25,7 +37,7 @@
        width="49%">
 </p>
 
-如果你正在用的 agent 不是 Codex，也可以尝试一下安装项目里的 [visual toolkit](#安装-vision-tools-skill可选)，提供了 cli 让 agent 与图片交互
+如果你正在用的 agent 不是 Codex：Claude Code 可以把 `ANTHROPIC_BASE_URL` 指向同一个代理；Pi / Oh My Pi / OpenCode 有单文件的[原生 extension](extensions/)，带来同一套描述层；任何有 shell 的 agent 都可以安装 [visual toolkit](#安装-vision-tools-skill可选)，提供了 cli 让 agent 与图片交互
 
 > 如果项目对你有用，欢迎 star🌟 & follow～，我会分享更多的实用工具和技巧
 > 
@@ -177,6 +189,8 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 
 视觉 prompt 不是固定的"请描述这张图"。代理会给视觉模型附上 **focus hint**，让描述围绕当下真正要紧的内容展开：贴图场景用用户的请求做 hint；模型主动调用 `view_image` 的场景，用模型自己说明的看图动机做 hint（没有则回退到用户请求）。描述按（图片, prompt）缓存；两种 hint 都取自不可变的对话历史，同一张图只描述一次，之后每轮都命中缓存。
 
+代理仅凭请求体形态识别方言——OpenAI Responses（Codex）或 Anthropic Messages（Claude Code）——同一个实例同时服务两者，无需按宿主配置。Claude Code 侧的两条图片通道是粘贴图和对图片文件的 `Read`，hint 策略完全相同。
+
 第一次模型响应只要求 Codex 调用 `view_image`。Codex 在本机执行工具后，第二次请求才携带图片；代理在这个请求方向完成图片转文字。若 catalog 明确声明仅支持 `text`，Codex 的 handler 会先拒绝工具，因此只在这一种情况下给现有条目追加 `image`。
 
 ## 常见问题
@@ -203,8 +217,12 @@ Codex（携带原有 Authorization）
 | `ground.py` / `bin/ground` | 可选的图片目标定位 CLI |
 | `detect.py` / `bin/detect` | 可选的元素盘点 CLI（与 ground 共用实现） |
 | `bin/trace` | 可选的本地图转 SVG 描摹 CLI（精确形状几何，不调视觉 API） |
+| `extensions/pi/vision.ts` | Pi 与 Oh My Pi 的单文件原生 extension |
+| `extensions/opencode/vision.ts` | OpenCode 的单文件原生 plugin |
 | `AGENT_INSTALL.md` | Codex Agent 的安装与验证步骤 |
 | `tests/test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |
+| `tests/test_anthropic_rewrite.py` | Anthropic Messages（Claude Code）改写路径测试 |
+| `tests/test_extensions.mjs` | Pi / Oh My Pi / OpenCode extension 测试（node 或 bun） |
 | `tests/smoke_test_proxy.py` | 代理透传、鉴权和流式协议测试 |
 | `tests/test_vision_client.py` | 视觉客户端重试与 `glance` 测试 |
 | `tests/test_ground.py` | `ground` 坐标解析和共享配置测试 |
