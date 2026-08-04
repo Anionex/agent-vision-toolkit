@@ -53,6 +53,24 @@ _CHANNEL_NOTE = (
     "looking for and call `view_image`: the next one is written to answer that."
 )
 
+_ANTHROPIC_CHANNEL_NOTE = (
+    "[vision proxy] Images reach you as text here: a vision model reads the file "
+    "and writes a description — you never receive visual tokens, and reading an "
+    "image file returns a description as well. Each one is written to answer the "
+    "stated reason for looking. Whenever a description misses what you need, say "
+    "what you are looking for and read the image file again: the next description "
+    "is written to answer that."
+)
+
+_CHAT_CHANNEL_NOTE = (
+    "[vision proxy] Images reach you as text here: a vision model reads each image "
+    "and writes a description — you never receive visual tokens. Each description "
+    "is written to answer the stated reason for looking. Whenever a description "
+    "misses what you need, say what you are looking for and view the image again "
+    "through whatever tool or attachment channel you have: the next description "
+    "is written to answer that."
+)
+
 
 # Codex-injected user-role blocks that are never "the user's current request".
 _INJECTED_PREFIXES = ("<environment_context>", "<user_instructions>", "# AGENTS.md instructions")
@@ -179,14 +197,123 @@ def _collect_responses_jobs(parsed):
     return jobs
 
 
+# Claude Code-injected user-role text that is never "the user's current request".
+_ANTHROPIC_INJECTED_PREFIXES = ("<system-reminder>", "<command-name>", "<command-message>",
+                                "<local-command-stdout>", "<local-command-caveat>",
+                                "Caveat: The messages below")
+
+# A paste leaves "[Image #1]"-style placeholders in the typed text; placeholder-only
+# text is the Anthropic analogue of Codex's <image> wrapper, not a hint.
+_IMAGE_PLACEHOLDER_RE = re.compile(r"^\s*(\[Image #\d+\]\s*)+$")
+
+
+def _anthropic_image_url(block):
+    source = block.get("source")
+    if not isinstance(source, dict):
+        return None
+    if source.get("type") == "base64" and isinstance(source.get("media_type"), str) \
+            and isinstance(source.get("data"), str):
+        return "data:" + source["media_type"] + ";base64," + source["data"]
+    if source.get("type") == "url" and isinstance(source.get("url"), str):
+        return source["url"]
+    return None
+
+
+def _collect_anthropic_jobs(parsed):
+    """Anthropic Messages API (Claude Code): messages[] with image / tool_result blocks."""
+    jobs = []
+    last_user_text = ""
+    last_assistant_text = ""
+    for message in parsed["messages"]:
+        if not isinstance(message, dict):
+            continue
+        role = message.get("role")
+        content = message.get("content")
+        blocks = content if isinstance(content, list) else []
+        if role == "user":
+            if isinstance(content, str):
+                texts = [content]
+            else:
+                texts = [block["text"] for block in blocks
+                         if isinstance(block, dict) and block.get("type") == "text"
+                         and isinstance(block.get("text"), str)]
+            # Injected reminders ride user messages as sibling text blocks here,
+            # so the filter is per-block, not first-block-only as in Codex.
+            texts = [text for text in texts
+                     if not text.lstrip().startswith(_ANTHROPIC_INJECTED_PREFIXES)
+                     and not _IMAGE_PLACEHOLDER_RE.match(text)]
+            item_user_text = "\n".join(texts) if any(text.strip() for text in texts) else ""
+            if item_user_text:
+                last_user_text = item_user_text
+                # A new user turn makes earlier assistant intent stale. Tool
+                # results arrive in user-role messages here but carry no text
+                # blocks of their own, so they never trigger this reset.
+                last_assistant_text = ""
+            for index, block in enumerate(blocks):
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "image":
+                    url = _anthropic_image_url(block)
+                    if url:
+                        jobs.append((blocks, index, url, _vision_prompt(item_user_text, "user")))
+                elif block.get("type") == "tool_result":
+                    inner = block.get("content")
+                    if not isinstance(inner, list):
+                        continue
+                    for inner_index, inner_block in enumerate(inner):
+                        if isinstance(inner_block, dict) and inner_block.get("type") == "image":
+                            url = _anthropic_image_url(inner_block)
+                            if url:
+                                hint, source = ((_last_paragraph(last_assistant_text), "assistant")
+                                                if last_assistant_text else (last_user_text, "user"))
+                                jobs.append((inner, inner_index, url, _vision_prompt(hint, source)))
+        elif role == "assistant":
+            thinking = [block["thinking"] for block in blocks
+                        if isinstance(block, dict) and block.get("type") == "thinking"
+                        and isinstance(block.get("thinking"), str)]
+            if isinstance(content, str):
+                texts = [content]
+            else:
+                texts = [block["text"] for block in blocks
+                         if isinstance(block, dict) and block.get("type") == "text"
+                         and isinstance(block.get("text"), str)]
+            # Thinking first, message text last: _last_paragraph then favors the
+            # user-facing statement whenever one exists.
+            combined = "\n\n".join(part for part in thinking + texts if part.strip())
+            if combined:
+                last_assistant_text = combined
+    return jobs
+
+
 def _detect_format(parsed):
     if isinstance(parsed.get("input"), list):
         return "responses"
+    messages = parsed.get("messages")
+    if not isinstance(messages, list):
+        return None
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            kind = block.get("type")
+            if kind == "image":
+                return "anthropic"
+            if kind == "tool_result":
+                inner = block.get("content")
+                if isinstance(inner, list) and any(
+                        isinstance(b, dict) and b.get("type") == "image" for b in inner):
+                    return "anthropic"
     return None
 
 
 _FORMATS = {
     "responses": (_collect_responses_jobs, lambda text: {"type": "input_text", "text": text}, _CHANNEL_NOTE),
+    "anthropic": (_collect_anthropic_jobs, lambda text: {"type": "text", "text": text}, _ANTHROPIC_CHANNEL_NOTE),
 }
 
 
