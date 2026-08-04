@@ -93,7 +93,7 @@ function parseEnvFile(path: string, into: Record<string, string>): void {
   }
 }
 
-export function loadVisionConfig(): VisionConfig | { error: string } {
+function loadVisionConfig(): VisionConfig | { error: string } {
   const vars: Record<string, string> = {};
   for (const key of ["VISION_API_KEY", "VISION_BASE_URL", "VISION_MODEL", "LANG"]) {
     const value = process.env[key];
@@ -287,7 +287,7 @@ function textPart(template: any, text: string): any {
   return part;
 }
 
-export async function rewriteMessages(
+async function rewriteMessages(
   messages: any[],
   config: VisionConfig | { error: string },
   fetchImpl: typeof fetch = fetch,
@@ -350,9 +350,11 @@ export async function rewriteMessages(
 }
 
 // ---------------------------------------------------------------------------
-// Plugin entry point.
+// Plugin entry point. opencode's loader calls every export of this module as a
+// plugin, so there must be exactly one export; the internals tests need are
+// attached to the plugin function instead of being exported by name.
 
-export const VisionBridge = async (_input: any) => {
+const VisionBridge = async (_input: any) => {
   return {
     "experimental.chat.messages.transform": async (_hookInput: any, output: any) => {
       if ((process.env.VISION_REWRITE || "").toLowerCase() === "off") return;
@@ -363,5 +365,7 @@ export const VisionBridge = async (_input: any) => {
     },
   };
 };
+
+VisionBridge.internals = { loadVisionConfig, rewriteMessages };
 
 export default VisionBridge;

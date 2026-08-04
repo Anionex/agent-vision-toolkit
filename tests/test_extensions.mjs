@@ -13,7 +13,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const pi = await import("../extensions/pi/vision.ts");
-const oc = await import("../extensions/opencode/vision.ts");
+const ocModule = await import("../extensions/opencode/vision.ts");
+const oc = { ...ocModule.default.internals, VisionBridge: ocModule.default };
+if (Object.keys(ocModule).length !== 1) {
+  console.error("FAIL: opencode plugin must have exactly one export (default) — its loader calls every export");
+  process.exit(1);
+}
 
 const CONFIG = { apiKey: "test-key", baseUrl: "http://vision.test", model: "test-vision" };
 
