@@ -116,14 +116,19 @@ def _image_desc_from_url(image_url, prompt=None):
     return description
 
 
-async def _rewrite_image_inputs(parsed):
-    inputs = parsed.get("input")
-    if not isinstance(inputs, list):
-        return False
+# Image rewriting is split in two: per-dialect collectors that walk a request
+# body and emit (values_list, index, image_url, vision_prompt) jobs, and a
+# dialect-blind pipeline that describes, dedupes, caches, fails closed and
+# writes the text back. A request reveals its dialect by shape alone, so the
+# proxy needs no per-host configuration.
+
+
+def _collect_responses_jobs(parsed):
+    """OpenAI Responses API (Codex): input[] items."""
     jobs = []
     last_user_text = ""
     last_assistant_text = ""
-    for item in inputs:
+    for item in parsed["input"]:
         if not isinstance(item, dict):
             continue
         role = item.get("role")
@@ -170,10 +175,23 @@ async def _rewrite_image_inputs(parsed):
                                         else (last_user_text, "user"))
                     else:
                         hint, source = item_user_text, "user"
-                    jobs.append((item, field, index, value["image_url"], _vision_prompt(hint, source)))
-    if not jobs:
-        return False
-    requests = list(dict.fromkeys((job[3], job[4]) for job in jobs))
+                    jobs.append((values, index, value["image_url"], _vision_prompt(hint, source)))
+    return jobs
+
+
+def _detect_format(parsed):
+    if isinstance(parsed.get("input"), list):
+        return "responses"
+    return None
+
+
+_FORMATS = {
+    "responses": (_collect_responses_jobs, lambda text: {"type": "input_text", "text": text}, _CHANNEL_NOTE),
+}
+
+
+async def _describe_jobs(jobs):
+    requests = list(dict.fromkeys((job[2], job[3]) for job in jobs))
     semaphore = asyncio.Semaphore(4)
 
     async def run(url, prompt):
@@ -197,16 +215,28 @@ async def _rewrite_image_inputs(parsed):
         raise VisionError(
             f"{len(errors)} image(s) failed to describe; original images were not forwarded to the text-only model: {details}"
         )
+    return descriptions
+
+
+async def _rewrite_image_inputs(parsed):
+    fmt = _detect_format(parsed)
+    if fmt is None:
+        return False
+    collect, text_block, channel_note = _FORMATS[fmt]
+    jobs = collect(parsed)
+    if not jobs:
+        return False
+    descriptions = await _describe_jobs(jobs)
     prefix = "[vision model description] "
-    for item, field, index, url, prompt in jobs:
-        item[field][index] = {"type": "input_text", "text": prefix + descriptions[(url, prompt)]}
+    for values, index, url, prompt in jobs:
+        values[index] = text_block(prefix + descriptions[(url, prompt)])
     # Explain the channel once, at the conversation's first image whichever path
     # it arrived on. The history is append-only, so "first" keeps pointing at the
     # same block on every later turn: the note is replayed, never repeated, and
     # the vision prompt is untouched so no cache key moves.
-    first_item, first_field, first_index = jobs[0][:3]
-    first_item[first_field].insert(first_index, {"type": "input_text", "text": _CHANNEL_NOTE})
-    _log(f"[vision-proxy] image rewrite ok images={len(requests)} cache_entries={len(_DESC_CACHE)}")
+    first_values, first_index = jobs[0][:2]
+    first_values.insert(first_index, text_block(channel_note))
+    _log(f"[vision-proxy] image rewrite ok format={fmt} images={len(descriptions)} cache_entries={len(_DESC_CACHE)}")
     return True
 
 
