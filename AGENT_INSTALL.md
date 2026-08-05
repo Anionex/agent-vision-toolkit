@@ -1,12 +1,19 @@
-# Codex Agent 安装说明
+# Agent 安装说明
 
-开始前先完整阅读 [README.md](README.md)，理解项目用途、工作原理和限制。本说明用于指导 Codex Agent 根据用户机器上的真实配置完成部署，不是固定路径的一键安装脚本。
+开始前先完整阅读 [README.md](README.md)，理解项目用途、工作原理和限制。本说明用于指导用户的 agent 根据用户机器上的真实配置部署**无缝接入层**（本地代理），不是固定路径的一键安装脚本。
 
-代理、Codex 配置修改和验证流程与操作系统无关。平台差异只存在于文件路径、后台常驻方式和可选 CLI wrapper。
+## 适用范围
+
+- **Codex**：本说明的完整路径（代理 + `config.toml` + model catalog）。
+- **Claude Code**：同一个代理，宿主侧只改 `ANTHROPIC_BASE_URL`，见[第 4 步的 Claude Code 小节](#claude-code)。
+- **Pi / Oh My Pi / OpenCode**：不走代理，用 [`extensions/`](extensions/) 下的单文件原生 extension，安装步骤见各自 README。
+- **只装视觉工具箱**（`glance`/`ground`/`detect`/`trace` + skill）：不需要代理，按 README 的 Quick Start 即可；本文末尾的「可选」各节是逐工具的部署细节。
+
+代理、宿主配置修改和验证流程与操作系统无关。平台差异只存在于文件路径、后台常驻方式和可选 CLI wrapper。
 
 ## 目标与边界
 
-用户的 DeepSeek 必须已经能在 Codex 中正常对话。部署只补充图片转文字代理，不重建用户现有的 DeepSeek 配置。
+用户的纯文本模型（下文以 DeepSeek 为例）必须已经能在宿主中正常对话。部署只补充图片转文字代理，不重建用户现有的上游配置。
 
 - 保留现有模型、slug、`display_name`、provider、鉴权方式和 DeepSeek key。
 - 不新增模型，也不主动改写用户的模型配置。代理兼容既有的 `gpt-5.2` 显示别名，并在转发时将其映射为 `deepseek-v4-flash`。
@@ -18,7 +25,7 @@
 
 ## 前置条件
 
-- 已经能正常使用 DeepSeek 的 Codex
+- 已接入纯文本模型并能正常对话的宿主（Codex 或 Claude Code）
 - Python 3.11+
 - 一个支持 `/chat/completions` 和 `image_url` 的 OpenAI-compatible 视觉 API
 
@@ -53,7 +60,7 @@ VISION_MODEL=...
 LANG=zh  # 可选：视觉模型输出语言（zh/en），不填保持默认中文
 ```
 
-不要在 env 中写入 `DEEPSEEK_API_KEY`。DeepSeek 鉴权仍由 Codex 发送。
+不要在 env 中写入上游模型的 key（如 `DEEPSEEK_API_KEY`）。上游鉴权仍由宿主发送。
 
 - macOS / Linux：执行 `chmod 600 <ENV_FILE>`。
 - Windows：把 env 保留在当前用户的 `%LOCALAPPDATA%` 下，不复制到公共目录。
@@ -111,18 +118,22 @@ base_url = "http://127.0.0.1:19100"
 - 已经包含 `image`：不修改。
 - 不修改 slug、模型名、`display_name` 或其他能力字段。
 
+### Claude Code
+
+宿主是 Claude Code 时跳过上面的 `config.toml` / catalog 两小节：第 1 步记录的是用户现有的 `ANTHROPIC_BASE_URL`（作为代理的 `--upstream`），第 4 步只需把环境里的 `ANTHROPIC_BASE_URL` 改为 `http://127.0.0.1:19100`。鉴权头由 Claude Code 照常发送、代理原样透传；注意覆盖 `ANTHROPIC_BASE_URL` 后 CLI 不再读取 keychain 凭据，原有部署若依赖 `ANTHROPIC_AUTH_TOKEN` 需保持其可见。
+
 ## 5. 设置后台常驻
 
 这一步只负责在用户登录后运行第 3 步已经验证过的命令。启动配置中只能保存脚本路径、参数和 env 文件路径，不能包含 API key。
 
 ### macOS
 
-创建 `~/Library/LaunchAgents/com.codex.vision-proxy.plist`，使用当前 Python、`INSTALL_DIR`、`ENV_FILE` 和原始上游地址的绝对路径，并设置 `RunAtLoad`、`KeepAlive` 和日志路径。加载：
+创建 `~/Library/LaunchAgents/com.agent-vision-toolkit.proxy.plist`，使用当前 Python、`INSTALL_DIR`、`ENV_FILE` 和原始上游地址的绝对路径，并设置 `RunAtLoad`、`KeepAlive` 和日志路径。加载：
 
 ```bash
-launchctl bootout "gui/$(id -u)/com.codex.vision-proxy" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.codex.vision-proxy.plist
-launchctl kickstart -k "gui/$(id -u)/com.codex.vision-proxy"
+launchctl bootout "gui/$(id -u)/com.agent-vision-toolkit.proxy" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.agent-vision-toolkit.proxy.plist
+launchctl kickstart -k "gui/$(id -u)/com.agent-vision-toolkit.proxy"
 ```
 
 ### Windows
@@ -158,11 +169,11 @@ python tests/test_vision_client.py
 - macOS / Linux：`nc -z 127.0.0.1 19100`
 - Windows PowerShell：`Test-NetConnection 127.0.0.1 -Port 19100`
 
-完全重启 Codex，然后要求当前 DeepSeek 对一张本地图片实际调用 `view_image`，确认：
+完全重启宿主，然后要求当前模型对一张本地图片实际调用内置看图工具（Codex 的 `view_image`，Claude Code 的 `Read`），确认：
 
-1. `view_image` 成功返回，而不是 modality 拒绝错误。
-2. 代理调用视觉 API，并把图片描述交给 DeepSeek。
-3. DeepSeek 能基于图片内容回答。
+1. 看图工具成功返回，而不是 modality 拒绝错误。
+2. 代理调用视觉 API，并把图片描述交给当前模型。
+3. 当前模型能基于图片内容回答。
 4. 普通文本、原有模型名、鉴权和流式输出仍正常。
 
 完成后向用户报告：备份路径、实际修改的字段、服务状态和真实 `view_image` 验证结果。不得输出任何 API key。
@@ -224,5 +235,5 @@ wrapper 必须使用当前系统的绝对 Python 和脚本路径，并放入用�
 | `view_image is not allowed because you do not support image inputs` | 检查当前 catalog 条目是否明确为仅 `text`；若是，只追加 `image` 后重启 Codex |
 | 视觉 API 返回 429/5xx | 查看代理错误日志；代理只做有限重试，最终失败应明确返回错误 |
 | 端口未监听 | 检查 Python、脚本、env、上游地址、后台启动项和端口占用 |
-| 改配置后未生效 | 完全退出并重启 Codex |
-| DeepSeek 返回鉴权错误 | 确认 Codex 仍发送原有 `Authorization`，且代理没有删除或替换该请求头 |
+| 改配置后未生效 | 完全退出并重启宿主 |
+| 上游返回鉴权错误 | 确认宿主仍发送原有鉴权头，且代理没有删除或替换该请求头 |
