@@ -28,6 +28,25 @@ _DESC_CACHE = {}
 
 FOCUS_HINT_MAX_CHARS = 500
 
+
+class _VisionUnavailable:
+    """Marker for a vision call that failed.
+
+    The note text is written into the conversation instead of the image, so the
+    rest of the request (plain text included) can continue on its way instead of
+    the whole conversation being answered with 502. The failure is never silent:
+    the reason travels with the note, the failure is logged, and the note asks
+    the model to tell the user that the vision tool is unavailable.
+    """
+
+    def __init__(self, reason):
+        self.reason = reason
+
+    def __str__(self):
+        return (f"[vision unavailable: {self.reason}] "
+                "The vision tool is temporarily unavailable; let the user know.")
+
+
 _ROLE_PROMPT = (
     "You are the eyes of a text-only coding assistant that cannot see images. "
     "Transcribe and describe this image so the assistant can act on it. "
@@ -322,17 +341,12 @@ async def _describe_jobs(jobs):
 
     results = await asyncio.gather(*(run(url, prompt) for url, prompt in requests))
     descriptions = {}
-    errors = []
     for key, value in results:
         if value is None or isinstance(value, VisionError):
-            errors.append(str(value) if isinstance(value, VisionError) else "image description failed")
+            reason = str(value) if isinstance(value, VisionError) else "image description failed"
+            descriptions[key] = _VisionUnavailable(reason)
         else:
             descriptions[key] = value
-    if errors:
-        details = "；".join(dict.fromkeys(errors))
-        raise VisionError(
-            f"{len(errors)} image(s) failed to describe; original images were not forwarded to the text-only model: {details}"
-        )
     return descriptions
 
 
@@ -347,14 +361,21 @@ async def _rewrite_image_inputs(parsed):
     descriptions = await _describe_jobs(jobs)
     prefix = "[vision model description] "
     for values, index, url, prompt in jobs:
-        values[index] = text_block(prefix + descriptions[(url, prompt)])
+        description = descriptions[(url, prompt)]
+        if isinstance(description, _VisionUnavailable):
+            values[index] = text_block(str(description))
+        else:
+            values[index] = text_block(prefix + description)
     # Explain the channel once, at the conversation's first image whichever path
     # it arrived on. The history is append-only, so "first" keeps pointing at the
     # same block on every later turn: the note is replayed, never repeated, and
     # the vision prompt is untouched so no cache key moves.
     first_values, first_index = jobs[0][:2]
     first_values.insert(first_index, text_block(channel_note))
-    _log(f"[vision-proxy] image rewrite ok format={fmt} images={len(descriptions)} cache_entries={len(_DESC_CACHE)}")
+    unavailable = sum(1 for value in descriptions.values() if isinstance(value, _VisionUnavailable))
+    state = "degraded" if unavailable else "ok"
+    _log(f"[vision-proxy] image rewrite {state} format={fmt} images={len(descriptions)} "
+         f"unavailable={unavailable} cache_entries={len(_DESC_CACHE)}")
     return True
 
 
@@ -403,7 +424,8 @@ def _inject_reasoning_summaries(text):
 
 
 class Proxy:
-    def __init__(self, port, upstream, log_path, codex_header_compat=False, inject_reasoning_summary=False):
+    def __init__(self, port, upstream, log_path, codex_header_compat=False,
+                 inject_reasoning_summary=False):
         self.port = port
         self.upstream = upstream.rstrip("/")
         self.codex_header_compat = codex_header_compat
@@ -573,7 +595,8 @@ async def main():
             validate_vision_config()
         except VisionError as exc:
             parser.error(str(exc))
-    proxy = Proxy(args.port, args.upstream, args.log, args.codex_header_compat, args.inject_reasoning_summary)
+    proxy = Proxy(args.port, args.upstream, args.log, args.codex_header_compat,
+                  args.inject_reasoning_summary)
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
