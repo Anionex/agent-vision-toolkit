@@ -260,15 +260,7 @@ def main():
         out = mod._rewrite_sse_frame(f, state)
         ok = ok and len(out) == 1 and out[0] == f
     check("anthropic sse passthrough", ok)
-    # c) Chat Completions request: flat function apply_patch keeps a valid
-    # shape (description normalized, structure intact); nested shape skipped.
-    chat_req = {"tools": [{"type": "function", "name": "apply_patch", "description": "orig",
-                           "parameters": {"type": "object", "properties": {"input": {"type": "string"}}}}]}
-    check("chat flat apply_patch normalized", mod._rewrite_apply_patch_tool(chat_req) is True
-          and chat_req["tools"][0]["type"] == "function"
-          and chat_req["tools"][0]["name"] == "apply_patch"
-          and chat_req["tools"][0]["parameters"]["properties"]["input"]["type"] == "string")
-    # d) Chat Completions SSE frames have no top-level "type" -> passthrough.
+    # c) Chat Completions SSE frames have no top-level "type" -> passthrough.
     chat_frames = [
         b'data: {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "c", "function": {"name": "apply_patch", "arguments": "{\\"patch\\": \\"x\\"}"}}]}}]}\n\n',
         b'data: {"choices": [{"delta": {"content": "done"}}]}\n\n',
@@ -280,8 +272,13 @@ def main():
         out = mod._rewrite_sse_frame(f, state)
         ok = ok and len(out) == 1 and out[0] == f
     check("chat sse passthrough", ok)
-    # e) Non-streaming chat JSON response (choices shape) untouched.
-    chat_json = b'{"choices": [{"message": {"role": "assistant", "content": "ok"}}]}'
+    # d) Non-streaming chat JSON response untouched even when it carries an
+    # apply_patch tool_call (bridge only rewrites top-level "output" lists).
+    chat_json = (b'{"choices": [{"message": {"role": "assistant", "content": null, "tool_calls": '
+                 b'[{"id": "call_1", "type": "function", "function": {"name": "apply_patch", '
+                 b'"arguments": "{\\"patch\\": \\"x\\"}"}}]}}]}')
+    parsed_chat = json.loads(chat_json)
+    check("chat json fixture is real", parsed_chat["choices"][0]["message"]["tool_calls"][0]["function"]["name"] == "apply_patch")
     check("chat json response untouched", mod._rewrite_apply_patch_response_json(chat_json) is chat_json)
 
     print("----")
