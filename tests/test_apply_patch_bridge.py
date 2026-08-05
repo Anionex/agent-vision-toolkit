@@ -205,29 +205,37 @@ def main():
     check("flat function shape rewritten", mod._rewrite_apply_patch_tool(parsed) is True
           and parsed["tools"][0]["description"] == mod.APPLY_PATCH_TOOL_DESCRIPTION)
 
-    # H2: terminal event flushes a pending call with status incomplete BEFORE
-    # the terminal frame, so codex still sees the interrupted call.
-    state = {"pending": {}, "completed": False}
-    frames = []
-    frames += mod._rewrite_sse_frame(mod._sse_event("response.output_item.added", {
-        "type": "response.output_item.added", "output_index": 0,
-        "item": {"id": "fc_x", "type": "function_call", "name": "apply_patch", "arguments": "", "call_id": "cx"}}), state)
-    frames += mod._rewrite_sse_frame(mod._sse_event("response.function_call_arguments.delta", {
-        "type": "response.function_call_arguments.delta", "item_id": "fc_x", "output_index": 0,
-        "delta": json.dumps({"patch": "*** Begin Patch\n*** End Patch"})}), state)
-    completed = mod._sse_event("response.completed", {"type": "response.completed", "response": {"id": "r"}})
-    frames += mod._rewrite_sse_frame(completed, state)
-    types = []
-    for f in frames:
-        data = next((line[5:].strip() for line in f.decode().splitlines() if line.startswith("data:")), None)
-        types.append(json.loads(data).get("type"))
-    incomplete_idx = [i for i, t in enumerate(types) if t == "response.output_item.done"
-                      and "incomplete" in frames[i].decode()]
-    check("terminal flush before completed", len(incomplete_idx) == 1
-          and incomplete_idx[0] == len(types) - 2
-          and types[-1] == "response.completed",
-          f"incomplete at {incomplete_idx}, last={types[-1]}")
-    check("terminal flush marks incomplete", "incomplete" in frames[incomplete_idx[0]].decode())
+    # H2: a terminal event must flush a pending call BEFORE the terminal frame
+    # so codex still sees it. Codex 0.146 ignores custom_tool_call status, so a
+    # complete patch is flushed for execution while a truncated one is dropped
+    # (executing it would only pollute tool history with a parse failure).
+    def run_interrupted(delta_text):
+        state = {"pending": {}, "completed": False}
+        frames = []
+        frames += mod._rewrite_sse_frame(mod._sse_event("response.output_item.added", {
+            "type": "response.output_item.added", "output_index": 0,
+            "item": {"id": "fc_x", "type": "function_call", "name": "apply_patch", "arguments": "", "call_id": "cx"}}), state)
+        frames += mod._rewrite_sse_frame(mod._sse_event("response.function_call_arguments.delta", {
+            "type": "response.function_call_arguments.delta", "item_id": "fc_x", "output_index": 0,
+            "delta": delta_text}), state)
+        completed = mod._sse_event("response.completed", {"type": "response.completed", "response": {"id": "r"}})
+        frames += mod._rewrite_sse_frame(completed, state)
+        return frames
+
+    full_frames = run_interrupted(json.dumps({"patch": "*** Begin Patch\n*** End Patch"}))
+    done_idx = [i for i, f in enumerate(full_frames)
+                if json.loads(next(line[5:].strip() for line in f.decode().splitlines() if line.startswith("data:"))).get("type") == "response.output_item.done"]
+    check("terminal flush before completed", len(done_idx) == 1
+          and done_idx[0] == len(full_frames) - 2, f"done at {done_idx}")
+    check("complete patch flushed for execution", "*** Begin Patch" in full_frames[done_idx[0]].decode()
+          and '"status": "completed"' in full_frames[done_idx[0]].decode())
+
+    cut_frames = run_interrupted(json.dumps({"patch": "*** Begin Patch\n- old\n+ ne"}))
+    cut_done = [i for i, f in enumerate(cut_frames)
+                if json.loads(next(line[5:].strip() for line in f.decode().splitlines() if line.startswith("data:"))).get("type") == "response.output_item.done"
+                and "apply_patch" in f.decode()]
+    check("truncated patch dropped", cut_done == [] and cut_frames[-1].decode().startswith("event: response.completed"),
+          f"unexpected done frames: {cut_done}")
 
     # H1: buffered rewrite path behaves like the streaming path. (`out` was
     # reused by the fail-safe checks above, so compare against outputs[0].)

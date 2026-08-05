@@ -581,11 +581,19 @@ def _flush_apply_patch(entry, interrupted=False):
         call_id = entry.get("call_id") or item_id
         name = entry.get("name") or "apply_patch"
         output_index = entry.get("output_index", 0)
-        if interrupted or not input_text.strip():
-            item = {"type": "custom_tool_call", "id": item_id, "call_id": call_id, "name": name,
-                    "input": input_text, "status": "incomplete"}
-            _log(f"[vision-proxy] apply_patch flush INCOMPLETE item_id={item_id} args_len={len(entry.get('args_acc') or '')}")
-            return [_sse_event("response.output_item.done", {"type": "response.output_item.done", "output_index": output_index, "item": item})]
+        if interrupted:
+            if "*** Begin Patch" in input_text and "*** End Patch" in input_text:
+                _log(f"[vision-proxy] apply_patch interrupted but complete, applying item_id={item_id} input_len={len(input_text)}")
+            else:
+                # Codex 0.146 ignores custom_tool_call status and would execute
+                # the truncated arguments, polluting tool history with a parse
+                # failure. The item was announced with empty input; dropping the
+                # terminal frame keeps the interrupted call inert.
+                _log(f"[vision-proxy] apply_patch interrupted with incomplete patch, dropping item_id={item_id} args_len={len(entry.get('args_acc') or '')}")
+                return []
+        if not input_text.strip():
+            _log(f"[vision-proxy] apply_patch flush EMPTY item_id={item_id}")
+            return []
         frames = [
             _sse_event("response.custom_tool_call_input.delta", {
                 "type": "response.custom_tool_call_input.delta", "item_id": item_id,
@@ -885,14 +893,10 @@ class Proxy:
         read_chunk = getattr(response, "read1", response.read)
         buffer = bytearray()
         state = {"pending": {}, "completed": False}
-        out_buf = bytearray()
 
         async def emit(frame_bytes):
-            out_buf.extend(frame_bytes)
-            if len(out_buf) >= 65536:
-                writer.write(bytes(out_buf))
-                await writer.drain()
-                out_buf.clear()
+            writer.write(frame_bytes)
+            await writer.drain()
 
         while True:
             chunk = await asyncio.to_thread(read_chunk, 65536)
@@ -915,9 +919,6 @@ class Proxy:
             _log(f"[vision-proxy] apply_patch stream ended mid-call item_id={item_id}")
             for out_frame in _flush_apply_patch(entry, interrupted=True):
                 await emit(out_frame)
-        if out_buf:
-            writer.write(bytes(out_buf))
-            await writer.drain()
 
     async def _write_head(self, writer, status, headers, content_length):
         reason = HTTPStatus(status).phrase if status in HTTPStatus._value2member_map_ else "Unknown"
