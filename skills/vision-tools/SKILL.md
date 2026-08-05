@@ -127,7 +127,7 @@ high-contrast graphics only; text becomes curves (pair with `--ocr` when
 the text matters). Small images are upscaled automatically before tracing,
 so a 30px icon traces as readily as a screenshot — size is not a reason to
 skip the tool. Before shipping or reusing a traced SVG, read
-`references/restore.md` — it holds the reuse traps and the
+`references/restore-exact.md` — it holds the reuse traps and the
 ship-vs-hand-write call.
 
 ## crop — cut a pixel box out of an image (local, no vision API)
@@ -234,7 +234,7 @@ sequence, and how to tell you got it right.
 
 | The job | Read |
 |---|---|
-| Rebuild what an image shows (page → HTML, icon/diagram → SVG, sketch/diagram → Mermaid/Graphviz) — or check a build against its design image | `references/restore.md` |
+| Rebuild what an image shows (page → HTML, icon/diagram → SVG, sketch/diagram → Mermaid/Graphviz) — or check a build against its design image | `references/restore.md` 选模式，再读 `references/restore-quick.md`（默认）或 `references/restore-exact.md`（仅明确要求像素级时） |
 | Operate a GUI from screenshots — locate, act, verify each step | `references/gui.md` |
 
 ## Notes
