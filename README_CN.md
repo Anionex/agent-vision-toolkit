@@ -74,7 +74,7 @@ git clone https://github.com/Anionex/agent-vision-toolkit.git
 export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # 写进 shell 配置以持久生效
 ```
 
-`glance` 只需要 Python 3.11+；`ground`/`detect` 需要 `pillow`，`trace` 需要 `vtracer`——只在你要用这些工具时，把它们装进一个隔离的 venv。
+`glance` 只需要 Python 3.11+；`ground`/`detect`/`crop` 需要 `pillow`，`trace` 需要 `vtracer`——只在你要用这些工具时，把它们装进一个隔离的 venv。
 
 **3. 安装 skill**，让 agent 知道这些工具的存在以及如何组合使用：
 
@@ -148,6 +148,17 @@ detect page.png --region 238,600,953,671
 ```bash
 trace diagram.png --polygon
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
+```
+
+### `crop` —— “把这个盒子裁出来”
+
+`crop` 把图片中的像素盒裁成独立文件——就是 `ground`/`detect` 输出的那组
+X1,Y1,X2,Y2 坐标，超出图片边界时自动收敛。同一个盒子接下来要喂给
+pixel_diff、dominant_colors、trace 多次时，先裁一次存成文件复用，而不是每次
+调用都在内存里重裁。需要可选依赖 `pillow`。
+
+```bash
+crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 ```
 
 
@@ -242,6 +253,7 @@ Codex（携带原有 Authorization）
 | `ground.py` / `bin/ground` | 图片目标定位 CLI |
 | `detect.py` / `bin/detect` | 元素盘点 CLI（与 ground 共用实现） |
 | `bin/trace` | 本地图转 SVG 描摹 CLI（精确形状几何，不调视觉 API） |
+| `bin/crop` | 本地区域裁剪 CLI（像素盒转图片文件，不调视觉 API） |
 | `skills/vision-tools/` | skill：工具手册、由粗到细的方法论、按场景的 playbook |
 | `vision_client.py` | 代理与 CLI 共用的视觉 API 客户端 |
 | `vision_proxy.py` | 本地图片改写代理与 SSE 转发 |

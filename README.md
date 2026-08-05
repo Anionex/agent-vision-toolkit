@@ -74,7 +74,7 @@ git clone https://github.com/Anionex/agent-vision-toolkit.git
 export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # add to your shell profile to persist
 ```
 
-`glance` needs nothing beyond Python 3.11+; `ground`/`detect` need `pillow` and `trace` needs `vtracer` — install those into an isolated venv only if you want those tools.
+`glance` needs nothing beyond Python 3.11+; `ground`/`detect`/`crop` need `pillow` and `trace` needs `vtracer` — install those into an isolated venv only if you want those tools.
 
 **3. Install the skill** so your agent knows the tools exist and how to combine them:
 
@@ -148,6 +148,18 @@ A full-screen pass is a fast first draft; for completeness on dense screens, inv
 ```bash
 trace diagram.png --polygon
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
+```
+
+### `crop` — "cut that box out"
+
+`crop` cuts a pixel box out of an image into its own file — the same
+X1,Y1,X2,Y2 coordinates `ground`/`detect` print, clamped to the image
+bounds. Once the same box is about to feed several checks (pixel_diff,
+dominant_colors, trace), cut it once and reuse the file instead of
+re-cropping in memory on every call. Requires the optional `pillow`.
+
+```bash
+crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 ```
 
 
@@ -243,6 +255,7 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 | `ground.py` / `bin/ground` | Image target-grounding CLI |
 | `detect.py` / `bin/detect` | Element-inventory CLI (shares the ground machinery) |
 | `bin/trace` | Local image-to-SVG tracing CLI (exact shape geometry, no vision API) |
+| `bin/crop` | Local region-crop CLI (pixel box to image file, no vision API) |
 | `skills/vision-tools/` | The skill: tool manual, coarse-to-fine method, per-scenario playbooks |
 | `vision_client.py` | Vision API client shared by the proxy and the CLIs |
 | `vision_proxy.py` | Local image-rewriting proxy and SSE forwarding |
