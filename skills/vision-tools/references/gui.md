@@ -20,11 +20,23 @@ and divide every box by that ratio. Skipping this puts every click at half
 or double distance from the origin — consistently wrong in a way that
 looks like bad grounding.
 
-**2. Locate with `ground`, click the box center. Cache fixed targets.**
+**2. Prefer the UI tree; fall back to vision.**
 
-Centers, not corners — ground boxes are not pixel-exact at the edges. For
-tiny targets (checkboxes, close buttons), go coarse-to-fine: ground the
-containing block, then `ground --region` inside it.
+If the environment exposes a UI tree (Android `uiautomator dump`, desktop
+accessibility tree, browser DOM), read coordinates and state from there —
+it is exact, fast, and carries semantic attributes (enabled, checked,
+focusable) that pixels cannot. Use `ground` only when:
+
+- No tree is available (games, custom-rendered canvases, remote desktops),
+- The target element is absent from the tree (canvas-drawn overlays,
+  non-standard widgets), or
+- You need to verify a visual state the tree doesn't expose (color, icon
+  appearance).
+
+When using `ground`: centers, not corners — ground boxes are not
+pixel-exact at the edges. For tiny targets (checkboxes, close buttons), go
+coarse-to-fine: ground the containing block, then `ground --region` inside
+it.
 
 For elements that stay put across interactions (toolbar buttons, sidebar
 links, fixed panels), ground them once and record a coordinate table — an
