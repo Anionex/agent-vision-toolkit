@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""crop: cut a pixel box out of an image into its own file.
+
+The other CLIs zoom by re-cropping in memory (glance --region, trace
+--region), but once the same box is needed twice — feed it to pixel_diff,
+dominant_colors, trace, or another agent — it earns a file. Coordinates are
+the same X1,Y1,X2,Y2 pixel boxes ground/detect print, and are clamped to
+the image bounds exactly like the --region flags elsewhere in the toolkit.
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+
+def parse_region(region: str) -> tuple[int, int, int, int]:
+    parts = region.split(",")
+    if len(parts) != 4:
+        raise ValueError("--region expects four integers: X1,Y1,X2,Y2 (pixels)")
+    try:
+        return (int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3]))
+    except ValueError:
+        raise ValueError("--region expects four integers: X1,Y1,X2,Y2 (pixels)") from None
+
+
+def clamp_box(box: tuple[int, int, int, int], width: int, height: int) -> tuple[int, int, int, int]:
+    x1, y1, x2, y2 = box
+    x1, x2 = sorted((x1, x2))
+    y1, y2 = sorted((y1, y2))
+    return (max(0, x1), max(0, y1), min(width, x2), min(height, y2))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="crop",
+        description="Cut a pixel box out of an image into its own file (local, no vision API)",
+    )
+    parser.add_argument("image", help="path to the image")
+    parser.add_argument("--region", metavar="X1,Y1,X2,Y2", required=True,
+                        help="pixel box to cut out (e.g. a box from ground); clamped to the image bounds")
+    parser.add_argument("-o", "--output",
+                        help="write the crop here (default: <image-stem>.crop.png next to the input)")
+    args = parser.parse_args()
+
+    try:
+        from PIL import Image
+    except ImportError:
+        parser.exit(1, "crop: requires Pillow; install the optional dependency pillow first\n")
+
+    source = Path(args.image).expanduser()
+    if not source.is_file():
+        parser.exit(1, f"crop: Image not found: {source}\n")
+
+    try:
+        x1, y1, x2, y2 = parse_region(args.region)
+    except ValueError as exc:
+        parser.exit(1, f"crop: {exc}\n")
+
+    with Image.open(source) as image:
+        width, height = image.size
+        box = clamp_box((x1, y1, x2, y2), width, height)
+        if box[2] <= box[0] or box[3] <= box[1]:
+            parser.exit(1, f"crop: --region {args.region} is empty after clamping to {width}x{height}\n")
+        if box != (x1, y1, x2, y2):
+            print(f"note: region {x1},{y1},{x2},{y2} clamped to {box[0]},{box[1]},{box[2]},{box[3]}",
+                  file=sys.stderr)
+        if args.output:
+            output = Path(args.output).expanduser()
+        else:
+            output = source.with_name(source.stem + ".crop.png")
+        try:
+            image.crop(box).save(output)
+        except OSError as exc:
+            parser.exit(1, f"crop: cannot write {output}: {exc}\n")
+    print(f"wrote {output} ({box[2] - box[0]}x{box[3] - box[1]})")
+
+
+if __name__ == "__main__":
+    main()

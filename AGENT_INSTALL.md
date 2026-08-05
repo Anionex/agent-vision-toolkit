@@ -7,7 +7,7 @@
 - **Codex**：本说明的完整路径（代理 + `config.toml` + model catalog）。
 - **Claude Code**：同一个代理，宿主侧只改 `ANTHROPIC_BASE_URL`，见[第 4 步的 Claude Code 小节](#claude-code)。
 - **Pi / Oh My Pi / OpenCode**：不走代理，用 [`extensions/`](extensions/) 下的单文件原生 extension，安装步骤见各自 README。
-- **只装视觉工具箱**（`glance`/`ground`/`detect`/`trace` + skill）：不需要代理，按 README 的 Quick Start 即可；本文末尾的「可选」各节是逐工具的部署细节。
+- **只装视觉工具箱**（`glance`/`ground`/`detect`/`trace`/`crop` + skill）：不需要代理，按 README 的 Quick Start 即可；本文末尾的「可选」各节是逐工具的部署细节。
 
 代理、宿主配置修改和验证流程与操作系统无关。平台差异只存在于文件路径、后台常驻方式和可选 CLI wrapper。
 
@@ -158,7 +158,7 @@ Startup 目录由 PowerShell 的 `[Environment]::GetFolderPath("Startup")` 获�
 用当前系统的 Python 命令运行仓库内核心测试：
 
 ```text
-python -m py_compile vision_proxy.py vision_client.py bin/glance bin/trace ground.py detect.py
+python -m py_compile vision_proxy.py vision_client.py bin/glance bin/trace bin/crop ground.py detect.py
 python tests/test_image_rewrite_shapes.py
 python tests/smoke_test_proxy.py
 python tests/test_vision_client.py
@@ -220,6 +220,17 @@ wrapper 必须使用当前系统的绝对 Python 和脚本路径，并放入用�
 2. 在 `INSTALL_DIR/.venv-ground`（没有则用 `uv` 创建）中追加安装依赖 `vtracer`（`--region` 功能还需 `pillow`）。
 3. 按 glance/ground 相同方式创建 wrapper 放入 PATH；不得覆盖用户已有的同名命令。
 4. 验证：`trace /path/to/diagram.png --polygon` 应输出 SVG。
+
+## 可选：crop
+
+`crop` 在本地把图片中的像素盒（X1,Y1,X2,Y2，通常来自 `ground`/`detect` 的输出）裁剪成独立图片文件，完全不经过视觉 API，也不需要任何 key。
+
+用户需要时：
+
+1. 将 `bin/crop` 复制到 `INSTALL_DIR/bin`。
+2. 在 `INSTALL_DIR/.venv-ground`（没有则用 `uv` 创建）中确认已安装 `pillow`。
+3. 按 glance/ground 相同方式创建 wrapper 放入 PATH；不得覆盖用户已有的同名命令。
+4. 验证：`crop /path/to/image.png --region 100,100,300,300` 应生成裁剪后的 PNG 并打印输出路径。
 
 ## 可选兼容功能
 
