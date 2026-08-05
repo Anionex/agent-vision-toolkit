@@ -48,27 +48,6 @@ def test_vision_failure_degrades_by_default():
 
     content = body["input"][0]["content"]
     assert any(block.get("text", "").startswith("[vision proxy]") for block in content), content
-    text = content[-1]["text"]
-    assert text.startswith("[vision unavailable: "), text
-    assert "unauthorized" in text, text
-    assert "temporarily unavailable" in text, text
-    assert "[vision model description]" not in text, \
-        "an unavailable note is not a model description and must not wear its prefix"
-    print("PASS: a failed vision call degrades to a visible note by default")
-
-
-def test_failed_image_is_replaced_with_note():
-    mod = _load_proxy()
-
-    def boom(_url, _prompt=None):
-        raise mod.VisionError("Vision API HTTP 401: unauthorized")
-
-    mod._image_desc_from_url = boom
-    body = _responses_body("data:image/png;base64,AAA")
-    assert asyncio.run(mod._rewrite_image_inputs(body))
-
-    content = body["input"][0]["content"]
-    assert any(block.get("text", "").startswith("[vision proxy]") for block in content), content
     assert content[-1]["type"] == "input_text", content
     text = content[-1]["text"]
     assert text.startswith("[vision unavailable: "), text
@@ -76,7 +55,7 @@ def test_failed_image_is_replaced_with_note():
     assert "temporarily unavailable" in text, text
     assert "[vision model description]" not in text, \
         "an unavailable note is not a model description and must not wear its prefix"
-    print("PASS: the failed image is replaced with a note in place")
+    print("PASS: a failed vision call degrades to a visible note by default")
 
 
 def test_mixed_success_and_failure():
@@ -123,6 +102,5 @@ def test_anthropic_dialect():
 
 if __name__ == "__main__":
     test_vision_failure_degrades_by_default()
-    test_failed_image_is_replaced_with_note()
     test_mixed_success_and_failure()
     test_anthropic_dialect()
