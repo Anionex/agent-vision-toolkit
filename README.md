@@ -33,7 +33,7 @@ The only thing you need to prepare is an OpenAI-compatible vision API (key, base
 ```bash
 VISION_API_KEY=sk-...
 VISION_BASE_URL=https://openrouter.ai/api/v1
-VISION_MODEL=google/gemini-2.5-flash
+VISION_MODEL=google/gemini-3.6-flash
 ```
 
 Any OpenAI-compatible endpoint that supports `/chat/completions` with `image_url` works (e.g. Aliyun DashScope: `https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`). Add `LANG=en` for English descriptions (default is Chinese).

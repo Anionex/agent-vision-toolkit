@@ -33,7 +33,7 @@
 ```bash
 VISION_API_KEY=sk-...
 VISION_BASE_URL=https://openrouter.ai/api/v1
-VISION_MODEL=google/gemini-2.5-flash
+VISION_MODEL=google/gemini-3.6-flash
 ```
 
 任何支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 端点都可以（如阿里云百炼：`https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`）。需要英文描述时加 `LANG=en`（默认中文）。
