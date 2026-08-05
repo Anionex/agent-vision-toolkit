@@ -20,7 +20,7 @@ mkdir -p ~/.config/opencode/plugin && cp vision.ts ~/.config/opencode/plugin/
 ## Configure
 
 Same env chain as the proxy and CLI tools in this repository — typically
-`~/.config/codex-vision-proxy/env` (permissions `0600`):
+`~/.config/agent-vision-toolkit/env` (permissions `0600`):
 
 ```
 VISION_API_KEY=...
@@ -29,7 +29,7 @@ VISION_MODEL=your-vision-model
 # optional: LANG=zh  (or en) to pin the description language
 ```
 
-`$CODEX_VISION_PROXY_ENV`, `%LOCALAPPDATA%/codex-vision-proxy/env` and a `.env`
+`$VISION_ENV_FILE`, `%LOCALAPPDATA%/agent-vision-toolkit/env` and a `.env`
 in the working directory are also read; later files override earlier ones.
 
 ## Behavior

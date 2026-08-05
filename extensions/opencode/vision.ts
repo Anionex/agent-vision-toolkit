@@ -16,10 +16,10 @@
  * auto-detect vision-capable primaries; set VISION_REWRITE=off in the
  * environment to disable rewriting when running a multimodal model.
  *
- * Configuration comes from the same env chain as the codex-vision-proxy repo
+ * Configuration comes from the same env chain as the agent-vision-toolkit repo
  * (VISION_API_KEY / VISION_BASE_URL / VISION_MODEL, optional LANG=zh|en):
- * $CODEX_VISION_PROXY_ENV, %LOCALAPPDATA%/codex-vision-proxy/env,
- * ~/.config/codex-vision-proxy/env, ./.env — later files override earlier ones
+ * $VISION_ENV_FILE, %LOCALAPPDATA%/agent-vision-toolkit/env,
+ * ~/.config/agent-vision-toolkit/env, ./.env — later files override earlier ones
  * and the process environment, matching vision_client.py.
  *
  * A sibling implementation for Pi / Oh My Pi lives at extensions/pi/vision.ts;
@@ -100,9 +100,9 @@ function loadVisionConfig(): VisionConfig | { error: string } {
     if (value !== undefined) vars[key] = value;
   }
   const candidates: string[] = [];
-  if (process.env.CODEX_VISION_PROXY_ENV) candidates.push(process.env.CODEX_VISION_PROXY_ENV);
-  if (process.env.LOCALAPPDATA) candidates.push(join(process.env.LOCALAPPDATA, "codex-vision-proxy", "env"));
-  candidates.push(join(homedir(), ".config", "codex-vision-proxy", "env"));
+  if (process.env.VISION_ENV_FILE) candidates.push(process.env.VISION_ENV_FILE);
+  if (process.env.LOCALAPPDATA) candidates.push(join(process.env.LOCALAPPDATA, "agent-vision-toolkit", "env"));
+  candidates.push(join(homedir(), ".config", "agent-vision-toolkit", "env"));
   candidates.push(join(process.cwd(), ".env"));
   for (const path of candidates) {
     if (existsSync(path)) parseEnvFile(path, vars);
@@ -112,7 +112,7 @@ function loadVisionConfig(): VisionConfig | { error: string } {
       return {
         error:
           `${key} is not set. Put VISION_API_KEY / VISION_BASE_URL / VISION_MODEL in ` +
-          "~/.config/codex-vision-proxy/env (0600) or export them in the environment.",
+          "~/.config/agent-vision-toolkit/env (0600) or export them in the environment.",
       };
     }
   }
@@ -194,7 +194,7 @@ async function describeImage(
 }
 
 // ---------------------------------------------------------------------------
-// Focus-hint policy (shared with the proxy: see codex-vision-proxy.py).
+// Focus-hint policy (shared with the proxy: see vision_proxy.py).
 
 function visionPrompt(hint: string, source: "user" | "assistant"): string {
   // Keep the tail: long messages put the material first and the question last.

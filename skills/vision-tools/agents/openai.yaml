@@ -1,4 +1,4 @@
 interface:
-  display_name: "codex-vision-proxy vision tools"
+  display_name: "Agent Vision Toolkit"
   short_description: "Ask about, OCR, locate, inventory, and vectorize images with glance/ground/detect/trace"
   default_prompt: "Use $vision-tools to look at this image with glance, ground, detect, or trace."

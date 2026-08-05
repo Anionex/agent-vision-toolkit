@@ -1,6 +1,6 @@
 <div align="center">
 
-# codex-vision-proxy
+# agent-vision-toolkit
 
 **What it thinks is what it sees — a way to make a text-only model "see" images with its mind's eye, a vision toolkit, and drop-in setups for Codex, Claude Code, Pi, Oh My Pi, and OpenCode.**
 
@@ -26,7 +26,7 @@ All entry points share the same describe layer — the focus hint, the verbatim-
 
 Most vision wrappers simply turn an image into a generic description and leave the text model to recover the original task afterward.
 
-`codex-vision-proxy` preserves **why the agent is looking**. It extracts the viewing intent from the user message or the assistant's stated reason for calling `view_image`, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step—not a generic "detailed description." Lower cost, higher accuracy, and faster response times.
+`agent-vision-toolkit` preserves **why the agent is looking**. It extracts the viewing intent from the user message or the assistant's stated reason for calling `view_image`, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step—not a generic "detailed description." Lower cost, higher accuracy, and faster response times.
 
 <p align="center">
   <img src="assets/focus-hint-comparison-1.png"
@@ -164,7 +164,7 @@ trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 One way to install the extra vision tools into Codex is the bundled `vision-tools` skill, which tells Codex what `glance`/`ground` are and how to use them. Install it with the official skills CLI:
 
 ```bash
-npx skills add Anionex/codex-vision-proxy --skill vision-tools -a codex -g --copy -y
+npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y
 ```
 
 Or copy the folder manually:
@@ -210,7 +210,7 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 
 | File | Purpose |
 |---|---|
-| `codex-vision-proxy.py` | Local image-rewriting proxy and SSE forwarding |
+| `vision_proxy.py` | Local image-rewriting proxy and SSE forwarding |
 | `vision_client.py` | Vision API client shared by the proxy and `glance` |
 | `bin/glance` | Optional image description, Q&A, and OCR CLI |
 | `ground.py` / `bin/ground` | Optional image target-grounding CLI |

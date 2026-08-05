@@ -1,6 +1,6 @@
 <div align="center">
 
-# codex-vision-proxy
+# agent-vision-toolkit
 
 **所想即所见——一个让纯文本模型“用意念”看图的方法和视觉工具包，以及无缝接入 Codex、Claude Code、Pi、Oh My Pi、OpenCode 的现成方案。**
 
@@ -26,7 +26,7 @@
 
 大多数视觉转接方案只是把图片变成一段通用描述，之后再让纯文本模型自己去把原本的任务找回来。
 
-`codex-vision-proxy` 保留的是 **agent 为什么要看这张图**。它从用户消息、或模型调用 `view_image` 时自述的理由中提取出看图动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容，而不是一段通用的“详细描述”。更低成本，更高的准确率，更快的响应速度。
+`agent-vision-toolkit` 保留的是 **agent 为什么要看这张图**。它从用户消息、或模型调用 `view_image` 时自述的理由中提取出看图动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容，而不是一段通用的“详细描述”。更低成本，更高的准确率，更快的响应速度。
 
 <p align="center">
   <img src="assets/focus-hint-comparison-cn-1.png"
@@ -166,7 +166,7 @@ trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 安装额外视觉工具包的方式之一，是安装仓库内附带的 `vision-tools` skill：它告诉 Codex `glance`/`ground` 是什么以及怎么用。使用官方 skills CLI 安装：
 
 ```bash
-npx skills add Anionex/codex-vision-proxy --skill vision-tools -a codex -g --copy -y
+npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y
 ```
 
 也可以手动复制：
@@ -211,7 +211,7 @@ Codex（携带原有 Authorization）
 
 | 文件 | 作用 |
 |---|---|
-| `codex-vision-proxy.py` | 本地图片改写代理与 SSE 转发 |
+| `vision_proxy.py` | 本地图片改写代理与 SSE 转发 |
 | `vision_client.py` | 代理与 `glance` 共用的视觉 API 客户端 |
 | `bin/glance` | 可选的图片描述、问答和 OCR CLI |
 | `ground.py` / `bin/ground` | 可选的图片目标定位 CLI |

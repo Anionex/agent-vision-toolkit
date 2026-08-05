@@ -41,10 +41,10 @@ Codex 配置目录默认位于当前用户主目录下的 `.codex`。如用户�
 
 | 系统 | `INSTALL_DIR` | `ENV_FILE` |
 |---|---|---|
-| macOS / Linux | `~/.local/share/codex-vision-proxy` | `~/.config/codex-vision-proxy/env` |
-| Windows | `%LOCALAPPDATA%\codex-vision-proxy` | `%LOCALAPPDATA%\codex-vision-proxy\env` |
+| macOS / Linux | `~/.local/share/agent-vision-toolkit` | `~/.config/agent-vision-toolkit/env` |
+| Windows | `%LOCALAPPDATA%\agent-vision-toolkit` | `%LOCALAPPDATA%\agent-vision-toolkit\env` |
 
-将 `codex-vision-proxy.py` 和 `vision_client.py` 复制到 `INSTALL_DIR`，再把 `.env.example` 复制为 `ENV_FILE`。只填写：
+将 `vision_proxy.py` 和 `vision_client.py` 复制到 `INSTALL_DIR`，再把 `.env.example` 复制为 `ENV_FILE`。只填写：
 
 ```dotenv
 VISION_API_KEY=...
@@ -65,7 +65,7 @@ LANG=zh  # 可选：视觉模型输出语言（zh/en），不填保持默认中�
 macOS / Linux：
 
 ```bash
-python3 <INSTALL_DIR>/codex-vision-proxy.py \
+python3 <INSTALL_DIR>/vision_proxy.py \
   --port 19100 \
   --upstream "原始 DeepSeek base_url" \
   --env-file <ENV_FILE>
@@ -74,7 +74,7 @@ python3 <INSTALL_DIR>/codex-vision-proxy.py \
 Windows PowerShell：
 
 ```powershell
-py -3 "<INSTALL_DIR>\codex-vision-proxy.py" --port 19100 --upstream "原始 DeepSeek base_url" --env-file "<ENV_FILE>"
+py -3 "<INSTALL_DIR>\vision_proxy.py" --port 19100 --upstream "原始 DeepSeek base_url" --env-file "<ENV_FILE>"
 ```
 
 尖括号是占位符，执行前必须替换成真实绝对路径。确认代理监听 `127.0.0.1:19100`。如果端口已被占用，先确认占用者是否为用户已有的相关代理，不得直接终止未知进程。
@@ -131,7 +131,7 @@ launchctl kickstart -k "gui/$(id -u)/com.codex.vision-proxy"
 
 ```cmd
 @echo off
-start "Codex Vision Proxy" /min py -3 "%LOCALAPPDATA%\codex-vision-proxy\codex-vision-proxy.py" --port 19100 --upstream "原始 DeepSeek base_url" --env-file "%LOCALAPPDATA%\codex-vision-proxy\env" --log "%LOCALAPPDATA%\codex-vision-proxy\proxy.log"
+start "Agent Vision Toolkit" /min py -3 "%LOCALAPPDATA%\agent-vision-toolkit\vision_proxy.py" --port 19100 --upstream "原始 DeepSeek base_url" --env-file "%LOCALAPPDATA%\agent-vision-toolkit\env" --log "%LOCALAPPDATA%\agent-vision-toolkit\proxy.log"
 ```
 
 Startup 目录由 PowerShell 的 `[Environment]::GetFolderPath("Startup")` 获取。创建后运行一次该 `.cmd`，确认代理启动。不要把 key 写进 `.cmd`。
@@ -147,7 +147,7 @@ Startup 目录由 PowerShell 的 `[Environment]::GetFolderPath("Startup")` 获�
 用当前系统的 Python 命令运行仓库内核心测试：
 
 ```text
-python -m py_compile codex-vision-proxy.py vision_client.py bin/glance bin/trace ground.py detect.py
+python -m py_compile vision_proxy.py vision_client.py bin/glance bin/trace ground.py detect.py
 python tests/test_image_rewrite_shapes.py
 python tests/smoke_test_proxy.py
 python tests/test_vision_client.py

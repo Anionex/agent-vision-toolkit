@@ -46,7 +46,7 @@ flag 启动（`--codex-header-compat` 与 `--inject-reasoning-summary` 保持关
 `native` 需要视觉模型所在中转站支持 Codex 认识的 wire API。**若不支持，该条件记为
 未跑，不用任何替代品冒充上限。**
 
-代理变体不改生产代码：与机制层同样的做法，`codex-vision-proxy.py` 与
+代理变体不改生产代码：与机制层同样的做法，`vision_proxy.py` 与
 `vision_client.py` 从 `main` 现取副本再改常量，副本里对被改的原句加断言，
 生产 prompt 措辞一变就报错退出，不会静默退化成另一个条件的副本。
 

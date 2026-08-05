@@ -195,6 +195,6 @@ diagram as SVG, extracting a visual component — please read
 - If the vision API fails, relay the error faithfully; never fabricate
   image content.
 
-Source repository: https://github.com/Anionex/codex-vision-proxy
+Source repository: https://github.com/Anionex/agent-vision-toolkit
 
-Installation guide: https://github.com/Anionex/codex-vision-proxy/blob/main/AGENT_INSTALL.md
+Installation guide: https://github.com/Anionex/agent-vision-toolkit/blob/main/AGENT_INSTALL.md

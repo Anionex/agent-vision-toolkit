@@ -46,13 +46,13 @@ def load_env_file(path: str | os.PathLike[str] | None) -> None:
 
 
 def load_default_env() -> None:
-    explicit = os.environ.get("CODEX_VISION_PROXY_ENV")
+    explicit = os.environ.get("VISION_ENV_FILE")
     candidates = [Path(explicit).expanduser()] if explicit else []
     local_appdata = os.environ.get("LOCALAPPDATA")
     if local_appdata:
-        candidates.append(Path(local_appdata) / "codex-vision-proxy" / "env")
+        candidates.append(Path(local_appdata) / "agent-vision-toolkit" / "env")
     candidates.extend([
-        Path.home() / ".config" / "codex-vision-proxy" / "env",
+        Path.home() / ".config" / "agent-vision-toolkit" / "env",
         Path(__file__).resolve().parent / ".env",
         Path.cwd() / ".env",
     ])

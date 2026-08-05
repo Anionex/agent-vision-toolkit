@@ -21,7 +21,7 @@ PNG = {"type": "image", "source": {"type": "base64", "media_type": "image/png", 
 
 def _load_proxy():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        os.pardir, "codex-vision-proxy.py")
+                        os.pardir, "vision_proxy.py")
     spec = importlib.util.spec_from_file_location("ds_proxy_fail_open_mod", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

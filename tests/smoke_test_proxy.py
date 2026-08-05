@@ -27,7 +27,7 @@ SECOND = b'data: {"type":"second"}\n\n'
 def main():
     py = sys.executable
     proxy_script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                os.pardir, "codex-vision-proxy.py")
+                                os.pardir, "vision_proxy.py")
     log = "/tmp/ds_proxy_test.log"
     for path in (log, "/tmp/up_headers.json", "/tmp/up_body.json"):
         try:

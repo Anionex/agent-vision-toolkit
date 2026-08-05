@@ -76,7 +76,7 @@ README 现在的主张是：hint 让描述「贴合当前任务」。这只是�
 
 ## 六个条件
 
-prompt 一律从生产代码现取（`git show main:codex-vision-proxy.py`），不在评测里手抄副本——
+prompt 一律从生产代码现取（`git show main:vision_proxy.py`），不在评测里手抄副本——
 上一版实验正是因为手抄，「生产条件」漏掉了 `_DESCRIBE_PROMPT` 整段而无人察觉。
 
 | 条件 | 视觉侧 prompt | 代表什么 |
