@@ -187,7 +187,6 @@ sequence, and how to tell you got it right.
 |---|---|
 | Rebuild what an image shows (page → HTML, icon/diagram → SVG, sketch/diagram → Mermaid/Graphviz) — or check a build against its design image | `references/restore.md` |
 | Operate a GUI from screenshots — locate, act, verify each step | `references/gui.md` |
-| Extract values, trends, comparisons from a chart image | `references/charts.md` |
 
 ## Notes
 
