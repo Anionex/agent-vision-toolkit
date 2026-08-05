@@ -28,6 +28,22 @@ _DESC_CACHE = {}
 
 FOCUS_HINT_MAX_CHARS = 500
 
+
+class _VisionUnavailable:
+    """Marker for a vision call that failed while the proxy is in fail-open mode.
+
+    The note text is written into the conversation instead of the image, so the
+    rest of the request (plain text included) can continue on its way instead of
+    the whole conversation being answered with 502.
+    """
+
+    def __init__(self, reason):
+        self.reason = reason
+
+    def __str__(self):
+        return f"[vision unavailable: {self.reason}]"
+
+
 _ROLE_PROMPT = (
     "You are the eyes of a text-only coding assistant that cannot see images. "
     "Transcribe and describe this image so the assistant can act on it. "
@@ -308,7 +324,7 @@ _FORMATS = {
 }
 
 
-async def _describe_jobs(jobs):
+async def _describe_jobs(jobs, fail_open=False):
     requests = list(dict.fromkeys((job[2], job[3]) for job in jobs))
     semaphore = asyncio.Semaphore(4)
 
@@ -325,7 +341,11 @@ async def _describe_jobs(jobs):
     errors = []
     for key, value in results:
         if value is None or isinstance(value, VisionError):
-            errors.append(str(value) if isinstance(value, VisionError) else "image description failed")
+            reason = str(value) if isinstance(value, VisionError) else "image description failed"
+            if fail_open:
+                descriptions[key] = _VisionUnavailable(reason)
+            else:
+                errors.append(reason)
         else:
             descriptions[key] = value
     if errors:
@@ -336,7 +356,7 @@ async def _describe_jobs(jobs):
     return descriptions
 
 
-async def _rewrite_image_inputs(parsed):
+async def _rewrite_image_inputs(parsed, fail_open=False):
     fmt = _detect_format(parsed)
     if fmt is None:
         return False
@@ -344,17 +364,24 @@ async def _rewrite_image_inputs(parsed):
     jobs = collect(parsed)
     if not jobs:
         return False
-    descriptions = await _describe_jobs(jobs)
+    descriptions = await _describe_jobs(jobs, fail_open)
     prefix = "[vision model description] "
     for values, index, url, prompt in jobs:
-        values[index] = text_block(prefix + descriptions[(url, prompt)])
+        description = descriptions[(url, prompt)]
+        if isinstance(description, _VisionUnavailable):
+            values[index] = text_block(str(description))
+        else:
+            values[index] = text_block(prefix + description)
     # Explain the channel once, at the conversation's first image whichever path
     # it arrived on. The history is append-only, so "first" keeps pointing at the
     # same block on every later turn: the note is replayed, never repeated, and
     # the vision prompt is untouched so no cache key moves.
     first_values, first_index = jobs[0][:2]
     first_values.insert(first_index, text_block(channel_note))
-    _log(f"[vision-proxy] image rewrite ok format={fmt} images={len(descriptions)} cache_entries={len(_DESC_CACHE)}")
+    unavailable = sum(1 for value in descriptions.values() if isinstance(value, _VisionUnavailable))
+    state = "fail-open" if fail_open else "ok"
+    _log(f"[vision-proxy] image rewrite {state} format={fmt} images={len(descriptions)} "
+         f"unavailable={unavailable} cache_entries={len(_DESC_CACHE)}")
     return True
 
 
@@ -403,11 +430,13 @@ def _inject_reasoning_summaries(text):
 
 
 class Proxy:
-    def __init__(self, port, upstream, log_path, codex_header_compat=False, inject_reasoning_summary=False):
+    def __init__(self, port, upstream, log_path, codex_header_compat=False,
+                 inject_reasoning_summary=False, fail_open=False):
         self.port = port
         self.upstream = upstream.rstrip("/")
         self.codex_header_compat = codex_header_compat
         self.inject_reasoning_summary = inject_reasoning_summary
+        self.fail_open = fail_open
         os.environ["CODEX_VISION_PROXY_LOG"] = log_path
 
     def _upstream_headers(self, incoming):
@@ -454,7 +483,7 @@ class Proxy:
                 except json.JSONDecodeError:
                     pass
             if isinstance(parsed, dict):
-                image_changed = await _rewrite_image_inputs(parsed)
+                image_changed = await _rewrite_image_inputs(parsed, self.fail_open)
                 model_changed = _rewrite_model_compat(parsed)
                 if image_changed or model_changed:
                     body = bytearray(json.dumps(parsed).encode())
@@ -565,6 +594,8 @@ async def main():
     parser.add_argument("--env-file")
     parser.add_argument("--codex-header-compat", action="store_true")
     parser.add_argument("--inject-reasoning-summary", action="store_true")
+    parser.add_argument("--fail-open", action="store_true",
+                        help="on vision API failure replace images with a note instead of failing the request")
     parser.add_argument("--skip-vision-config-check", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     load_env_file(args.env_file)
@@ -573,7 +604,8 @@ async def main():
             validate_vision_config()
         except VisionError as exc:
             parser.error(str(exc))
-    proxy = Proxy(args.port, args.upstream, args.log, args.codex_header_compat, args.inject_reasoning_summary)
+    proxy = Proxy(args.port, args.upstream, args.log, args.codex_header_compat,
+                  args.inject_reasoning_summary, args.fail_open)
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
