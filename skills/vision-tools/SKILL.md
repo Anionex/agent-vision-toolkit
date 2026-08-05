@@ -188,6 +188,7 @@ sequence, and how to tell you got it right.
 | Rebuild what an image shows (page → HTML, icon/diagram → SVG) — or check a build against its design image | `references/restore.md` |
 | Turn a sketch, whiteboard photo, or diagram into a structured artifact (Mermaid, layout skeleton, outline) | `references/sketch.md` |
 | Operate a GUI from screenshots — locate, act, verify each step | `references/gui.md` |
+| Extract values, trends, comparisons from a chart image | `references/charts.md` |
 
 ## Notes
 
