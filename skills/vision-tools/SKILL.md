@@ -20,7 +20,7 @@ Pick the tool by the question you are answering:
 | "Cut this box out as its own image file" | `crop` |
 | "Turn this HTML file into a screenshot" | `scripts/html_shot.py` |
 | "Which colours dominate a region, and which palette value fits it?" | `scripts/dominant_colors.py` |
-| A number none of them return — a colour value, the gap between two things | code over the pixels (Pillow) |
+| A relation none of them return — a gap, a distance between two located things | code over the pixels (Pillow) |
 
 `glance` answers what something is; `ground` and `detect` answer where.
 You give `ground` a description of a particular thing; you give `detect` a
@@ -32,8 +32,26 @@ not reliable. That is accurate enough to crop with, to click, to compare
 positions against. When a number has to be exact, `trace` derives it from
 the actual pixels — offsets, sizes, shapes.
 
-Drop to Pillow only for what none of them return: sampling a colour, or
-computing a relation between two things you already located.
+## Use the provided tools before hand-rolled pixels
+
+Everything this toolkit ships a tool for, call the tool — do not rewrite
+it with Pillow in the middle of a task. The CLIs exist so the same pixel
+work is not hand-coded differently every time:
+
+- cut a box out of an image → `crop`, not `Image.open(...).crop(...)`
+- sample a region's palette → `scripts/dominant_colors.py`
+- compare two images → `scripts/pixel_diff.py`
+- vectorize to SVG → `trace`
+- locate / inventory elements → `ground` / `detect`
+- describe / OCR an image → `glance`
+- HTML file to a screenshot → `scripts/html_shot.py`
+
+Hand-written Pillow is only for what none of them return: a relation
+between two things you already located (a gap, a distance), a resize or
+overlay, drawing. If you catch yourself writing `.crop()`, `.convert()`,
+or histogram code where one of the tools above fits, replace it with the
+tool call — same coordinates, same box format, and the output feeds the
+next tool directly.
 
 ## glance — ask about an image
 
