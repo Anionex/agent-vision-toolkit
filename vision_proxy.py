@@ -424,7 +424,9 @@ def _inject_reasoning_summaries(text):
 
 
 def _is_apply_patch_name(name):
-    return name == "apply_patch" or (name or "").endswith(".apply_patch") or (name or "").endswith("/apply_patch")
+    # Bare name only: namespaced tools (mcp_*.apply_patch, plugin/apply_patch)
+    # are different tools and must never be captured by this bridge.
+    return name == "apply_patch"
 
 
 APPLY_PATCH_TOOL_DESCRIPTION = (
@@ -471,7 +473,8 @@ def _rewrite_apply_patch_tool(parsed):
         if tool_type == "custom":
             name = tool.get("name")
         elif tool_type == "function":
-            name = tool.get("name") or (tool.get("function") or {}).get("name")
+            # Flat Responses shape only; the nested chat shape stays untouched.
+            name = tool.get("name")
         else:
             continue
         if not _is_apply_patch_name(name):
@@ -511,13 +514,13 @@ def _extract_apply_patch_input(args_acc):
         except json.JSONDecodeError:
             return args_acc
         if isinstance(obj, dict):
-            value = obj.get("input")
-            if isinstance(value, str):
-                return value
-            for key in ("patch", "text", "payload", "command", "arguments"):
+            for key in ("input", "patch", "text", "payload", "command", "arguments"):
                 value = obj.get(key)
                 if isinstance(value, str) and "*** Begin Patch" in value:
                     return value
+            value = obj.get("input")
+            if isinstance(value, str):
+                return value
         return args_acc
     except Exception as exc:
         _log(f"[vision-proxy] extract_apply_patch_input failed: {exc!r}")
@@ -566,8 +569,6 @@ def _split_sse_frame(buffer, max_buffered=8 * 1024 * 1024):
         if index != -1:
             frame = bytes(buffer[:index + len(delim)])
             rest = bytearray(buffer[index + len(delim):])
-            if delim == b"\r\n\r\n":
-                frame = frame.replace(b"\r\n", b"\n")
             return frame, rest
     return None, buffer
 
@@ -600,7 +601,7 @@ def _flush_apply_patch(entry, interrupted=False):
         _log(f"[vision-proxy] apply_patch flush OK item_id={item_id} input_len={len(input_text)}")
         return frames
     except Exception as exc:
-        _log(f"[vision-proxy] apply_patch flush failed: {exc!r}")
+        _log(f"[vision-proxy] apply_patch flush failed, announced item may hang: {exc!r}")
         return []
 
 
@@ -635,7 +636,14 @@ def _rewrite_sse_frame(frame, state):
 
         if etype == "response.completed" or etype == "response.failed" or etype == "response.incomplete":
             state["completed"] = True
-            return [frame]
+            out = []
+            for item_id, entry in list(pending.items()):
+                pending.pop(item_id, None)
+                state.setdefault("flushed", set()).add(item_id)
+                _log(f"[vision-proxy] apply_patch call interrupted by terminal event item_id={item_id}")
+                out.extend(_flush_apply_patch(entry, interrupted=True))
+            out.append(frame)
+            return out
 
         if etype == "response.output_item.added":
             item = payload.get("item") or {}
@@ -714,6 +722,32 @@ def _rewrite_sse_frame(frame, state):
     except Exception as exc:
         _log(f"[vision-proxy] sse frame rewrite failed, forwarding raw: {exc!r}")
         return [frame]
+
+
+def _rewrite_sse_body(body):
+    """Run the frame bridge over a fully buffered SSE body. Fail-safe: any
+    anomaly keeps the raw frame; used when the response must be buffered
+    anyway (e.g. --inject-reasoning-summary)."""
+    state = {"pending": {}, "completed": False}
+    buffer = bytearray(body)
+    out = bytearray()
+    while True:
+        frame, rest = _split_sse_frame(buffer)
+        if frame is None:
+            break
+        buffer = rest
+        for out_frame in _rewrite_sse_frame(frame, state):
+            out.extend(out_frame)
+    if buffer:
+        for out_frame in _rewrite_sse_frame(bytes(buffer), state):
+            out.extend(out_frame)
+    for item_id, entry in list(state["pending"].items()):
+        state["pending"].pop(item_id, None)
+        state.setdefault("flushed", set()).add(item_id)
+        _log(f"[vision-proxy] apply_patch stream ended mid-call item_id={item_id}")
+        for out_frame in _flush_apply_patch(entry, interrupted=True):
+            out.extend(out_frame)
+    return bytes(out)
 
 
 class Proxy:
@@ -820,6 +854,7 @@ class Proxy:
         if "text/event-stream" in content_type and not compressed:
             if self.inject_reasoning_summary:
                 body = await asyncio.to_thread(response.read)
+                body = _rewrite_sse_body(body)
                 body = _inject_reasoning_summaries(body.decode(errors="replace")).encode()
                 await self._write_head(writer, status, headers, len(body))
                 writer.write(body)
@@ -850,6 +885,15 @@ class Proxy:
         read_chunk = getattr(response, "read1", response.read)
         buffer = bytearray()
         state = {"pending": {}, "completed": False}
+        out_buf = bytearray()
+
+        async def emit(frame_bytes):
+            out_buf.extend(frame_bytes)
+            if len(out_buf) >= 65536:
+                writer.write(bytes(out_buf))
+                await writer.drain()
+                out_buf.clear()
+
         while True:
             chunk = await asyncio.to_thread(read_chunk, 65536)
             if not chunk:
@@ -861,19 +905,19 @@ class Proxy:
                     break
                 buffer = rest
                 for out_frame in _rewrite_sse_frame(frame, state):
-                    writer.write(out_frame)
-                    await writer.drain()
+                    await emit(out_frame)
         if buffer:
             for out_frame in _rewrite_sse_frame(bytes(buffer), state):
-                writer.write(out_frame)
-                await writer.drain()
+                await emit(out_frame)
         for item_id, entry in list(state["pending"].items()):
             state["pending"].pop(item_id, None)
             state.setdefault("flushed", set()).add(item_id)
             _log(f"[vision-proxy] apply_patch stream ended mid-call item_id={item_id}")
             for out_frame in _flush_apply_patch(entry, interrupted=True):
-                writer.write(out_frame)
-                await writer.drain()
+                await emit(out_frame)
+        if out_buf:
+            writer.write(bytes(out_buf))
+            await writer.drain()
 
     async def _write_head(self, writer, status, headers, content_length):
         reason = HTTPStatus(status).phrase if status in HTTPStatus._value2member_map_ else "Unknown"

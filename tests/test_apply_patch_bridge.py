@@ -184,6 +184,56 @@ def main():
     check("json rewrite", rewritten["output"][0]["type"] == "custom_tool_call"
           and rewritten["output"][0]["input"] == EXPECTED_PATCH)
 
+    # H4: namespaced tools are never captured by the bridge.
+    parsed = {"tools": [
+        {"type": "function", "name": "my_company.apply_patch", "description": "x", "parameters": {}},
+        {"type": "custom", "name": "plugin/apply_patch", "description": "y", "format": {}},
+    ]}
+    check("namespaced tools untouched", mod._rewrite_apply_patch_tool(parsed) is False
+          and parsed["tools"][0]["name"] == "my_company.apply_patch"
+          and parsed["tools"][1]["type"] == "custom")
+
+    # H3: nested chat shape is left byte-identical.
+    nested = {"type": "function", "function": {"name": "apply_patch", "description": "x"}}
+    parsed = {"tools": [nested]}
+    check("nested chat shape untouched", mod._rewrite_apply_patch_tool(parsed) is False
+          and parsed["tools"][0] is nested)
+    # Flat Responses function shape is still normalized (idempotent rewrite).
+    flat = {"type": "function", "name": "apply_patch",
+            "description": "other", "parameters": {"type": "object", "properties": {}, "required": []}}
+    parsed = {"tools": [flat]}
+    check("flat function shape rewritten", mod._rewrite_apply_patch_tool(parsed) is True
+          and parsed["tools"][0]["description"] == mod.APPLY_PATCH_TOOL_DESCRIPTION)
+
+    # H2: terminal event flushes a pending call with status incomplete BEFORE
+    # the terminal frame, so codex still sees the interrupted call.
+    state = {"pending": {}, "completed": False}
+    frames = []
+    frames += mod._rewrite_sse_frame(mod._sse_event("response.output_item.added", {
+        "type": "response.output_item.added", "output_index": 0,
+        "item": {"id": "fc_x", "type": "function_call", "name": "apply_patch", "arguments": "", "call_id": "cx"}}), state)
+    frames += mod._rewrite_sse_frame(mod._sse_event("response.function_call_arguments.delta", {
+        "type": "response.function_call_arguments.delta", "item_id": "fc_x", "output_index": 0,
+        "delta": json.dumps({"patch": "*** Begin Patch\n*** End Patch"})}), state)
+    completed = mod._sse_event("response.completed", {"type": "response.completed", "response": {"id": "r"}})
+    frames += mod._rewrite_sse_frame(completed, state)
+    types = []
+    for f in frames:
+        data = next((line[5:].strip() for line in f.decode().splitlines() if line.startswith("data:")), None)
+        types.append(json.loads(data).get("type"))
+    incomplete_idx = [i for i, t in enumerate(types) if t == "response.output_item.done"
+                      and "incomplete" in frames[i].decode()]
+    check("terminal flush before completed", len(incomplete_idx) == 1
+          and incomplete_idx[0] == len(types) - 2
+          and types[-1] == "response.completed",
+          f"incomplete at {incomplete_idx}, last={types[-1]}")
+    check("terminal flush marks incomplete", "incomplete" in frames[incomplete_idx[0]].decode())
+
+    # H1: buffered rewrite path behaves like the streaming path. (`out` was
+    # reused by the fail-safe checks above, so compare against outputs[0].)
+    buffered = mod._rewrite_sse_body(raw)
+    check("buffered rewrite == streaming rewrite", buffered == outputs[0])
+
     print("----")
     if failures:
         print("FAILURES:", failures)
