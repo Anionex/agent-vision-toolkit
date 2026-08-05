@@ -19,30 +19,33 @@
 
 ## 快速开始
 
-**1. 指向一个视觉 API。** 在 `~/.config/agent-vision-toolkit/env` 里写三个环境变量（`chmod 600`）：
+**最简单的安装方式：交给你的 agent。** 把这句话发给你的 coding agent：
+
+> 请阅读 https://github.com/Anionex/agent-vision-toolkit ，在本机装好视觉工具箱和 skill；如果我的宿主适用，也按 AGENT_INSTALL.md 部署无缝接入。
+
+你唯一要准备的是一个 OpenAI-compatible 的视觉 API（key、地址、模型名），其余都由 agent 完成。
+
+<details>
+<summary><b>想手动装？</b>三步。</summary>
+
+**1. 指向一个视觉 API**——在 `~/.config/agent-vision-toolkit/env` 里写三个环境变量（`chmod 600`）：
 
 ```bash
 VISION_API_KEY=sk-...
 VISION_BASE_URL=https://openrouter.ai/api/v1
 VISION_MODEL=google/gemini-2.5-flash
-LANG=zh   # 视觉模型输出语言：zh 或 en（默认 zh）
 ```
 
-任何支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 端点都可以。两组示例配置：
+任何支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 端点都可以（如阿里云百炼：`https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`）。需要英文描述时加 `LANG=en`（默认中文）。
 
-| 供应商 | `VISION_BASE_URL` | `VISION_MODEL` |
-|---|---|---|
-| OpenRouter | `https://openrouter.ai/api/v1` | `google/gemini-2.5-flash` |
-| 阿里云百炼 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-vl-max-latest` |
-
-**2. 把 CLI 放进 PATH。**
+**2. 把 CLI 放进 PATH：**
 
 ```bash
 git clone https://github.com/Anionex/agent-vision-toolkit.git
 export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # 写进 shell 配置以持久生效
 ```
 
-`glance` 只需要 Python 3.11+。`ground`、`detect` 和 `--region` 需要 `pillow`，`trace` 需要 `vtracer`——只在你要用这些工具时，把它们装进一个隔离的 venv。
+`glance` 只需要 Python 3.11+；`ground`/`detect` 需要 `pillow`，`trace` 需要 `vtracer`——只在你要用这些工具时，把它们装进一个隔离的 venv。
 
 **3. 安装 skill**，让 agent 知道这些工具的存在以及如何组合使用：
 
@@ -50,11 +53,9 @@ export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # 写进 shell 配置以持�
 npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y
 ```
 
-也可以手动复制，之后重启 agent 生效：
+也可以把 `skills/vision-tools/` 复制到你的 agent 的 skills 目录（如 `~/.codex/skills/`），重启生效。
 
-```bash
-cp -r skills/vision-tools ~/.codex/skills/
-```
+</details>
 
 ## 工具
 
@@ -167,11 +168,7 @@ trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 
 ### 怎么装
 
-本仓库不提供通用一键安装器——部署取决于你这台机器的真实配置。推荐把仓库链接交给你的 agent：
-
-> 我已经在 Codex 中接入并可正常使用一个纯文本模型。请先阅读这个仓库的 README，再按照 AGENT_INSTALL.md 根据当前系统部署并验证 `view_image`。
-
-详细执行步骤见 **[Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，见那里各宿主的 README。
+这一层同样交给 agent 安装——快速开始里那句话已经覆盖了它；本仓库刻意不提供一键安装器，因为部署取决于你这台机器的真实配置。agent 遵循的步骤在 **[Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，见那里各宿主的 README。
 
 ## 亮点
 

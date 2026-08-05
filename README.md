@@ -19,30 +19,33 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 
 ## Quick Start
 
-**1. Point it at a vision API.** Three env vars in `~/.config/agent-vision-toolkit/env` (`chmod 600`):
+**The easiest install: hand it to your agent.** Paste this into your coding agent:
+
+> Read https://github.com/Anionex/agent-vision-toolkit and set it up on this machine: the vision toolkit and skill, plus the seamless integration per AGENT_INSTALL.md if my host supports it.
+
+The only thing you need to prepare is an OpenAI-compatible vision API (key, base URL, model name) — the agent does the rest.
+
+<details>
+<summary><b>Prefer to install by hand?</b> Three steps.</summary>
+
+**1. Point it at a vision API** — three env vars in `~/.config/agent-vision-toolkit/env` (`chmod 600`):
 
 ```bash
 VISION_API_KEY=sk-...
 VISION_BASE_URL=https://openrouter.ai/api/v1
 VISION_MODEL=google/gemini-2.5-flash
-LANG=zh   # vision model output language: zh or en (default zh)
 ```
 
-Any OpenAI-compatible endpoint that supports `/chat/completions` with `image_url` works. Two example setups:
+Any OpenAI-compatible endpoint that supports `/chat/completions` with `image_url` works (e.g. Aliyun DashScope: `https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`). Add `LANG=en` for English descriptions (default is Chinese).
 
-| Provider | `VISION_BASE_URL` | `VISION_MODEL` |
-|---|---|---|
-| OpenRouter | `https://openrouter.ai/api/v1` | `google/gemini-2.5-flash` |
-| Aliyun DashScope | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-vl-max-latest` |
-
-**2. Put the CLIs on your PATH.**
+**2. Put the CLIs on your PATH:**
 
 ```bash
 git clone https://github.com/Anionex/agent-vision-toolkit.git
 export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # add to your shell profile to persist
 ```
 
-`glance` needs nothing beyond Python 3.11+. `ground`, `detect`, and `--region` need `pillow`; `trace` needs `vtracer` — install those into an isolated venv only if you want those tools.
+`glance` needs nothing beyond Python 3.11+; `ground`/`detect` need `pillow` and `trace` needs `vtracer` — install those into an isolated venv only if you want those tools.
 
 **3. Install the skill** so your agent knows the tools exist and how to combine them:
 
@@ -50,11 +53,9 @@ export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # add to your shell profile 
 npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y
 ```
 
-Or copy the folder manually, then restart your agent:
+Or copy `skills/vision-tools/` into your agent's skills directory (e.g. `~/.codex/skills/`) and restart the agent.
 
-```bash
-cp -r skills/vision-tools ~/.codex/skills/
-```
+</details>
 
 ## The Tools
 
@@ -167,11 +168,7 @@ This one preserves **why the agent is looking**. It extracts the viewing intent 
 
 ### Installing it
 
-This repository doesn't provide a universal one-click installer — deployment depends on your machine's actual config. The recommended way is to hand the repository link to your agent:
-
-> I've already got a text-only model working in Codex. Please read this repository's README first, then follow AGENT_INSTALL.md to deploy and verify `view_image` on the current system.
-
-Detailed steps are in the **[Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a restart, just paste an image or let the model call its built-in image tool. Pi, Oh My Pi, and OpenCode use the single-file [native extensions](extensions/) instead of the proxy — see the per-host READMEs there.
+This layer is also agent-installed — the Quick Start prompt already covers it, and there is deliberately no one-click installer because deployment depends on your machine's actual config. The steps your agent follows are in the **[Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a restart, just paste an image or let the model call its built-in image tool. Pi, Oh My Pi, and OpenCode use the single-file [native extensions](extensions/) instead of the proxy — see the per-host READMEs there.
 
 ## Highlights
 
