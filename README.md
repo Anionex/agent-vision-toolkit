@@ -17,6 +17,35 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 
 > If this project helps you, feel free to star🌟 & follow～ I'll keep sharing more practical tools and tips.
 
+
+## Real-world Effects
+
+<p align="center">
+  <img src="assets/effect-3.jpg" alt="Multi-round image Q&A with the optional glance CLI" width="49%">
+  <img src="assets/effect-4.jpg" alt="DeepSeek V4 playing chess by locating screen elements with glance/ground" width="49%">
+</p>
+
+*Left: multi-round image Q&A with `glance`. Right: with `ground`, DeepSeek V4 locates screen elements to play chess autonomously.*
+
+<p align="center">
+  <img src="assets/effect-1.jpg" alt="DeepSeek in Codex answering a style question about a UI screenshot" width="49%">
+  <img src="assets/effect-2.jpg" alt="DeepSeek in Codex debugging mismatched UI fields from a screenshot" width="49%">
+</p>
+
+*Left: DeepSeek V4 answers a UI style question with similar-style comparisons. Right: DeepSeek V4 debugs a field-name mismatch from a screenshot.*
+
+
+## Highlights
+
+- **Descriptions target the current question**: every image gets a focus hint — a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking — so the description covers the details this turn actually needs instead of being a generic caption.
+- **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
+- **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
+- **The vision model only looks, it doesn't reason for you**: it transcribes and describes, leaving the conclusion to your coding model.
+- **Coarse to fine**: the first description is a map, not the whole answer — `glance -q` and `ground --region` are the follow-up channel when a detail wasn't covered.
+- **Exact geometry stays local**: `trace` never calls a vision API, so numbers come from pixels rather than from a model's confident estimate.
+- **More vision tools may be added later**
+
+
 ## Quick Start
 
 **The easiest install: hand it to your agent.** Paste this into your coding agent:
@@ -121,21 +150,6 @@ trace diagram.png --polygon
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 ```
 
-## Real-world Effects
-
-<p align="center">
-  <img src="assets/effect-3.jpg" alt="Multi-round image Q&A with the optional glance CLI" width="49%">
-  <img src="assets/effect-4.jpg" alt="DeepSeek V4 playing chess by locating screen elements with glance/ground" width="49%">
-</p>
-
-*Left: multi-round image Q&A with `glance`. Right: with `ground`, DeepSeek V4 locates screen elements to play chess autonomously.*
-
-<p align="center">
-  <img src="assets/effect-1.jpg" alt="DeepSeek in Codex answering a style question about a UI screenshot" width="49%">
-  <img src="assets/effect-2.jpg" alt="DeepSeek in Codex debugging mismatched UI fields from a screenshot" width="49%">
-</p>
-
-*Left: DeepSeek V4 answers a UI style question with similar-style comparisons. Right: DeepSeek V4 debugs a field-name mismatch from a screenshot.*
 
 ## Upgrade: Seamless Integration
 
@@ -170,15 +184,6 @@ This one preserves **why the agent is looking**. It extracts the viewing intent 
 
 This layer is also agent-installed — the Quick Start prompt already covers it, and there is deliberately no one-click installer because deployment depends on your machine's actual config. The steps your agent follows are in the **[Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a restart, just paste an image or let the model call its built-in image tool. Pi, Oh My Pi, and OpenCode use the single-file [native extensions](extensions/) instead of the proxy — see the per-host READMEs there.
 
-## Highlights
-
-- **Descriptions target the current question**: every image gets a focus hint — a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking — so the description covers the details this turn actually needs instead of being a generic caption.
-- **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
-- **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
-- **The vision model only looks, it doesn't reason for you**: it transcribes and describes, leaving the conclusion to your coding model.
-- **Coarse to fine**: the first description is a map, not the whole answer — `glance -q` and `ground --region` are the follow-up channel when a detail wasn't covered.
-- **Exact geometry stays local**: `trace` never calls a vision API, so numbers come from pixels rather than from a model's confident estimate.
-- **More vision tools may be added later**
 
 ## How It Works
 

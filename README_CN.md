@@ -17,6 +17,35 @@
 
 > 如果项目对你有用，欢迎 star🌟 & follow～，我会分享更多的实用工具和技巧
 
+
+## 实际效果
+
+<p align="center">
+  <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
+  <img src="assets/effect-4.jpg" alt="DeepSeek V4 用 glance/ground 定位屏幕元素自主游玩国际象棋" width="49%">
+</p>
+
+*左：用 `glance` 做多轮图片问答；右：用 `ground` 定位屏幕视觉元素，DeepSeek V4 自主游玩国际象棋。*
+
+<p align="center">
+  <img src="assets/effect-1.jpg" alt="Codex 里的 DeepSeek 看 UI 图回答风格问题" width="49%">
+  <img src="assets/effect-2.jpg" alt="Codex 里的 DeepSeek 看图排查界面字段不一致 bug" width="49%">
+</p>
+
+*左：DeepSeek V4 回答 UI 背景风格问题并对比相近风格；右：DeepSeek V4 根据截图排查字段名称不符预期的 bug。*
+
+
+## 亮点
+
+- **描述围绕当前问题展开**：每张图都会附上 focus hint，贴图用它自己那条消息的文字，`view_image` 取回的图用模型自述的看图动机，描述因此覆盖这一轮真正要用到的细节，而不是一段通用 caption。
+- **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图。
+- **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
+- **视觉模型只负责看，不替你推理**：它只转写和描述图片内容，不直接回答问题，结论仍由你的编程模型基于描述得出。
+- **由粗到细**：首轮描述是地图，不是完整答案——描述里缺了你要的细节时，用 `glance -q` 追问、用 `ground --region` 放大。
+- **精确几何留在本地**：`trace` 不经过视觉 API，数字来自真实像素，而不是模型自信的估计。
+- **后续可能加入的更多视觉工具**
+
+
 ## 快速开始
 
 **最简单的安装方式：交给你的 agent。** 把这句话发给你的 coding agent：
@@ -121,21 +150,6 @@ trace diagram.png --polygon
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 ```
 
-## 实际效果
-
-<p align="center">
-  <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
-  <img src="assets/effect-4.jpg" alt="DeepSeek V4 用 glance/ground 定位屏幕元素自主游玩国际象棋" width="49%">
-</p>
-
-*左：用 `glance` 做多轮图片问答；右：用 `ground` 定位屏幕视觉元素，DeepSeek V4 自主游玩国际象棋。*
-
-<p align="center">
-  <img src="assets/effect-1.jpg" alt="Codex 里的 DeepSeek 看 UI 图回答风格问题" width="49%">
-  <img src="assets/effect-2.jpg" alt="Codex 里的 DeepSeek 看图排查界面字段不一致 bug" width="49%">
-</p>
-
-*左：DeepSeek V4 回答 UI 背景风格问题并对比相近风格；右：DeepSeek V4 根据截图排查字段名称不符预期的 bug。*
 
 ## 升级：无缝接入
 
@@ -170,15 +184,6 @@ trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 
 这一层同样交给 agent 安装——快速开始里那句话已经覆盖了它；本仓库刻意不提供一键安装器，因为部署取决于你这台机器的真实配置。agent 遵循的步骤在 **[Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，见那里各宿主的 README。
 
-## 亮点
-
-- **描述围绕当前问题展开**：每张图都会附上 focus hint，贴图用它自己那条消息的文字，`view_image` 取回的图用模型自述的看图动机，描述因此覆盖这一轮真正要用到的细节，而不是一段通用 caption。
-- **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图。
-- **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
-- **视觉模型只负责看，不替你推理**：它只转写和描述图片内容，不直接回答问题，结论仍由你的编程模型基于描述得出。
-- **由粗到细**：首轮描述是地图，不是完整答案——描述里缺了你要的细节时，用 `glance -q` 追问、用 `ground --region` 放大。
-- **精确几何留在本地**：`trace` 不经过视觉 API，数字来自真实像素，而不是模型自信的估计。
-- **后续可能加入的更多视觉工具**
 
 ## 工作原理
 
