@@ -20,11 +20,18 @@ and divide every box by that ratio. Skipping this puts every click at half
 or double distance from the origin — consistently wrong in a way that
 looks like bad grounding.
 
-**2. Locate with `ground`, click the box center.**
+**2. Locate with `ground`, click the box center. Cache fixed targets.**
 
 Centers, not corners — ground boxes are not pixel-exact at the edges. For
 tiny targets (checkboxes, close buttons), go coarse-to-fine: ground the
 containing block, then `ground --region` inside it.
+
+For elements that stay put across interactions (toolbar buttons, sidebar
+links, fixed panels), ground them once and record a coordinate table — an
+id/label plus center coordinates. Subsequent clicks reference the table
+entry directly instead of re-running ground each time. Invalidate the
+table when the layout changes (window resize, navigation to a different
+page, scroll).
 
 **3. One screenshot per action — act, re-shoot, verify, then continue.**
 
