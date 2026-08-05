@@ -1,10 +1,11 @@
 # Rebuilding UI or graphics from an image
 
 **When to use**: the task is reproducing what an image shows — a page as
-HTML, an icon or diagram as SVG, a visual component lifted out for reuse.
-Checking an existing implementation against its design image is the same
-job entered at the Verify step: render, diff, zoom. Not for answering
-questions about an image; that is `glance` alone.
+HTML, an icon or diagram as SVG, a visual component lifted out for reuse,
+or a sketch/diagram/whiteboard turned into structured code (Mermaid,
+Graphviz, JSON outline). Checking an existing implementation against its
+design image is the same job entered at the Verify step: render, diff,
+zoom. Not for answering questions about an image; that is `glance` alone.
 
 Tool syntax lives in `SKILL.md`. This file is the sequence and the
 pass/fail test.
@@ -96,6 +97,16 @@ It prints an overall difference percentage and the worst regions as
 `detect --region` take, so the top offender goes straight back into a zoom
 call. Fix the largest diff, re-render, re-run; the number should drop each
 round.
+
+**When the output is structural code** (Mermaid, Graphviz, JSON layout) —
+pixel-diffing is meaningless because the render and the original differ
+everywhere by design. Verify structure instead: render the artifact to an
+image, rebuild an inventory from it (`detect` + OCR), and compare node
+count, label set, edge list with directions against the original. A
+missing node or reversed arrow shows up as a list diff even when both
+images "look right". Labels must match verbatim — do not tidy spelling or
+expand abbreviations; a label you cannot read is `[unreadable]`, never a
+guess.
 
 Two rules about reading that output, both about not stopping early:
 
