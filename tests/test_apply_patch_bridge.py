@@ -242,6 +242,45 @@ def main():
     buffered = mod._rewrite_sse_body(raw)
     check("buffered rewrite == streaming rewrite", buffered == outputs[0])
 
+    # Non-Codex dialects must pass through the bridge untouched.
+    # a) Anthropic Messages tools carry no "type" field -> never matched.
+    anthropic_req = {"model": "opus", "tools": [{"name": "apply_patch", "input_schema": {"type": "object"}}], "messages": []}
+    check("anthropic request untouched", mod._rewrite_apply_patch_tool(anthropic_req) is False
+          and anthropic_req["tools"][0]["name"] == "apply_patch"
+          and "input_schema" in anthropic_req["tools"][0])
+    # b) Anthropic SSE frames (content_block_*) pass through byte-identical.
+    anthro_frames = [
+        b'event: content_block_start\ndata: {"type": "content_block_start", "index": 0, "content_block": {"type": "text"}}\n\n',
+        b'event: content_block_delta\ndata: {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "hi"}}\n\n',
+        b'event: message_stop\ndata: {"type": "message_stop"}\n\n',
+    ]
+    state = {"pending": {}, "completed": False}
+    ok = True
+    for f in anthro_frames:
+        out = mod._rewrite_sse_frame(f, state)
+        ok = ok and len(out) == 1 and out[0] == f
+    check("anthropic sse passthrough", ok)
+    # c) Chat Completions SSE frames have no top-level "type" -> passthrough.
+    chat_frames = [
+        b'data: {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "c", "function": {"name": "apply_patch", "arguments": "{\\"patch\\": \\"x\\"}"}}]}}]}\n\n',
+        b'data: {"choices": [{"delta": {"content": "done"}}]}\n\n',
+        b'data: [DONE]\n\n',
+    ]
+    state = {"pending": {}, "completed": False}
+    ok = True
+    for f in chat_frames:
+        out = mod._rewrite_sse_frame(f, state)
+        ok = ok and len(out) == 1 and out[0] == f
+    check("chat sse passthrough", ok)
+    # d) Non-streaming chat JSON response untouched even when it carries an
+    # apply_patch tool_call (bridge only rewrites top-level "output" lists).
+    chat_json = (b'{"choices": [{"message": {"role": "assistant", "content": null, "tool_calls": '
+                 b'[{"id": "call_1", "type": "function", "function": {"name": "apply_patch", '
+                 b'"arguments": "{\\"patch\\": \\"x\\"}"}}]}}]}')
+    parsed_chat = json.loads(chat_json)
+    check("chat json fixture is real", parsed_chat["choices"][0]["message"]["tool_calls"][0]["function"]["name"] == "apply_patch")
+    check("chat json response untouched", mod._rewrite_apply_patch_response_json(chat_json) is chat_json)
+
     print("----")
     if failures:
         print("FAILURES:", failures)
