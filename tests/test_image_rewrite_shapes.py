@@ -98,14 +98,12 @@ def test_failure_is_not_forwarded():
     body = {"input": [{"type": "message", "content": [
         {"type": "input_image", "image_url": "data:image/png;base64,AAA"}
     ]}]}
-    try:
-        asyncio.run(mod._rewrite_image_inputs(body))
-    except mod.VisionError:
-        pass
-    else:
-        raise AssertionError("failed vision calls must raise instead of forwarding the image")
-    assert body["input"][0]["content"][0]["type"] == "input_image"
-    print("PASS: failed vision call is not converted into an error description")
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+    text = body["input"][0]["content"][-1]["text"]
+    assert text.startswith("[vision unavailable: "), text
+    assert "image description failed" in text, text
+    assert "[vision model description]" not in text, text
+    print("PASS: failed vision call degrades to a visible note, never a fake description")
 
 
 def test_failure_reason_is_included():
@@ -118,14 +116,11 @@ def test_failure_reason_is_included():
     body = {"input": [{"type": "message", "content": [
         {"type": "input_image", "image_url": "data:image/png;base64,AAA"}
     ]}]}
-    try:
-        asyncio.run(mod._rewrite_image_inputs(body))
-    except mod.VisionError as exc:
-        assert "balance insufficient" in str(exc), exc
-        assert "not forwarded" in str(exc), exc
-    else:
-        raise AssertionError("failed vision calls must raise")
-    print("PASS: failure reason is included in the raised error")
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+    text = body["input"][0]["content"][-1]["text"]
+    assert "balance insufficient" in text, text
+    assert "temporarily unavailable" in text, text
+    print("PASS: failure reason is included in the visible note")
 
 
 def test_channel_note_lands_once_on_the_first_image():

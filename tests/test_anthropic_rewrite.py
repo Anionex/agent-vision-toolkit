@@ -214,14 +214,11 @@ def test_failure_is_not_forwarded():
     mod = _load_proxy()
     mod._image_desc_from_url = lambda _url, _prompt=None: None
     body = {"messages": [{"role": "user", "content": [dict(PNG)]}]}
-    try:
-        asyncio.run(mod._rewrite_image_inputs(body))
-    except mod.VisionError:
-        pass
-    else:
-        raise AssertionError("failed vision calls must raise instead of forwarding the image")
-    assert body["messages"][0]["content"][0]["type"] == "image"
-    print("PASS: a failed description still fails closed in the anthropic dialect")
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+    text = body["messages"][0]["content"][-1]["text"]
+    assert text.startswith("[vision unavailable: "), text
+    assert "image description failed" in text, text
+    print("PASS: a failed description degrades to a visible note in the anthropic dialect")
 
 
 def test_text_only_anthropic_body_is_untouched():

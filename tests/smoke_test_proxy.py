@@ -203,7 +203,7 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
         assert next((v for k, v in ups2.items() if k.lower() == "x-api-key"), None) == "existing-anthropic-key"
         print("DIALECT PASS: anthropic text-only bodies pass through byte-for-byte")
 
-        # ---- fail-closed: image bodies without vision config must 502, never forward ----
+        # ---- degraded: image bodies without vision config become a visible note ----
         env2 = {k: v for k, v in os.environ.items() if not k.startswith("VISION_")}
         pr2 = subprocess.Popen(
             [py, proxy_script, "--port", "19102", "--upstream", "http://127.0.0.1:19999",
@@ -226,11 +226,88 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
                 resp3 = conn3.getresponse()
                 resp3.read()
                 conn3.close()
-                assert resp3.status == 502, (path, resp3.status)
-            assert open("/tmp/up_body.json", "rb").read() == b"", "an image body leaked upstream"
-            print("FAIL-CLOSED PASS: image bodies in both dialects 502 without a vision config")
+                assert resp3.status == 200, (path, resp3.status)
+            upb3 = json.load(open("/tmp/up_body.json"))
+            assert "[vision unavailable:" in json.dumps(upb3, ensure_ascii=False), upb3
+            log3 = open("/tmp/ds_proxy_test2.log").read()
+            assert "image description failed" in log3 and "image rewrite degraded" in log3, log3
+            print("DEGRADED PASS: no vision config -> visible note forwarded, failure logged, never 502")
         finally:
             pr2.terminate()
+
+        # ---- broken vision API (401): request continues with a visible note ----
+        vision_src = r'''
+import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+class V(BaseHTTPRequestHandler):
+    def do_POST(self):
+        n = int(self.headers.get('Content-Length', 0) or 0)
+        if n:
+            self.rfile.read(n)
+        self.send_response(401)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({"error": {"message": "invalid api key"}}).encode())
+    def log_message(self, *a): pass
+HTTPServer(('127.0.0.1', 19998), V).serve_forever()
+'''
+        vision_file = "/tmp/ds_vision_401_server.py"
+        with open(vision_file, "w") as f:
+            f.write(vision_src)
+        vision_up = subprocess.Popen([py, vision_file],
+                                     stdout=open("/tmp/ds_vision_401.log", "w"), stderr=subprocess.STDOUT)
+        time.sleep(0.8)
+        env3 = {k: v for k, v in os.environ.items() if not k.startswith("VISION_")}
+        env3.update({"VISION_BASE_URL": "http://127.0.0.1:19998",
+                     "VISION_API_KEY": "bad-key", "VISION_MODEL": "vision-test"})
+        pr3 = subprocess.Popen(
+            [py, proxy_script, "--port", "19103", "--upstream", "http://127.0.0.1:19999",
+             "--log", "/tmp/ds_proxy_test3.log", "--skip-vision-config-check"],
+            stdout=open("/tmp/ds_proxy_proc3.log", "w"), stderr=subprocess.STDOUT, env=env3,
+        )
+        time.sleep(1.2)
+        try:
+            open("/tmp/up_body.json", "wb").close()
+            img_resp = ('{"model":"m","input":[{"type":"message","role":"user",'
+                        '"content":[{"type":"input_image","image_url":"data:image/png;base64,AAAA"}]}]}')
+            conn4 = http.client.HTTPConnection("127.0.0.1", 19103, timeout=5)
+            conn4.request("POST", "/responses", body=img_resp, headers={"Content-Type": "application/json"})
+            resp4 = conn4.getresponse()
+            resp4.read()
+            conn4.close()
+            up_resp = json.load(open("/tmp/up_body.json"))
+            resp_content = up_resp["input"][0]["content"]
+            assert resp4.status == 200, resp4.status
+            assert any("[vision unavailable:" in block.get("text", "") for block in resp_content), resp_content
+
+            open("/tmp/up_body.json", "wb").close()
+            anth_img = ('{"model":"m","messages":[{"role":"user","content":[{"type":"image",'
+                        '"source":{"type":"base64","media_type":"image/png","data":"AAAA"}}]}]}')
+            conn5 = http.client.HTTPConnection("127.0.0.1", 19103, timeout=5)
+            conn5.request("POST", "/v1/messages", body=anth_img, headers={"Content-Type": "application/json"})
+            resp5 = conn5.getresponse()
+            resp5.read()
+            conn5.close()
+            up_anth = json.load(open("/tmp/up_body.json"))
+            anth_content = up_anth["messages"][0]["content"]
+            assert resp5.status == 200, resp5.status
+            assert any("[vision unavailable:" in block.get("text", "") for block in anth_content), anth_content
+
+            open("/tmp/up_body.json", "wb").close()
+            text_only = '{"model":"m","input":"hi"}'
+            conn6 = http.client.HTTPConnection("127.0.0.1", 19103, timeout=5)
+            conn6.request("POST", "/responses", body=text_only, headers={"Content-Type": "application/json"})
+            resp6 = conn6.getresponse()
+            resp6.read()
+            conn6.close()
+            assert resp6.status == 200, resp6.status
+            assert open("/tmp/up_body.json", "rb").read() == text_only.encode(), "text-only body must pass through"
+            log3b = open("/tmp/ds_proxy_test3.log").read()
+            assert "Vision API HTTP 401" in log3b, "the 401 failure must be logged, never silent"
+            print("DEGRADED PASS: vision 401 -> note in both dialects, 401 logged; text-only stays 200")
+        finally:
+            pr3.terminate()
+            vision_up.terminate()
     finally:
         conn.close()
         up.terminate()
