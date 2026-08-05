@@ -2,111 +2,72 @@
 
 # agent-vision-toolkit
 
-**What it thinks is what it sees — a way to make a text-only model "see" images with its mind's eye, a vision toolkit, and drop-in setups for Codex, Claude Code, Pi, Oh My Pi, and OpenCode.**
+**What it thinks is what it sees — give any text-only coding agent eyes: image Q&A, OCR, screenshot understanding, visual grounding, and image-to-SVG, as a vision toolkit plus a skill, with optional drop-in integration for Codex, Claude Code, Pi, Oh My Pi, and OpenCode.**
 
 🌐 [**中文**](README_CN.md) ｜ **English**
 
 </div>
 
-If your Codex is already connected to a text-only model like DeepSeek V4, but you're frustrated that it can't see images — every attempt to look at one is blocked by the system — this repository offers a way to let a text-only model call Codex's built-in `view_image` without errors. Instead of failing, it returns a task-aware description shaped by the agent's original viewing intent, keeping the text-only model's experience as close as possible to a multimodal one, without introducing extra MCPs, skills, or CLIs, and without the risk of repeated configuration. It also provides an optional vision toolkit that leverages multimodal models for image Q&A, OCR, visual grounding, and more.
+If your coding agent runs on a text-only model like DeepSeek V4, it can't look at images — screenshots, mockups, diagrams, and error dialogs are all dead ends. This repository gives it eyes in two layers:
+
+1. **The toolkit** — four CLIs, plus a skill that teaches your agent when to reach for each one. Works in any agent with a shell.
+2. **Seamless integration** *(optional upgrade)* — a transparent local proxy and single-file native extensions, so **pasted images and built-in image tools work too**, with no tool call and no extra prompting.
 
 All code has been verified in real Codex + DeepSeek sessions, and the same pipeline has been live-verified end-to-end in Claude Code, Pi, Oh My Pi, and OpenCode. Use cases include but are not limited to: image Q&A, screenshot analysis, Computer Use GUI operation, and multi-step image reasoning.
 
-## Supported Agents
-
-| Agent | How | Status |
-|---|---|---|
-| **Codex** | transparent local proxy (Responses API) | ✅ verified |
-| **Claude Code** | the same proxy — point `ANTHROPIC_BASE_URL` at it | ✅ verified |
-| **Pi / Oh My Pi** | one-file native extension ([`extensions/pi/`](extensions/pi/)) | ✅ verified |
-| **OpenCode** | one-file native plugin ([`extensions/opencode/`](extensions/opencode/)) | ✅ verified |
-| Any agent with a shell | CLI toolkit (`glance` / `ground` / `detect` / `trace`) + skill | ✅ |
-
-All entry points share the same describe layer — the focus hint, the verbatim-transcription contract, the re-query channel note, and the per-(image, prompt) cache — and the same three `VISION_*` env vars.
-
-Most vision wrappers simply turn an image into a generic description and leave the text model to recover the original task afterward.
-
-`agent-vision-toolkit` preserves **why the agent is looking**. It extracts the viewing intent from the user message or the assistant's stated reason for calling `view_image`, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step—not a generic "detailed description." Lower cost, higher accuracy, and faster response times.
-
-<p align="center">
-  <img src="assets/focus-hint-comparison-1.png"
-       alt="Generic image descriptions compared with task-aware vision using a focus hint - Part 1"
-       width="49%">
-  <img src="assets/focus-hint-comparison-2.png"
-       alt="Generic image descriptions compared with task-aware vision using a focus hint - Part 2"
-       width="49%">
-</p>
-
-If the agent you're using isn't Codex: Claude Code can point `ANTHROPIC_BASE_URL` at the same proxy, Pi / Oh My Pi / OpenCode get the same describe layer as single-file [native extensions](extensions/), and any agent with a shell can install the [visual toolkit](#install-the-vision-tools-skill-optional) — CLIs that let agents interact with images.
-
 > If this project helps you, feel free to star🌟 & follow～ I'll keep sharing more practical tools and tips.
 
-## Real-world Effects
+## Quick Start
 
-<p align="center">
-  <img src="assets/effect-1.jpg" alt="DeepSeek in Codex answering a style question about a UI screenshot" width="49%">
-  <img src="assets/effect-2.jpg" alt="DeepSeek in Codex debugging mismatched UI fields from a screenshot" width="49%">
-</p>
+**1. Point it at a vision API.** Three env vars in `~/.config/agent-vision-toolkit/env` (`chmod 600`):
 
-*Left: DeepSeek V4 answers a UI style question with similar-style comparisons. Right: DeepSeek V4 debugs a field-name mismatch from a screenshot.*
+```bash
+VISION_API_KEY=sk-...
+VISION_BASE_URL=https://openrouter.ai/api/v1
+VISION_MODEL=google/gemini-2.5-flash
+LANG=zh   # vision model output language: zh or en (default zh)
+```
 
-<p align="center">
-  <img src="assets/effect-3.jpg" alt="Multi-round image Q&A with the optional glance CLI" width="49%">
-  <img src="assets/effect-4.jpg" alt="DeepSeek V4 playing chess by locating screen elements with glance/ground" width="49%">
-</p>
+Any OpenAI-compatible endpoint that supports `/chat/completions` with `image_url` works. Two example setups:
 
-*Left: multi-round image Q&A after installing the optional `glance` CLI. Right: after installing `ground`, DeepSeek V4 locates screen elements to play chess autonomously.*
+| Provider | `VISION_BASE_URL` | `VISION_MODEL` |
+|---|---|---|
+| OpenRouter | `https://openrouter.ai/api/v1` | `google/gemini-2.5-flash` |
+| Aliyun DashScope | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-vl-max-latest` |
 
-## Highlights
+**2. Put the CLIs on your PATH.**
 
-- **Descriptions target the current question**: every image gets a focus hint — a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking — so the description covers the details this turn actually needs instead of being a generic caption.
-- **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
-- **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
-- **Optional `glance`**: a concise standalone CLI for image Q&A and OCR — the follow-up channel when a description misses a detail you need.
-- **Optional `ground`**: locate a target in an image with natural language and get a bounding box in original pixel coordinates — for GUI-automation clicks and zoom-in crops.
-- **Optional `detect`**: inventory the elements of a screen or region in one call — the scaffold for rebuilding a UI from a screenshot.
-- **Optional `trace`**: local, deterministic image-to-SVG tracing, no vision API involved — for reproducing icons/graphics as vectors and measuring exact shape geometry.
-- **More vision tools may be added later**
+```bash
+git clone https://github.com/Anionex/agent-vision-toolkit.git
+export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # add to your shell profile to persist
+```
 
-## Usage
+`glance` needs nothing beyond Python 3.11+. `ground`, `detect`, and `--region` need `pillow`; `trace` needs `vtracer` — install those into an isolated venv only if you want those tools.
 
-This repository doesn't provide a universal one-click installer. The recommended way is to hand the repository link to your Codex agent:
+**3. Install the skill** so your agent knows the tools exist and how to combine them:
 
-> I've already got a text-only model working in Codex. Please read this repository's README first, then follow AGENT_INSTALL.md to deploy and verify `view_image` on the current system.
+```bash
+npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y
+```
 
-Detailed steps are in the **[Codex Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a Codex restart, just paste an image or let the model call the built-in `view_image`.
+Or copy the folder manually, then restart your agent:
 
-## Prerequisites
+```bash
+cp -r skills/vision-tools ~/.codex/skills/
+```
 
-- Codex already working with a text-only model (e.g. DeepSeek V4)
-- Python 3.11+
-- An OpenAI-compatible vision API that supports `/chat/completions` and `image_url`
+## The Tools
 
-## Configuration
+Each tool answers one kind of question, so the calling agent — which holds the full context — picks the right one instead of guessing at a single overloaded command.
 
-Only these env vars are required:
+### `glance` — "what does it show?"
 
-| Variable | Required | Description |
-|---|---:|---|
-| `VISION_API_KEY` | Yes | API key of the multimodal model |
-| `VISION_BASE_URL` | Yes | OpenAI-compatible API base URL |
-| `VISION_MODEL` | Yes | Multimodal model name |
-| `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
-
-Upstream authentication is still sent by Codex and passed through by the proxy, so there's no need to store it again in the env.
-
-## Optional Tool: glance (Recommended)
-
-`glance` is a standalone CLI for asking questions about an image directly, to fill in specific details.
-
-For a global command, let Codex create a wrapper following the install guide. The call then becomes:
+Ask a question about an image directly, or transcribe its text.
 
 ```bash
 glance screenshot.png -q "What is the dominant color of this image?"
 glance screenshot.png --ocr
 ```
-
-Answer:
 
 ```
 The dominant colors of this image are **white and light gray, with light blue accents.**
@@ -118,9 +79,9 @@ Password
 Login
 ```
 
-## Optional Tool: ground
+### `ground` — "where is X?"
 
-`ground` is a standalone CLI for locating objects or regions in an image:
+Locate an object or region and get a bounding box in original pixel coordinates:
 
 ```bash
 ground screenshot.png "Send button"
@@ -130,11 +91,11 @@ ground screenshot.png "Send button"
 x1: 1067, y1: 841, x2: 1108, y2: 881
 ```
 
-It analyzes one full image per call and outputs the target's pixel coordinates in the original image. With `--region X1,Y1,X2,Y2` it searches only that box and still reports original-image coordinates.
+It analyzes one full image per call. With `--region X1,Y1,X2,Y2` it searches only that box and still reports original-image coordinates — the zoom-in path for small targets.
 
-## Optional Tool: detect
+### `detect` — "what's here?"
 
-`detect` is a standalone CLI that inventories the elements of an image (or a region) — a numbered list with exact visible text and pixel boxes:
+Inventory the elements of an image (or a region) — a numbered list with exact visible text and pixel boxes:
 
 ```bash
 detect page.png
@@ -150,7 +111,7 @@ detect page.png --region 238,600,953,671
 
 A full-screen pass is a fast first draft; for completeness on dense screens, inventory region by region.
 
-## Optional Tool: trace
+### `trace` — "what's the exact shape?"
 
 `trace` vectorizes an image (or a cropped region) into SVG **locally and deterministically** — coordinates come from the actual pixels, not from a vision model's estimates. Use it for exact shape geometry: reproducing icons/logos as SVG, reading a diagram's layout, or measuring elements. Requires the optional `vtracer` (and `pillow` for `--region`).
 
@@ -159,21 +120,68 @@ trace diagram.png --polygon
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 ```
 
-## Install the vision-tools Skill (optional)
+## Real-world Effects
 
-One way to install the extra vision tools into Codex is the bundled `vision-tools` skill, which tells Codex what `glance`/`ground` are and how to use them. Install it with the official skills CLI:
+<p align="center">
+  <img src="assets/effect-3.jpg" alt="Multi-round image Q&A with the optional glance CLI" width="49%">
+  <img src="assets/effect-4.jpg" alt="DeepSeek V4 playing chess by locating screen elements with glance/ground" width="49%">
+</p>
 
-```bash
-npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y
-```
+*Left: multi-round image Q&A with `glance`. Right: with `ground`, DeepSeek V4 locates screen elements to play chess autonomously.*
 
-Or copy the folder manually:
+<p align="center">
+  <img src="assets/effect-1.jpg" alt="DeepSeek in Codex answering a style question about a UI screenshot" width="49%">
+  <img src="assets/effect-2.jpg" alt="DeepSeek in Codex debugging mismatched UI fields from a screenshot" width="49%">
+</p>
 
-```bash
-cp -r skills/vision-tools ~/.codex/skills/
-```
+*Left: DeepSeek V4 answers a UI style question with similar-style comparisons. Right: DeepSeek V4 debugs a field-name mismatch from a screenshot.*
 
-Restart Codex afterwards.
+## Upgrade: Seamless Integration
+
+The toolkit covers everything your agent decides to look at. It cannot cover images the **user pastes** — those reach the model before any tool can run. That gap is what this layer closes: images become text on the wire, so pasting a screenshot just works, and the agent's built-in image tool (`view_image`, `Read`) stops erroring out.
+
+| Agent | How | Status |
+|---|---|---|
+| **Codex** | transparent local proxy (Responses API) | ✅ verified |
+| **Claude Code** | the same proxy — point `ANTHROPIC_BASE_URL` at it | ✅ verified |
+| **Pi / Oh My Pi** | one-file native extension ([`extensions/pi/`](extensions/pi/)) | ✅ verified |
+| **OpenCode** | one-file native plugin ([`extensions/opencode/`](extensions/opencode/)) | ✅ verified |
+| Any agent with a shell | the toolkit above — no integration needed | ✅ |
+
+All entry points share the same describe layer — the focus hint, the verbatim-transcription contract, the re-query channel note, and the per-(image, prompt) cache — and the same three `VISION_*` env vars.
+
+### Descriptions that keep the task in view
+
+Most vision wrappers simply turn an image into a generic description and leave the text model to recover the original task afterward.
+
+This one preserves **why the agent is looking**. It extracts the viewing intent from the user message or the assistant's stated reason for calling `view_image`, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step—not a generic "detailed description." Lower cost, higher accuracy, and faster response times.
+
+<p align="center">
+  <img src="assets/focus-hint-comparison-1.png"
+       alt="Generic image descriptions compared with task-aware vision using a focus hint - Part 1"
+       width="49%">
+  <img src="assets/focus-hint-comparison-2.png"
+       alt="Generic image descriptions compared with task-aware vision using a focus hint - Part 2"
+       width="49%">
+</p>
+
+### Installing it
+
+This repository doesn't provide a universal one-click installer — deployment depends on your machine's actual config. The recommended way is to hand the repository link to your agent:
+
+> I've already got a text-only model working in Codex. Please read this repository's README first, then follow AGENT_INSTALL.md to deploy and verify `view_image` on the current system.
+
+Detailed steps are in the **[Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a restart, just paste an image or let the model call its built-in image tool. Pi, Oh My Pi, and OpenCode use the single-file [native extensions](extensions/) instead of the proxy — see the per-host READMEs there.
+
+## Highlights
+
+- **Descriptions target the current question**: every image gets a focus hint — a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking — so the description covers the details this turn actually needs instead of being a generic caption.
+- **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
+- **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
+- **The vision model only looks, it doesn't reason for you**: it transcribes and describes, leaving the conclusion to your coding model.
+- **Coarse to fine**: the first description is a map, not the whole answer — `glance -q` and `ground --region` are the follow-up channel when a detail wasn't covered.
+- **Exact geometry stays local**: `trace` never calls a vision API, so numbers come from pixels rather than from a model's confident estimate.
+- **More vision tools may be added later**
 
 ## How It Works
 
@@ -191,6 +199,25 @@ The vision prompt is not a fixed "describe this image". The proxy attaches a **f
 The proxy identifies the request dialect from the body shape alone — OpenAI Responses (Codex) or Anthropic Messages (Claude Code) — so one instance serves both, with no per-host configuration. For Claude Code the two image paths are pastes and `Read` on an image file; the hint policy is the same.
 
 The first model response only asks Codex to call `view_image`. After Codex executes the tool locally, the second request carries the image; the proxy converts image to text on this request path. If the catalog explicitly declares support for `text` only, Codex's handler rejects the tool first, so `image` is appended to the existing entry only in that case.
+
+## Configuration
+
+Only these env vars are required, for both the toolkit and the proxy:
+
+| Variable | Required | Description |
+|---|---:|---|
+| `VISION_API_KEY` | Yes | API key of the multimodal model |
+| `VISION_BASE_URL` | Yes | OpenAI-compatible API base URL |
+| `VISION_MODEL` | Yes | Multimodal model name |
+| `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
+
+Upstream authentication is still sent by your agent and passed through by the proxy, so there's no need to store it again in the env.
+
+## Prerequisites
+
+- A coding agent already working with a text-only model (e.g. DeepSeek V4)
+- Python 3.11+
+- An OpenAI-compatible vision API that supports `/chat/completions` and `image_url`
 
 ## FAQ
 
@@ -210,15 +237,16 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 
 | File | Purpose |
 |---|---|
+| `bin/glance` | Image description, Q&A, and OCR CLI |
+| `ground.py` / `bin/ground` | Image target-grounding CLI |
+| `detect.py` / `bin/detect` | Element-inventory CLI (shares the ground machinery) |
+| `bin/trace` | Local image-to-SVG tracing CLI (exact shape geometry, no vision API) |
+| `skills/vision-tools/` | The skill: tool manual, coarse-to-fine method, per-scenario playbooks |
+| `vision_client.py` | Vision API client shared by the proxy and the CLIs |
 | `vision_proxy.py` | Local image-rewriting proxy and SSE forwarding |
-| `vision_client.py` | Vision API client shared by the proxy and `glance` |
-| `bin/glance` | Optional image description, Q&A, and OCR CLI |
-| `ground.py` / `bin/ground` | Optional image target-grounding CLI |
-| `detect.py` / `bin/detect` | Optional element-inventory CLI (shares the ground machinery) |
-| `bin/trace` | Optional local image-to-SVG tracing CLI (exact shape geometry, no vision API) |
 | `extensions/pi/vision.ts` | Single-file native extension for Pi and Oh My Pi |
 | `extensions/opencode/vision.ts` | Single-file native plugin for OpenCode |
-| `AGENT_INSTALL.md` | Installation and verification steps for Codex agents |
+| `AGENT_INSTALL.md` | Installation and verification steps for agents |
 | `tests/test_image_rewrite_shapes.py` | Tests for image structures, concurrency, caching, and failure behavior |
 | `tests/test_anthropic_rewrite.py` | Tests for the Anthropic Messages (Claude Code) rewrite path |
 | `tests/test_extensions.mjs` | Tests for the Pi / Oh My Pi / OpenCode extensions (node or bun) |
@@ -229,9 +257,9 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 
 ## Limitations
 
-- This is an image-to-text proxy; it doesn't hand vision tokens directly to the text model.
+- This is an image-to-text layer; it doesn't hand vision tokens directly to the text model.
 - Description quality depends on the configured vision model.
-- The cache lives only inside the proxy process and is cleared on restart.
+- The proxy's cache lives only inside its process and is cleared on restart.
 
 ---
 

@@ -2,114 +2,73 @@
 
 # agent-vision-toolkit
 
-**所想即所见——一个让纯文本模型“用意念”看图的方法和视觉工具包，以及无缝接入 Codex、Claude Code、Pi、Oh My Pi、OpenCode 的现成方案。**
+**所想即所见——给任意纯文本 coding agent 装上眼睛：图片问答、OCR、截图分析、视觉定位、图转 SVG，一套视觉工具箱加一个 skill，并可选无缝接入 Codex、Claude Code、Pi、Oh My Pi、OpenCode。**
 
 🌐 **中文** ｜ [**English**](README.md)
 
 </div>
 
-如果你的 Codex 已经接入了 DeepSeek V4 这类纯文本模型，却烦恼于它不能看图、每次调用看图都会被系统拦下，本仓库提供了一种方式，可以在不引入额外mcp、skills、cli的情况下，让纯文本模型调用codex内置view image的时候不报错，而是给出一段由 agent 看图动机塑造的、贴合当前任务的描述，尽量让纯文本模型的交互体验和多模态模型的交互体验保持一致，免去反复配置的风险。同时也提供可选的视觉工具包，利用多模态模型的能力完成图片问答、ocr、视觉定位等操作。
+如果你的 coding agent 接的是 DeepSeek V4 这类纯文本模型，它就没法看图——截图、设计稿、示意图、报错弹窗全是死路。本仓库分两层给它装上眼睛：
 
-所有代码均已在真实 Codex + DeepSeek 会话中验证过，同一套管线也在 Claude Code、Pi、Oh My Pi、OpenCode 中完成了真机端到端验证。可用场景包括但不限于：图片问答，截图分析，Computer Use GUI界面操作，多步图像推理
+1. **工具箱** —— 四个 CLI，外加一个 skill 告诉 agent 什么时候该用哪个。任何有 shell 的 agent 都能用。
+2. **无缝接入**（可选升级）—— 透明本地代理与单文件原生 extension，让**用户粘贴的图片和 agent 内置看图工具也能工作**，不需要额外的工具调用，也不需要额外提示词。
 
-## 支持的 Agent
-
-| Agent | 接入方式 | 状态 |
-|---|---|---|
-| **Codex** | 透明本地代理（Responses API） | ✅ 已验证 |
-| **Claude Code** | 同一个代理——把 `ANTHROPIC_BASE_URL` 指向它 | ✅ 已验证 |
-| **Pi / Oh My Pi** | 单文件原生 extension（[`extensions/pi/`](extensions/pi/)） | ✅ 已验证 |
-| **OpenCode** | 单文件原生 plugin（[`extensions/opencode/`](extensions/opencode/)） | ✅ 已验证 |
-| 任何有 shell 的 agent | CLI 工具包（`glance` / `ground` / `detect` / `trace`）+ skill | ✅ |
-
-所有入口共享同一套描述层——focus hint、逐字转写约定、重查 channel note、（图片, prompt）缓存——以及同样的三个 `VISION_*` 环境变量。
-
-大多数视觉转接方案只是把图片变成一段通用描述，之后再让纯文本模型自己去把原本的任务找回来。
-
-`agent-vision-toolkit` 保留的是 **agent 为什么要看这张图**。它从用户消息、或模型调用 `view_image` 时自述的理由中提取出看图动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容，而不是一段通用的“详细描述”。更低成本，更高的准确率，更快的响应速度。
-
-<p align="center">
-  <img src="assets/focus-hint-comparison-cn-1.png"
-       alt="通用图片描述与带 focus hint 的任务感知视觉的对比 - 上半部分"
-       width="49%">
-  <img src="assets/focus-hint-comparison-cn-2.png"
-       alt="通用图片描述与带 focus hint 的任务感知视觉的对比 - 下半部分"
-       width="49%">
-</p>
-
-如果你正在用的 agent 不是 Codex：Claude Code 可以把 `ANTHROPIC_BASE_URL` 指向同一个代理；Pi / Oh My Pi / OpenCode 有单文件的[原生 extension](extensions/)，带来同一套描述层；任何有 shell 的 agent 都可以安装 [visual toolkit](#安装-vision-tools-skill可选)，提供了 cli 让 agent 与图片交互
+所有代码均已在真实 Codex + DeepSeek 会话中验证过，同一套管线也在 Claude Code、Pi、Oh My Pi、OpenCode 中完成了真机端到端验证。可用场景包括但不限于：图片问答，截图分析，Computer Use GUI 界面操作，多步图像推理。
 
 > 如果项目对你有用，欢迎 star🌟 & follow～，我会分享更多的实用工具和技巧
-> 
 
-## 实际效果
+## 快速开始
 
-<p align="center">
-  <img src="assets/effect-1.jpg" alt="Codex 里的 DeepSeek 看 UI 图回答风格问题" width="49%">
-  <img src="assets/effect-2.jpg" alt="Codex 里的 DeepSeek 看图排查界面字段不一致 bug" width="49%">
-</p>
+**1. 指向一个视觉 API。** 在 `~/.config/agent-vision-toolkit/env` 里写三个环境变量（`chmod 600`）：
 
-*左：DeepSeek V4 回答 UI 背景风格问题并对比相近风格；右：DeepSeek V4 根据截图排查字段名称不符预期的 bug。*
+```bash
+VISION_API_KEY=sk-...
+VISION_BASE_URL=https://openrouter.ai/api/v1
+VISION_MODEL=google/gemini-2.5-flash
+LANG=zh   # 视觉模型输出语言：zh 或 en（默认 zh）
+```
 
-<p align="center">
-  <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
-  <img src="assets/effect-4.jpg" alt="DeepSeek V4 用 glance/ground 定位屏幕元素自主游玩国际象棋" width="49%">
-</p>
+任何支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 端点都可以。两组示例配置：
 
-*左：安装可选 `glance` 后的多轮图片问答；右：安装 `ground` 后，DeepSeek V4 定位屏幕视觉元素，自主游玩国际象棋。*
+| 供应商 | `VISION_BASE_URL` | `VISION_MODEL` |
+|---|---|---|
+| OpenRouter | `https://openrouter.ai/api/v1` | `google/gemini-2.5-flash` |
+| 阿里云百炼 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-vl-max-latest` |
 
-## 亮点
+**2. 把 CLI 放进 PATH。**
 
-- **描述围绕当前问题展开**：每张图都会附上 focus hint，贴图用它自己那条消息的文字，`view_image` 取回的图用模型自述的看图动机，描述因此覆盖这一轮真正要用到的细节，而不是一段通用 caption。
-- **视觉模型只负责看，不替你推理**：它只转写和描述图片内容，不直接回答问题，结论仍由你的编程模型基于描述得出。
-- **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图
-- **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
-- **同图只调一次**：按（图片, prompt）缓存描述，两种 hint 都取自不可变的对话历史，组合稳定复现，多步任务的后续每轮都命中缓存，近乎零延迟。
-- **可选 `glance`**：简洁的独立 CLI，图片问答和 OCR——描述里缺了你要的细节时，用它追问补充。
-- **可选 `ground`**：用自然语言定位图片中的目标，输出原图像素坐标下的边界框——用于 GUI 自动化点击和局部放大裁剪。
-- **可选 `detect`**：一次调用盘点整屏或区域内的元素清单——从截图还原 UI 时的脚手架。
-- **可选 `trace`**：本地确定性图转 SVG 描摹，不经过视觉 API——用于把图标/图形还原成矢量、精确测量形状几何。
-- **后续可能加入的更多视觉工具** 
+```bash
+git clone https://github.com/Anionex/agent-vision-toolkit.git
+export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # 写进 shell 配置以持久生效
+```
 
-## 使用方式
+`glance` 只需要 Python 3.11+。`ground`、`detect` 和 `--region` 需要 `pillow`，`trace` 需要 `vtracer`——只在你要用这些工具时，把它们装进一个隔离的 venv。
 
-本仓库不提供通用一键安装器。推荐把仓库链接交给 Codex Agent：
+**3. 安装 skill**，让 agent 知道这些工具的存在以及如何组合使用：
 
-> 我已经在 Codex 中接入并可正常使用一个纯文本模型。请先阅读这个仓库的 README，再按照 AGENT_INSTALL.md 根据当前系统部署并验证 `view_image`。
+```bash
+npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y
+```
 
-详细执行步骤见 **[Codex Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启 Codex 后，直接粘贴图片或让模型调用内置 `view_image` 即可。
+也可以手动复制，之后重启 agent 生效：
 
-## 前置条件
+```bash
+cp -r skills/vision-tools ~/.codex/skills/
+```
 
-- 已接入纯文本模型（如 DeepSeek V4）并可正常使用的 Codex
-- Python 3.11+
-- 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API
+## 工具
 
-## 配置
+每个工具回答一类问题，让掌握完整上下文的调用方 agent 去选择，而不是让它对着一个大而全的命令猜参数。
 
-env 只需配置：
+### `glance` —— “图上有什么？”
 
-| 变量 | 必需 | 说明 |
-|---|---:|---|
-| `VISION_API_KEY` | 是 | 多模态模型的 API key |
-| `VISION_BASE_URL` | 是 | OpenAI-compatible API 地址 |
-| `VISION_MODEL` | 是 | 多模态模型名 |
-| `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
-
-上游模型的认证继续由 Codex 发送并由代理透传，不需要在 env 中重复保存。
-
-## 可选工具：glance 
-
-`glance` 是独立cli工具。它用于直接对图片发起提问，补充特定细节。
-
-需要全局命令时，可让 Codex 按照安装说明创建 wrapper。得到更简洁的调用形式如下：
+直接对图片提问，或转写图中的文字。
 
 ```bash
 glance screenshot.png -q "这张图片的主色调是什么？"
-glance screenshot.png --ocr 
+glance screenshot.png --ocr
 ```
 
-回答：
 ```
 这张图片的主色调为**白色和浅灰色，局部带淡蓝色。**
 ```
@@ -120,9 +79,9 @@ glance screenshot.png --ocr
 登录
 ```
 
-## 可选工具：ground
+### `ground` —— “X 在哪？”
 
-`ground` 是独立cli工具，用于定位图片中的对象或区域：
+定位图片中的对象或区域，输出原图像素坐标下的边界框：
 
 ```bash
 ground screenshot.png "发送按钮"
@@ -132,11 +91,11 @@ ground screenshot.png "发送按钮"
 x1: 1067, y1: 841, x2: 1108, y2: 881
 ```
 
-每次只分析一张完整图片，并输出目标在原图中的像素坐标。加 `--region X1,Y1,X2,Y2` 可只在该框内查找，输出仍是原图坐标。
+每次分析一张完整图片。加 `--region X1,Y1,X2,Y2` 可只在该框内查找，输出仍是原图坐标——小目标的放大通道。
 
-## 可选工具：detect
+### `detect` —— “这里有些什么？”
 
-`detect` 是独立 CLI，盘点图片（或指定区域）中的元素——输出编号清单，带逐字可见文字和像素框：
+盘点图片（或指定区域）中的元素——输出编号清单，带逐字可见文字和像素框：
 
 ```bash
 detect page.png
@@ -152,7 +111,7 @@ detect page.png --region 238,600,953,671
 
 整屏一遍是快速初稿；密集页面要完整清单时，按区域逐块盘点。
 
-## 可选工具：trace
+### `trace` —— “精确形状是什么？”
 
 `trace` 在**本地确定性地**把图片（或裁剪区域）矢量化为 SVG——坐标来自真实像素，不是视觉模型的估计。用于精确形状几何：图标/logo 还原为 SVG、读取示意图布局、测量元素尺寸。需要可选依赖 `vtracer`（`--region` 另需 `pillow`）。
 
@@ -161,21 +120,68 @@ trace diagram.png --polygon
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 ```
 
-## 安装 vision-tools skill（可选）
+## 实际效果
 
-安装额外视觉工具包的方式之一，是安装仓库内附带的 `vision-tools` skill：它告诉 Codex `glance`/`ground` 是什么以及怎么用。使用官方 skills CLI 安装：
+<p align="center">
+  <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
+  <img src="assets/effect-4.jpg" alt="DeepSeek V4 用 glance/ground 定位屏幕元素自主游玩国际象棋" width="49%">
+</p>
 
-```bash
-npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y
-```
+*左：用 `glance` 做多轮图片问答；右：用 `ground` 定位屏幕视觉元素，DeepSeek V4 自主游玩国际象棋。*
 
-也可以手动复制：
+<p align="center">
+  <img src="assets/effect-1.jpg" alt="Codex 里的 DeepSeek 看 UI 图回答风格问题" width="49%">
+  <img src="assets/effect-2.jpg" alt="Codex 里的 DeepSeek 看图排查界面字段不一致 bug" width="49%">
+</p>
 
-```bash
-cp -r skills/vision-tools ~/.codex/skills/
-```
+*左：DeepSeek V4 回答 UI 背景风格问题并对比相近风格；右：DeepSeek V4 根据截图排查字段名称不符预期的 bug。*
 
-之后重启 Codex 生效。
+## 升级：无缝接入
+
+工具箱覆盖了 agent 自己决定要看的一切。它覆盖不了**用户粘贴**的图片——那些图在任何工具运行之前就已经到达模型。这一层补的就是这个缺口：图片在链路上变成文字，粘贴截图直接可用，agent 内置的看图工具（`view_image`、`Read`）也不再报错。
+
+| Agent | 接入方式 | 状态 |
+|---|---|---|
+| **Codex** | 透明本地代理（Responses API） | ✅ 已验证 |
+| **Claude Code** | 同一个代理——把 `ANTHROPIC_BASE_URL` 指向它 | ✅ 已验证 |
+| **Pi / Oh My Pi** | 单文件原生 extension（[`extensions/pi/`](extensions/pi/)） | ✅ 已验证 |
+| **OpenCode** | 单文件原生 plugin（[`extensions/opencode/`](extensions/opencode/)） | ✅ 已验证 |
+| 任何有 shell 的 agent | 上面的工具箱——无需接入 | ✅ |
+
+所有入口共享同一套描述层——focus hint、逐字转写约定、重查 channel note、（图片, prompt）缓存——以及同样的三个 `VISION_*` 环境变量。
+
+### 让描述始终对着当前任务
+
+大多数视觉转接方案只是把图片变成一段通用描述，之后再让纯文本模型自己去把原本的任务找回来。
+
+`agent-vision-toolkit` 保留的是 **agent 为什么要看这张图**。它从用户消息、或模型调用 `view_image` 时自述的理由中提取出看图动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容，而不是一段通用的“详细描述”。更低成本，更高的准确率，更快的响应速度。
+
+<p align="center">
+  <img src="assets/focus-hint-comparison-cn-1.png"
+       alt="通用图片描述与带 focus hint 的任务感知视觉的对比 - 上半部分"
+       width="49%">
+  <img src="assets/focus-hint-comparison-cn-2.png"
+       alt="通用图片描述与带 focus hint 的任务感知视觉的对比 - 下半部分"
+       width="49%">
+</p>
+
+### 怎么装
+
+本仓库不提供通用一键安装器——部署取决于你这台机器的真实配置。推荐把仓库链接交给你的 agent：
+
+> 我已经在 Codex 中接入并可正常使用一个纯文本模型。请先阅读这个仓库的 README，再按照 AGENT_INSTALL.md 根据当前系统部署并验证 `view_image`。
+
+详细执行步骤见 **[Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，见那里各宿主的 README。
+
+## 亮点
+
+- **描述围绕当前问题展开**：每张图都会附上 focus hint，贴图用它自己那条消息的文字，`view_image` 取回的图用模型自述的看图动机，描述因此覆盖这一轮真正要用到的细节，而不是一段通用 caption。
+- **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图。
+- **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
+- **视觉模型只负责看，不替你推理**：它只转写和描述图片内容，不直接回答问题，结论仍由你的编程模型基于描述得出。
+- **由粗到细**：首轮描述是地图，不是完整答案——描述里缺了你要的细节时，用 `glance -q` 追问、用 `ground --region` 放大。
+- **精确几何留在本地**：`trace` 不经过视觉 API，数字来自真实像素，而不是模型自信的估计。
+- **后续可能加入的更多视觉工具**
 
 ## 工作原理
 
@@ -192,6 +198,25 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 代理仅凭请求体形态识别方言——OpenAI Responses（Codex）或 Anthropic Messages（Claude Code）——同一个实例同时服务两者，无需按宿主配置。Claude Code 侧的两条图片通道是粘贴图和对图片文件的 `Read`，hint 策略完全相同。
 
 第一次模型响应只要求 Codex 调用 `view_image`。Codex 在本机执行工具后，第二次请求才携带图片；代理在这个请求方向完成图片转文字。若 catalog 明确声明仅支持 `text`，Codex 的 handler 会先拒绝工具，因此只在这一种情况下给现有条目追加 `image`。
+
+## 配置
+
+工具箱与代理都只需要这些环境变量：
+
+| 变量 | 必需 | 说明 |
+|---|---:|---|
+| `VISION_API_KEY` | 是 | 多模态模型的 API key |
+| `VISION_BASE_URL` | 是 | OpenAI-compatible API 地址 |
+| `VISION_MODEL` | 是 | 多模态模型名 |
+| `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
+
+上游模型的认证继续由 agent 发送并由代理透传，不需要在 env 中重复保存。
+
+## 前置条件
+
+- 已接入纯文本模型（如 DeepSeek V4）并可正常使用的 coding agent
+- Python 3.11+
+- 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API
 
 ## 常见问题
 
@@ -211,28 +236,29 @@ Codex（携带原有 Authorization）
 
 | 文件 | 作用 |
 |---|---|
+| `bin/glance` | 图片描述、问答和 OCR CLI |
+| `ground.py` / `bin/ground` | 图片目标定位 CLI |
+| `detect.py` / `bin/detect` | 元素盘点 CLI（与 ground 共用实现） |
+| `bin/trace` | 本地图转 SVG 描摹 CLI（精确形状几何，不调视觉 API） |
+| `skills/vision-tools/` | skill：工具手册、由粗到细的方法论、按场景的 playbook |
+| `vision_client.py` | 代理与 CLI 共用的视觉 API 客户端 |
 | `vision_proxy.py` | 本地图片改写代理与 SSE 转发 |
-| `vision_client.py` | 代理与 `glance` 共用的视觉 API 客户端 |
-| `bin/glance` | 可选的图片描述、问答和 OCR CLI |
-| `ground.py` / `bin/ground` | 可选的图片目标定位 CLI |
-| `detect.py` / `bin/detect` | 可选的元素盘点 CLI（与 ground 共用实现） |
-| `bin/trace` | 可选的本地图转 SVG 描摹 CLI（精确形状几何，不调视觉 API） |
 | `extensions/pi/vision.ts` | Pi 与 Oh My Pi 的单文件原生 extension |
 | `extensions/opencode/vision.ts` | OpenCode 的单文件原生 plugin |
-| `AGENT_INSTALL.md` | Codex Agent 的安装与验证步骤 |
+| `AGENT_INSTALL.md` | Agent 的安装与验证步骤 |
 | `tests/test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |
 | `tests/test_anthropic_rewrite.py` | Anthropic Messages（Claude Code）改写路径测试 |
 | `tests/test_extensions.mjs` | Pi / Oh My Pi / OpenCode extension 测试（node 或 bun） |
 | `tests/smoke_test_proxy.py` | 代理透传、鉴权和流式协议测试 |
 | `tests/test_vision_client.py` | 视觉客户端重试与 `glance` 测试 |
 | `tests/test_ground.py` | `ground` 坐标解析和共享配置测试 |
+| `tests/test_detect.py` | `detect` 盘点与区域坐标映射测试 |
 
 ## 限制
 
-- 这是图片转文字代理，不会把视觉 token 直接交给纯文本模型。
+- 这是图片转文字的一层，不会把视觉 token 直接交给纯文本模型。
 - 图片描述质量取决于所配置的视觉模型。
-- 缓存只存在于代理进程内，重启后清空。
-
+- 代理的缓存只存在于进程内，重启后清空。
 
 ---
 Made by [Anionex](https://github.com/Anionex) with codex
