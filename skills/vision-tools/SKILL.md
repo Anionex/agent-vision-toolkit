@@ -1,6 +1,6 @@
 ---
 name: vision-tools
-description: Local vision CLIs: glance (describe/ask/OCR an image), ground (locate a target, pixel box), detect (element inventory), trace (image to SVG geometry). Use for any task involving an image — questions, text, locating elements, comparing, rebuilding as HTML/SVG, digitizing a sketch or diagram, reading values off a chart, operating a GUI from screenshots — and to re-check an image yourself when a description you were given lacks a detail.
+description: Local vision CLIs: glance (describe/ask/OCR an image), pdf_pages (describe a PDF page by page), ground (locate a target, pixel box), detect (element inventory), trace (image to SVG geometry). Use for any task involving an image or PDF — questions, text, locating elements, comparing, rebuilding as HTML/SVG, digitizing a sketch or diagram, reading values off a chart, operating a GUI from screenshots — and to re-check an image yourself when a description you were given lacks a detail.
 ---
 
 # vision-tools
@@ -14,6 +14,7 @@ Pick the tool by the question you are answering:
 | Question | Tool |
 |---|---|
 | "What does this image show / say?" | `glance` |
+| "What's in this PDF, page by page?" | `scripts/pdf_pages.py` |
 | "Where is X?" — a thing you can name | `ground` |
 | "Where are all the Xs?" — every instance of a kind | `detect` |
 | "What is its exact shape, size, offset?" | `trace` |
@@ -52,6 +53,31 @@ But "what changed between these two?" is not a glance question. A one-word
 badge or a small shift is a rounding error to a vision model and exact to
 `scripts/pixel_diff.py`. Diff first to get the box, then `glance --region`
 that box to read what the change actually is.
+
+## `scripts/pdf_pages.py` — read a PDF page by page
+
+Renders a PDF's pages to PNG with poppler and describes each one with the
+vision model in a single pass, so a text-only agent can read a deck or
+document without an extra PDF-to-image step. The script path below is
+relative to this skill's directory, like the other scripts here; the PDF
+argument itself is resolved from your current working directory:
+
+```bash
+python3 scripts/pdf_pages.py deck.pdf                      # describe every page
+python3 scripts/pdf_pages.py deck.pdf -p 1-3,5,7-9         # only those pages (1-based)
+python3 scripts/pdf_pages.py deck.pdf --ocr                # verbatim transcription per page
+python3 scripts/pdf_pages.py deck.pdf -q "What is the headline on each page?"
+python3 scripts/pdf_pages.py deck.pdf --dpi 150            # higher render resolution
+python3 scripts/pdf_pages.py deck.pdf --keep work/pages/   # keep rendered PNGs (one fresh subdir per run)
+```
+
+Output is Markdown with one `## Page N / M` section per page, so you can
+quote page numbers back to the user. The script is self-contained like
+`pixel_diff.py`: it renders pages with poppler (`pdftoppm` + `pdfinfo`,
+install with e.g. `brew install poppler`) and asks the `glance` CLI to
+describe each page. It reports a clear error instead of guessing when
+either is missing. Page ranges are 1-based and must fit the PDF's page
+count.
 
 ## ground — locate a named target
 
@@ -190,7 +216,8 @@ sequence, and how to tell you got it right.
 
 ## Notes
 
-- Only PNG / JPEG / GIF / WebP images are supported.
+- Only PNG / JPEG / GIF / WebP images are supported. PDFs are handled by
+  `scripts/pdf_pages.py`, which renders pages to PNG first (requires poppler).
 - If a command is not found, the optional tools were not installed — report
   this to the user instead of improvising a replacement.
 - If the vision API fails, relay the error faithfully; never fabricate
