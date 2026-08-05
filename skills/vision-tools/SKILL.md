@@ -186,6 +186,7 @@ sequence, and how to tell you got it right.
 | The job | Read |
 |---|---|
 | Rebuild what an image shows (page → HTML, icon/diagram → SVG) — or check a build against its design image | `references/restore.md` |
+| Turn a sketch, whiteboard photo, or diagram into a structured artifact (Mermaid, layout skeleton, outline) | `references/sketch.md` |
 
 ## Notes
 
