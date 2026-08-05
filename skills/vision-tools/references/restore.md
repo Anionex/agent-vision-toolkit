@@ -2,7 +2,9 @@
 
 **When to use**: the task is reproducing what an image shows — a page as
 HTML, an icon or diagram as SVG, a visual component lifted out for reuse.
-Not for answering questions about an image; that is `glance` alone.
+Checking an existing implementation against its design image is the same
+job entered at the Verify step: render, diff, zoom. Not for answering
+questions about an image; that is `glance` alone.
 
 Tool syntax lives in `SKILL.md`. This file is the sequence and the
 pass/fail test.

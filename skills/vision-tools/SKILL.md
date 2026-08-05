@@ -183,9 +183,9 @@ anything multi-step, work outside-in:
 Each file below is one job, start to finish: when it applies, the call
 sequence, and how to tell you got it right.
 
-When you are rebuilding what an image shows — a page as HTML, an icon or
-diagram as SVG, extracting a visual component — please read
-`references/restore.md`.
+| The job | Read |
+|---|---|
+| Rebuild what an image shows (page → HTML, icon/diagram → SVG) — or check a build against its design image | `references/restore.md` |
 
 ## Notes
 
