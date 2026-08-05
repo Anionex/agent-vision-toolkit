@@ -423,6 +423,293 @@ def _inject_reasoning_summaries(text):
     return "\n\n".join(output)
 
 
+def _is_apply_patch_name(name):
+    return name == "apply_patch" or (name or "").endswith(".apply_patch") or (name or "").endswith("/apply_patch")
+
+
+APPLY_PATCH_TOOL_DESCRIPTION = (
+    "Edit files with a V4A patch. ALWAYS use this tool to write file content; never use shell "
+    "redirection (cat/printf/echo >) for edits. "
+    "Call this function with a single `input` string containing the full patch. "
+    "The patch MUST start with exactly `*** Begin Patch` as the first line and end with `*** End Patch`. "
+    "File operations: `*** Add File: <path>` (every content line prefixed with `+`, blank lines as bare `+`), "
+    "`*** Update File: <path>` (hunks with `-old line` / `+new line`, no space after the prefix; optional context "
+    "lines prefixed with a single space; optional single-sided `@@ <header>` anchors such as `@@ def foo():` -- "
+    "never write a trailing `@@`), or `*** Delete File: <path>`. "
+    "Use relative paths only. `-` lines and context lines must match the file byte-for-byte; if unsure, read the file first. "
+    "Prefer surgical targeted edits over rewriting whole files. "
+    "Inside the JSON string value, encode real newlines as \\n."
+)
+
+APPLY_PATCH_INPUT_DESCRIPTION = (
+    "A V4A patch starting with `*** Begin Patch` and ending with `*** End Patch`; "
+    "lines are `-text`, `+text`, or ` text` (single prefix char, no space after it). "
+    "`*** Add File:` uses only `+`-prefixed lines (blank lines as bare `+`). "
+    "Update hunks: `-` removes an existing byte-exact line, `+` adds a new line; "
+    "add space-prefixed context lines or a single-sided `@@ <header>` if the `-` line is ambiguous. "
+    "Relative paths only; never `@@ ... @@`."
+)
+
+
+def _rewrite_apply_patch_tool(parsed):
+    """Request side: lower Codex freeform custom apply_patch to a chat function tool."""
+    tools = parsed.get("tools")
+    if not isinstance(tools, list):
+        return False
+    changed = False
+    for tool in tools:
+        if not isinstance(tool, dict):
+            continue
+        tool_type = tool.get("type")
+        name = None
+        if tool_type == "custom":
+            name = tool.get("name")
+        elif tool_type == "function":
+            fn = tool.get("function")
+            name = fn.get("name") if isinstance(fn, dict) else None
+        if not _is_apply_patch_name(name):
+            continue
+        if tool_type == "custom":
+            tool.clear()
+            tool["type"] = "function"
+            tool["function"] = {
+                "name": "apply_patch",
+                "description": APPLY_PATCH_TOOL_DESCRIPTION,
+                "parameters": {
+                    "type": "object",
+                    "properties": {"input": {"type": "string", "description": APPLY_PATCH_INPUT_DESCRIPTION}},
+                    "required": ["input"],
+                },
+            }
+            changed = True
+        elif tool_type == "function":
+            fn = tool.setdefault("function", {})
+            if fn.get("description") != APPLY_PATCH_TOOL_DESCRIPTION:
+                fn["description"] = APPLY_PATCH_TOOL_DESCRIPTION
+                changed = True
+    if changed:
+        _log("[vision-proxy] apply_patch tool rewritten custom->function for upstream")
+    return changed
+
+
+def _extract_apply_patch_input(args_acc):
+    """Unwrap chat function arguments into bare V4A text. Never raises."""
+    try:
+        if not isinstance(args_acc, str):
+            return ""
+        trimmed = args_acc.strip()
+        if not trimmed:
+            return ""
+        try:
+            obj = json.loads(trimmed)
+        except json.JSONDecodeError:
+            return args_acc
+        if isinstance(obj, dict):
+            value = obj.get("input")
+            if isinstance(value, str):
+                return value
+            for key in ("patch", "text", "payload", "command", "arguments"):
+                value = obj.get(key)
+                if isinstance(value, str) and "*** Begin Patch" in value:
+                    return value
+        return args_acc
+    except Exception as exc:
+        _log(f"[vision-proxy] extract_apply_patch_input failed: {exc!r}")
+        return args_acc
+
+
+def _rewrite_apply_patch_response_json(body):
+    """Non-streaming JSON response rewrite. Fail-safe: returns original bytes on any problem."""
+    try:
+        parsed = json.loads(body.decode("utf-8", errors="replace"))
+        if not isinstance(parsed, dict):
+            return body
+        output = parsed.get("output")
+        if not isinstance(output, list):
+            return body
+        changed = False
+        for item in output:
+            if isinstance(item, dict) and item.get("type") == "function_call" and _is_apply_patch_name(item.get("name")):
+                item["type"] = "custom_tool_call"
+                item["input"] = _extract_apply_patch_input(item.get("arguments"))
+                item.pop("arguments", None)
+                item.setdefault("status", "completed")
+                changed = True
+        if not changed:
+            return body
+        return json.dumps(parsed, ensure_ascii=False).encode()
+    except Exception as exc:
+        _log(f"[vision-proxy] json response rewrite failed: {exc!r}")
+        return body
+
+
+def _sse_event(event_type, payload):
+    return f"event: {event_type}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n".encode()
+
+
+def _split_sse_frame(buffer, max_buffered=8 * 1024 * 1024):
+    """Return (frame_bytes|None, rest). The frame INCLUDES its trailing
+    delimiter so passthrough stays byte-identical. If no delimiter and the
+    buffer exceeds the cap, return the whole buffer as a raw frame to avoid
+    stalling (fail-safe)."""
+    if len(buffer) > max_buffered:
+        raw = bytes(buffer)
+        return raw, bytearray()
+    for delim in (b"\n\n", b"\r\n\r\n"):
+        index = buffer.find(delim)
+        if index != -1:
+            frame = bytes(buffer[:index + len(delim)])
+            rest = bytearray(buffer[index + len(delim):])
+            if delim == b"\r\n\r\n":
+                frame = frame.replace(b"\r\n", b"\n")
+            return frame, rest
+    return None, buffer
+
+
+def _flush_apply_patch(entry, interrupted=False):
+    """Emit custom_tool_call wire for one tracked apply_patch call."""
+    try:
+        input_text = _extract_apply_patch_input(entry.get("args_acc"))
+        item_id = entry.get("item_id")
+        call_id = entry.get("call_id") or item_id
+        name = entry.get("name") or "apply_patch"
+        output_index = entry.get("output_index", 0)
+        if interrupted or not input_text.strip():
+            item = {"type": "custom_tool_call", "id": item_id, "call_id": call_id, "name": name,
+                    "input": input_text, "status": "incomplete"}
+            _log(f"[vision-proxy] apply_patch flush INCOMPLETE item_id={item_id} args_len={len(entry.get('args_acc') or '')}")
+            return [_sse_event("response.output_item.done", {"type": "response.output_item.done", "output_index": output_index, "item": item})]
+        frames = [
+            _sse_event("response.custom_tool_call_input.delta", {
+                "type": "response.custom_tool_call_input.delta", "item_id": item_id,
+                "output_index": output_index, "call_id": call_id, "delta": input_text}),
+            _sse_event("response.custom_tool_call_input.done", {
+                "type": "response.custom_tool_call_input.done", "item_id": item_id,
+                "output_index": output_index, "call_id": call_id, "input": input_text}),
+            _sse_event("response.output_item.done", {
+                "type": "response.output_item.done", "output_index": output_index,
+                "item": {"type": "custom_tool_call", "id": item_id, "call_id": call_id,
+                         "name": name, "input": input_text, "status": "completed"}}),
+        ]
+        _log(f"[vision-proxy] apply_patch flush OK item_id={item_id} input_len={len(input_text)}")
+        return frames
+    except Exception as exc:
+        _log(f"[vision-proxy] apply_patch flush failed: {exc!r}")
+        return []
+
+
+def _rewrite_sse_frame(frame, state):
+    """One SSE frame. Fail-safe: any anomaly returns the raw frame bytes.
+
+    state: {"pending": {item_id: entry}, "completed": bool}
+    """
+    pending = state["pending"]
+    flushed = state.setdefault("flushed", set())
+    try:
+        if state.get("completed") or not frame.strip():
+            return [frame]
+        text = frame.decode("utf-8", errors="replace")
+        event = None
+        data_lines = []
+        for line in text.splitlines():
+            line = line.rstrip("\r")
+            if line.startswith("event:"):
+                event = line[6:].strip()
+            elif line.startswith("data:"):
+                data_lines.append(line[5:].strip())
+        if not data_lines:
+            return [frame]
+        try:
+            payload = json.loads("\n".join(data_lines))
+        except json.JSONDecodeError:
+            return [frame]
+        if not isinstance(payload, dict):
+            return [frame]
+        etype = payload.get("type") or event
+
+        if etype == "response.completed" or etype == "response.failed" or etype == "response.incomplete":
+            state["completed"] = True
+            return [frame]
+
+        if etype == "response.output_item.added":
+            item = payload.get("item") or {}
+            name = item.get("name") or ""
+            if item.get("type") == "function_call" and _is_apply_patch_name(name):
+                item_id = item.get("id")
+                entry = {
+                    "item_id": item_id,
+                    "call_id": item.get("call_id") or item_id,
+                    "name": name,
+                    "args_acc": "",
+                    "output_index": payload.get("output_index", 0),
+                }
+                if item_id:
+                    pending[item_id] = entry
+                else:
+                    _log("[vision-proxy] apply_patch function_call without item id; cannot track stream")
+                new_item = dict(item)
+                new_item["type"] = "custom_tool_call"
+                new_item["input"] = ""
+                new_item.pop("arguments", None)
+                new_payload = dict(payload)
+                new_payload["item"] = new_item
+                return [_sse_event("response.output_item.added", new_payload)]
+            return [frame]
+
+        if etype == "response.function_call_arguments.delta":
+            entry = pending.get(payload.get("item_id"))
+            if entry is not None:
+                delta = payload.get("delta")
+                if not isinstance(delta, str):
+                    _log(f"[vision-proxy] non-string function delta, forwarding raw: {type(delta).__name__}")
+                    return [frame]
+                entry["args_acc"] += delta
+                return []
+            return [frame]
+
+        if etype == "response.function_call_arguments.done":
+            item_id = payload.get("item_id")
+            entry = pending.pop(item_id, None)
+            if entry is not None:
+                arguments = payload.get("arguments")
+                if isinstance(arguments, str):
+                    entry["args_acc"] = arguments
+                flushed.add(item_id)
+                return _flush_apply_patch(entry, interrupted=False)
+            return [frame]
+
+        if etype == "response.output_item.done":
+            item = payload.get("item") or {}
+            name = item.get("name") or ""
+            if item.get("type") == "function_call" and _is_apply_patch_name(name):
+                item_id = item.get("id")
+                if item_id in flushed:
+                    return []  # already flushed at function_call_arguments.done
+                entry = pending.pop(item_id, None)
+                interrupted = item.get("status") == "incomplete" or payload.get("status") == "incomplete"
+                if entry is None:
+                    # Untracked: convert directly from the final item (still fail-safe for parsing).
+                    entry = {
+                        "item_id": item_id,
+                        "call_id": item.get("call_id") or item_id,
+                        "name": name,
+                        "args_acc": item.get("arguments") if isinstance(item.get("arguments"), str) else "",
+                        "output_index": payload.get("output_index", 0),
+                    }
+                else:
+                    arguments = item.get("arguments")
+                    if isinstance(arguments, str):
+                        entry["args_acc"] = arguments
+                flushed.add(item_id)
+                return _flush_apply_patch(entry, interrupted=interrupted)
+            return [frame]
+
+        return [frame]
+    except Exception as exc:
+        _log(f"[vision-proxy] sse frame rewrite failed, forwarding raw: {exc!r}")
+        return [frame]
+
+
 class Proxy:
     def __init__(self, port, upstream, log_path, codex_header_compat=False,
                  inject_reasoning_summary=False):
@@ -478,7 +765,8 @@ class Proxy:
             if isinstance(parsed, dict):
                 image_changed = await _rewrite_image_inputs(parsed)
                 model_changed = _rewrite_model_compat(parsed)
-                if image_changed or model_changed:
+                tools_changed = _rewrite_apply_patch_tool(parsed)
+                if image_changed or model_changed or tools_changed:
                     body = bytearray(json.dumps(parsed).encode())
             model = parsed.get("model") if isinstance(parsed, dict) else None
             _log(f"[vision-proxy] request {method} {path} model={model} body_bytes={len(body)}")
@@ -490,7 +778,7 @@ class Proxy:
         except (ConnectionResetError, BrokenPipeError):
             pass
         except Exception as exc:
-            _log(f"[vision-proxy] handler error: {exc!r}")
+            _log(f"[vision-proxy] handler error: {exc!r}\n{__import__('traceback').format_exc()}")
             if not response_started:
                 await self._send_error(writer, 502, "Upstream proxy request failed")
         finally:
@@ -521,9 +809,21 @@ class Proxy:
     async def _send_response(self, writer, response):
         status = getattr(response, "status", None) or getattr(response, "code", 502)
         headers = list(response.headers.items())
-        if self.inject_reasoning_summary and "text/event-stream" in response.headers.get("Content-Type", "") and not response.headers.get("Content-Encoding"):
+        content_type = response.headers.get("Content-Type", "")
+        compressed = response.headers.get("Content-Encoding")
+        if "text/event-stream" in content_type and not compressed:
+            if self.inject_reasoning_summary:
+                body = await asyncio.to_thread(response.read)
+                body = _inject_reasoning_summaries(body.decode(errors="replace")).encode()
+                await self._write_head(writer, status, headers, len(body))
+                writer.write(body)
+                await writer.drain()
+                return
+            await self._send_response_sse(writer, response, status, headers)
+            return
+        if "application/json" in content_type and not compressed:
             body = await asyncio.to_thread(response.read)
-            body = _inject_reasoning_summaries(body.decode(errors="replace")).encode()
+            body = _rewrite_apply_patch_response_json(body)
             await self._write_head(writer, status, headers, len(body))
             writer.write(body)
             await writer.drain()
@@ -534,6 +834,40 @@ class Proxy:
         while chunk := await asyncio.to_thread(read_chunk, 65536):
             writer.write(chunk)
             await writer.drain()
+
+    async def _send_response_sse(self, writer, response, status, headers):
+        """Stream the upstream SSE response. Fail-safe apply_patch bridge:
+        only whitelisted apply_patch frames are transformed; every other
+        frame is forwarded byte-identical (including its delimiter). Any
+        parse/transform error forwards the raw frame."""
+        await self._write_head(writer, status, headers, None)
+        read_chunk = getattr(response, "read1", response.read)
+        buffer = bytearray()
+        state = {"pending": {}, "completed": False}
+        while True:
+            chunk = await asyncio.to_thread(read_chunk, 65536)
+            if not chunk:
+                break
+            buffer.extend(chunk)
+            while True:
+                frame, rest = _split_sse_frame(buffer)
+                if frame is None:
+                    break
+                buffer = rest
+                for out_frame in _rewrite_sse_frame(frame, state):
+                    writer.write(out_frame)
+                    await writer.drain()
+        if buffer:
+            for out_frame in _rewrite_sse_frame(bytes(buffer), state):
+                writer.write(out_frame)
+                await writer.drain()
+        for item_id, entry in list(state["pending"].items()):
+            state["pending"].pop(item_id, None)
+            state.setdefault("flushed", set()).add(item_id)
+            _log(f"[vision-proxy] apply_patch stream ended mid-call item_id={item_id}")
+            for out_frame in _flush_apply_patch(entry, interrupted=True):
+                writer.write(out_frame)
+                await writer.drain()
 
     async def _write_head(self, writer, status, headers, content_length):
         reason = HTTPStatus(status).phrase if status in HTTPStatus._value2member_map_ else "Unknown"
