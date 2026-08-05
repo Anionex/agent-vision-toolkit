@@ -79,6 +79,8 @@ py -3 "<INSTALL_DIR>\codex-vision-proxy.py" --port 19100 --upstream "原始 Deep
 
 尖括号是占位符，执行前必须替换成真实绝对路径。确认代理监听 `127.0.0.1:19100`。如果端口已被占用，先确认占用者是否为用户已有的相关代理，不得直接终止未知进程。
 
+> **可选：视觉失败降级（`--fail-open`）**。默认情况下，视觉 API 调用失败（key 失效、网络不通、上游限流等）时，代理会对整个请求返回 502，纯文本会话也被阻塞。在命令末尾追加 `--fail-open` 后，代理会把失败的图片替换为 `[vision unavailable: <原因>]` 占位文本并继续转发请求，纯文本不受影响；不传该参数时保持原行为。
+
 ## 4. 修改 Codex 配置
 
 ### config.toml
@@ -131,10 +133,10 @@ launchctl kickstart -k "gui/$(id -u)/com.codex.vision-proxy"
 
 ```cmd
 @echo off
-start "Codex Vision Proxy" /min py -3 "%LOCALAPPDATA%\codex-vision-proxy\codex-vision-proxy.py" --port 19100 --upstream "原始 DeepSeek base_url" --env-file "%LOCALAPPDATA%\codex-vision-proxy\env" --log "%LOCALAPPDATA%\codex-vision-proxy\proxy.log"
+start "Codex Vision Proxy" /min py -3 "%LOCALAPPDATA%\codex-vision-proxy\codex-vision-proxy.py" --port 19100 --upstream "原始 DeepSeek base_url" --env-file "%LOCALAPPDATA%\codex-vision-proxy\env" --log "%LOCALAPPDATA%\codex-vision-proxy\proxy.log" --fail-open
 ```
 
-Startup 目录由 PowerShell 的 `[Environment]::GetFolderPath("Startup")` 获取。创建后运行一次该 `.cmd`，确认代理启动。不要把 key 写进 `.cmd`。
+`--fail-open` 为可选：视觉 API 不可用时用占位文本替代图片，避免整个请求（含纯文本）返回 502。Startup 目录由 PowerShell 的 `[Environment]::GetFolderPath("Startup")` 获取。创建后运行一次该 `.cmd`，确认代理启动。不要把 key 写进 `.cmd`。
 
 ### 其他系统
 

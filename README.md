@@ -220,6 +220,7 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 | `extensions/opencode/vision.ts` | Single-file native plugin for OpenCode |
 | `AGENT_INSTALL.md` | Installation and verification steps for Codex agents |
 | `tests/test_image_rewrite_shapes.py` | Tests for image structures, concurrency, caching, and failure behavior |
+| `tests/test_fail_open.py` | Tests for vision-failure degradation (`--fail-open`) |
 | `tests/test_anthropic_rewrite.py` | Tests for the Anthropic Messages (Claude Code) rewrite path |
 | `tests/test_extensions.mjs` | Tests for the Pi / Oh My Pi / OpenCode extensions (node or bun) |
 | `tests/smoke_test_proxy.py` | Tests for proxy pass-through, auth, and streaming protocol |
@@ -232,6 +233,7 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 - This is an image-to-text proxy; it doesn't hand vision tokens directly to the text model.
 - Description quality depends on the configured vision model.
 - The cache lives only inside the proxy process and is cleared on restart.
+- By default, a failed vision call fails the whole request with 502 (plain text included). With `--fail-open` the proxy replaces failed images with a `[vision unavailable: <reason>]` note and keeps the text-only conversation going.
 
 ---
 

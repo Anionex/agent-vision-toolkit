@@ -221,6 +221,7 @@ Codex（携带原有 Authorization）
 | `extensions/opencode/vision.ts` | OpenCode 的单文件原生 plugin |
 | `AGENT_INSTALL.md` | Codex Agent 的安装与验证步骤 |
 | `tests/test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |
+| `tests/test_fail_open.py` | 视觉失败降级（`--fail-open`）测试 |
 | `tests/test_anthropic_rewrite.py` | Anthropic Messages（Claude Code）改写路径测试 |
 | `tests/test_extensions.mjs` | Pi / Oh My Pi / OpenCode extension 测试（node 或 bun） |
 | `tests/smoke_test_proxy.py` | 代理透传、鉴权和流式协议测试 |
@@ -232,6 +233,7 @@ Codex（携带原有 Authorization）
 - 这是图片转文字代理，不会把视觉 token 直接交给纯文本模型。
 - 图片描述质量取决于所配置的视觉模型。
 - 缓存只存在于代理进程内，重启后清空。
+- 默认情况下，视觉调用失败会让整个请求返回 502（含纯文本）。加 `--fail-open` 后，代理会把失败的图片替换为 `[vision unavailable: <原因>]` 占位文本，纯文本会话继续可用。
 
 
 ---
