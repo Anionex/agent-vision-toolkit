@@ -1,6 +1,6 @@
 ---
 name: vision-tools
-description: Local vision CLIs: glance (describe/ask/OCR an image), ground (locate a target, pixel box), detect (element inventory), trace (image to SVG geometry). Use for any task involving an image — questions, text, locating elements, comparing, rebuilding as HTML/SVG — and to re-check an image yourself when a description you were given lacks a detail.
+description: Local vision CLIs: glance (describe/ask/OCR an image), ground (locate a target, pixel box), detect (element inventory), trace (image to SVG geometry). Use for any task involving an image — questions, text, locating elements, comparing, rebuilding as HTML/SVG, digitizing a sketch or diagram, reading values off a chart, operating a GUI from screenshots — and to re-check an image yourself when a description you were given lacks a detail.
 ---
 
 # vision-tools
