@@ -92,15 +92,15 @@
 
 **最简单的安装方式，是把这句话发给 agent：**
 
-> 根据 https://github.com/Anionex/agent-vision-toolkit 仓库指引，在本地装好视觉工具箱和 skill；如未配置，请你打开并引导我配置env文件。
+> 根据 https://github.com/Anionex/agent-vision-toolkit 的仓库指引，在本地安装视觉工具箱和 skill。如果视觉 API 尚未配置，请按当前系统找到配置文件，并引导我填写 `VISION_API_KEY`、`VISION_BASE_URL` 和 `VISION_MODEL`。
 
-**如果需要安装可选的无缝代理服务，也可以发送：**
+**如果需要安装可选的无缝接入层，也可以发送：**
 
-> 根据 https://github.com/Anionex/agent-vision-toolkit/blob/main/AGENT_INSTALL.md ，为我们当前使用的agent应用安装可选的视觉代理服务/插件；如未配置，请你打开并引导我配置env文件。
+> 完整阅读 https://github.com/Anionex/agent-vision-toolkit/blob/main/AGENT_INSTALL.md，根据我们当前使用的 agent 应用，安装适用的视觉代理或原生 extension/plugin。如果视觉 API 尚未配置，请按当前系统找到配置文件，并引导我填写 `VISION_API_KEY`、`VISION_BASE_URL` 和 `VISION_MODEL`。
 
-唯一要准备的是 OpenAI兼容的多模态模型 API BASE和 API key，以及指定模型名称，发送上述消息安装完毕后，agent将会引导你配置env中完成三项的配置。
+唯一要准备的是 OpenAI-compatible 多模态模型的 API base URL、API key 和模型名称；agent 会引导你把它们写入对应的配置文件。
 
-> 对于可选代理，安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，可见各 agent的文档。
+> 对于可选接入层，安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，可见各 agent 的文档。
 
 <details>
 <summary><b>三步手动安装</b></summary>

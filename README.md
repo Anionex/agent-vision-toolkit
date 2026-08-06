@@ -92,13 +92,13 @@ Each playbook explains when to use the workflow, which tools to call and in what
 
 **The easiest way to install it is to send this to your agent:**
 
-> Follow the instructions in https://github.com/Anionex/agent-vision-toolkit to install the vision toolkit and skill locally. If the env file is not configured, open it and guide me through the setup.
+> Follow the instructions in https://github.com/Anionex/agent-vision-toolkit to install the vision toolkit and skill locally. If the vision API is not configured, locate the configuration file for the current operating system and guide me through setting `VISION_API_KEY`, `VISION_BASE_URL`, and `VISION_MODEL`.
 
-**If you also want the optional seamless proxy service, send this:**
+**If you also want the optional seamless integration layer, send this:**
 
-> Follow https://github.com/Anionex/agent-vision-toolkit/blob/main/AGENT_INSTALL.md to install the optional vision proxy service or extension for the agent application we are currently using. If the env file is not configured, open it and guide me through the setup.
+> Read https://github.com/Anionex/agent-vision-toolkit/blob/main/AGENT_INSTALL.md in full, then install the appropriate vision proxy or native extension/plugin for the agent application we are currently using. If the vision API is not configured, locate the configuration file for the current operating system and guide me through setting `VISION_API_KEY`, `VISION_BASE_URL`, and `VISION_MODEL`.
 
-All you need to prepare is an OpenAI-compatible multimodal API base URL, API key, and model name. After installation, the agent will guide you through configuring all three values in the env file.
+All you need to prepare is an OpenAI-compatible multimodal API base URL, API key, and model name. The agent will guide you through writing them to the appropriate configuration file.
 
 > After installing the optional integration and restarting the agent, paste an image directly or let the model call its built-in image tool. Pi, Oh My Pi, and OpenCode use single-file [native extensions](extensions/) rather than the proxy; see each agent's documentation.
 
