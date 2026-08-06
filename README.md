@@ -50,16 +50,15 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 
 ## Highlights
 
-- **More than image descriptions — it captures what the LLM actually cares about**: every image gets a focus hint. A pasted image uses the text from its own message, while an image fetched through `view_image` uses the model's stated reason for looking. The resulting description covers the details needed for the current turn instead of producing a generic caption.
+- **More than image descriptions — it captures what the LLM actually cares about**: when viewing an image, it passes along the user's or model's latest intent, producing the details needed for the current turn instead of a broad, unfocused description.
 - **Both pasted images and built-in image tools work**: the agent can understand images pasted directly as well as images opened through its built-in tools.
-- **Parallel multi-image parsing**: multiple images in one request are sent to the vision model concurrently, so N images take roughly the latency of one instead of being processed one by one.
 - **A battle-tested methodology for visual tasks**: the included skill teaches the agent what to inspect, which tool to choose, what sequence to follow, and how to verify the final result.
 
 
 ## Use-case Playbooks
 
-The included `vision-tools` skill contains complete playbooks that an agent can follow directly.
-Each playbook explains when to use the workflow, which tools to call and in what order, and how to verify the result:
+The included `vision-tools` skill contains complete examples that an agent can follow directly.
+When to use them, the order in which to call tools, and how to verify the result are all documented in the corresponding skill guides:
 
 | Use case | What the agent learns to do |
 |---|---|
