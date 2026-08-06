@@ -53,9 +53,7 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 - **Descriptions target the current question**: every image gets a focus hint — a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking — so the description covers the details this turn actually needs instead of being a generic caption.
 - **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
 - **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
-- **The vision model only looks, it doesn't reason for you**: it transcribes and describes, leaving the conclusion to your coding model.
 - **A practical methodology for visual work**: the skill teaches the agent what to inspect, which tool to choose, how to proceed step by step, and how to verify the result across different visual tasks.
-- **More vision tools may be added later**
 
 
 ## Use-case Playbooks
@@ -152,7 +150,8 @@ Or copy `skills/vision-tools/` into your agent's skills directory (e.g. `~/.code
 
 Each tool answers one kind of question, so the calling agent — which holds the full context — picks the right one instead of guessing at a single overloaded command.
 
-### `glance` — "what does it show?"
+<details>
+<summary><b><code>glance</code> — "what does it show?"</b></summary>
 
 Ask a question about an image directly, or transcribe its text.
 
@@ -179,7 +178,10 @@ a boundary audit:
 python3 skills/vision-tools/scripts/long_screenshot_ocr.py long-chat.png --mode chat -o long-chat.ocr.md
 ```
 
-### `ground` — "where is X?"
+</details>
+
+<details>
+<summary><b><code>ground</code> — "where is X?"</b></summary>
 
 Locate an object or region and get a bounding box in original pixel coordinates:
 
@@ -193,7 +195,10 @@ x1: 1067, y1: 841, x2: 1108, y2: 881
 
 It analyzes one full image per call. With `--region X1,Y1,X2,Y2` it searches only that box and still reports original-image coordinates — the zoom-in path for small targets.
 
-### `detect` — "what's here?"
+</details>
+
+<details>
+<summary><b><code>detect</code> — "what's here?"</b></summary>
 
 Inventory the elements of an image (or a region) — a numbered list with exact visible text and pixel boxes:
 
@@ -211,7 +216,10 @@ detect page.png --region 238,600,953,671
 
 A full-screen pass is a fast first draft; for completeness on dense screens, inventory region by region.
 
-### `trace` — "what's the exact shape?"
+</details>
+
+<details>
+<summary><b><code>trace</code> — "what's the exact shape?"</b></summary>
 
 `trace` vectorizes an image (or a cropped region) into SVG **locally and deterministically** — coordinates come from the actual pixels, not from a vision model's estimates. Use it for exact shape geometry: reproducing icons/logos as SVG, reading a diagram's layout, or measuring elements. Requires the optional `vtracer` (and `pillow` for `--region`).
 
@@ -220,7 +228,10 @@ trace diagram.png --polygon
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 ```
 
-### `crop` — "cut that box out"
+</details>
+
+<details>
+<summary><b><code>crop</code> — "cut that box out"</b></summary>
 
 `crop` cuts a pixel box out of an image into its own file — the same
 X1,Y1,X2,Y2 coordinates `ground`/`detect` print, clamped to the image
@@ -232,6 +243,7 @@ re-cropping in memory on every call. Requires the optional `pillow`.
 crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 ```
 
+</details>
 
 ## Upgrade: Seamless Integration
 
@@ -269,6 +281,9 @@ This layer is also agent-installed — the Quick Start prompt already covers it,
 
 ## How It Works
 
+<details>
+<summary><b>Request flow and protocol details</b></summary>
+
 ```text
 Codex -> 127.0.0.1:19100 -> your existing text-only upstream
              |
@@ -284,7 +299,12 @@ The proxy identifies the request dialect from the body shape alone — OpenAI Re
 
 The first model response only asks Codex to call `view_image`. After Codex executes the tool locally, the second request carries the image; the proxy converts image to text on this request path. If the catalog explicitly declares support for `text` only, Codex's handler rejects the tool first, so `image` is appended to the existing entry only in that case.
 
+</details>
+
 ## Configuration
+
+<details>
+<summary><b>Environment variables</b></summary>
 
 Only these env vars are required, for both the toolkit and the proxy:
 
@@ -296,6 +316,8 @@ Only these env vars are required, for both the toolkit and the proxy:
 | `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
 
 Upstream authentication is still sent by your agent and passed through by the proxy, so there's no need to store it again in the env.
+
+</details>
 
 ## Prerequisites
 
@@ -312,7 +334,8 @@ Upstream authentication is still sent by your agent and passed through by the pr
 
 ## FAQ
 
-### After pointing `base_url` at the local proxy, does the proxy also need the upstream model's API key?
+<details>
+<summary><b>After pointing <code>base_url</code> at the local proxy, does the proxy also need the upstream model's API key?</b></summary>
 
 No. Although the network request to the upstream is sent by the proxy process at `127.0.0.1:19100`, the upstream API key is still placed in the `Authorization` header by Codex per your existing configuration, and the proxy forwards that header unchanged:
 
@@ -323,6 +346,8 @@ Codex (carrying the original Authorization)
 ```
 
 So don't modify Codex's existing auth config, and don't store the upstream API key again in the proxy env. The proxy env only needs `VISION_API_KEY`, `VISION_BASE_URL`, and `VISION_MODEL`.
+
+</details>
 
 ## Limitations
 

@@ -53,9 +53,7 @@
 - **不只是看图描述，是获取llm真正关注的内容**：每张图都会附上 focus hint，贴图用它自己那条消息的文字，`view_image` 取回的图用模型自述的看图动机，描述因此覆盖这一轮真正要用到的细节，而不是一段通用 caption。
 - **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图。
 - **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
-- **视觉模型只负责看，不替你推理**：它只转写和描述图片内容，不直接回答问题，结论仍由你的编程模型基于描述得出。
 - **提供一套看图方法论**：skill 会告诉 agent 面对不同视觉任务时应该看什么、选择哪个工具、按什么步骤推进，以及最后如何验证结果。
-- **后续可能加入的更多视觉工具**
 
 
 ## 用例技能
@@ -152,7 +150,8 @@ npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --c
 
 每个工具回答一类问题，让掌握完整上下文的调用方 agent 去选择，而不是让它对着一个大而全的命令猜参数。
 
-### `glance` —— “图上有什么？”
+<details>
+<summary><b><code>glance</code> —— “图上有什么？”</b></summary>
 
 直接对图片提问，或转写图中的文字。
 
@@ -178,7 +177,10 @@ glance screenshot.png --ocr
 python3 skills/vision-tools/scripts/long_screenshot_ocr.py long-chat.png --mode chat -o long-chat.ocr.md
 ```
 
-### `ground` —— “X 在哪？”
+</details>
+
+<details>
+<summary><b><code>ground</code> —— “X 在哪？”</b></summary>
 
 定位图片中的对象或区域，输出原图像素坐标下的边界框：
 
@@ -192,7 +194,10 @@ x1: 1067, y1: 841, x2: 1108, y2: 881
 
 每次分析一张完整图片。加 `--region X1,Y1,X2,Y2` 可只在该框内查找，输出仍是原图坐标——小目标的放大通道。
 
-### `detect` —— “这里有些什么？”
+</details>
+
+<details>
+<summary><b><code>detect</code> —— “这里有些什么？”</b></summary>
 
 盘点图片（或指定区域）中的元素——输出编号清单，带逐字可见文字和像素框：
 
@@ -210,7 +215,10 @@ detect page.png --region 238,600,953,671
 
 整屏一遍是快速初稿；密集页面要完整清单时，按区域逐块盘点。
 
-### `trace` —— “精确形状是什么？”
+</details>
+
+<details>
+<summary><b><code>trace</code> —— “精确形状是什么？”</b></summary>
 
 `trace` 在**本地确定性地**把图片（或裁剪区域）矢量化为 SVG——坐标来自真实像素，不是视觉模型的估计。用于精确形状几何：图标/logo 还原为 SVG、读取示意图布局、测量元素尺寸。需要可选依赖 `vtracer`（`--region` 另需 `pillow`）。
 
@@ -219,7 +227,10 @@ trace diagram.png --polygon
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 ```
 
-### `crop` —— “把这个盒子裁出来”
+</details>
+
+<details>
+<summary><b><code>crop</code> —— “把这个盒子裁出来”</b></summary>
 
 `crop` 把图片中的像素盒裁成独立文件——就是 `ground`/`detect` 输出的那组
 X1,Y1,X2,Y2 坐标，超出图片边界时自动收敛。同一个盒子接下来要喂给
@@ -230,6 +241,7 @@ pixel_diff、dominant_colors、trace 多次时，先裁一次存成文件复用�
 crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 ```
 
+</details>
 
 ## 升级：无缝接入
 
@@ -267,6 +279,9 @@ crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 
 ## 工作原理
 
+<details>
+<summary><b>请求流与协议细节</b></summary>
+
 ```text
 Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
              |
@@ -281,7 +296,12 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 
 第一次模型响应只要求 Codex 调用 `view_image`。Codex 在本机执行工具后，第二次请求才携带图片；代理在这个请求方向完成图片转文字。若 catalog 明确声明仅支持 `text`，Codex 的 handler 会先拒绝工具，因此只在这一种情况下给现有条目追加 `image`。
 
+</details>
+
 ## 配置
+
+<details>
+<summary><b>环境变量</b></summary>
 
 工具箱与代理都只需要这些环境变量：
 
@@ -293,6 +313,8 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 | `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
 
 上游模型的认证继续由 agent 发送并由代理透传，不需要在 env 中重复保存。
+
+</details>
 
 ## 前置条件
 
@@ -309,7 +331,8 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 
 ## 常见问题
 
-### `base_url` 指向本地代理后，代理也需要配置上游模型的 API key 吗？
+<details>
+<summary><b><code>base_url</code> 指向本地代理后，代理也需要配置上游模型的 API key 吗？</b></summary>
 
 不需要。访问上游的网络请求虽然由 `127.0.0.1:19100` 的代理进程发出，但上游的 API key 仍由 Codex 按原有配置放在 `Authorization` 请求头中，代理会将这个请求头原样转发出去：
 
@@ -320,6 +343,8 @@ Codex（携带原有 Authorization）
 ```
 
 因此不要修改 Codex 原有的认证配置，也不要在代理 env 中重复保存上游的 API key。代理 env 只需配置 `VISION_API_KEY`、`VISION_BASE_URL` 和 `VISION_MODEL`。
+
+</details>
 
 ## 限制
 
