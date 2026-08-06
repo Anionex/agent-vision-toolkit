@@ -179,6 +179,13 @@ def test_chat_json_render_and_message_merge(mod):
     assert mod.normalize_timestamp("2026-08-06 10:30") == "2026-08-06 10:30"
     assert mod.normalize_timestamp("2026-08-06 10:3") == ""
     assert mod.normalize_timestamp("[clipped]") == ""
+    assert mod.join_visual_wraps(
+        "Uploading now.\nreport.pdf\n194 KB · PDF document",
+        preserve_lines=True,
+    ) == "Uploading now.\nreport.pdf\n194 KB · PDF document"
+    assert mod.join_visual_wraps(
+        "Confirm the gates:\nAre all gates green?\nAnonymous Poll\n• QA\n• Monitoring"
+    ) == "Confirm the gates:\nAre all gates green?\nAnonymous Poll\n• QA\n• Monitoring"
 
 
 def test_chat_overlap_uses_richer_boundary_messages(mod):
@@ -218,6 +225,11 @@ def test_chat_overlap_uses_richer_boundary_messages(mod):
 
 
 def test_resume_fingerprint_tracks_mode_and_prompt(mod):
+    chat_prompt = mod.ocr_prompt("chat", 1, 2, None)
+    assert "use You as the speaker" in chat_prompt
+    assert "unread divider as a system message" in chat_prompt
+    assert "write each option as a bullet line" in chat_prompt
+
     with tempfile.TemporaryDirectory() as temp_dir:
         chunk = make_chunk(mod, temp_dir, 1)
         base = mod.recognition_fingerprint(chunk, 2, "general", None)

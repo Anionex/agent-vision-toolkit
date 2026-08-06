@@ -3,402 +3,961 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Synthetic Telegram Chat - Long Screenshot OCR Demo</title>
+  <title>Synthetic Telegram Group Chat - Long Screenshot OCR Demo</title>
   <style>
     :root {
       color-scheme: light;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-      background: #cddbe3;
+      font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background: #7f9eae;
+      color: #17212b;
     }
 
     * { box-sizing: border-box; }
 
-    html, body {
-      margin: 0;
-      width: 100%;
-      min-height: 100%;
-      color: #182533;
-    }
-
+    html,
     body {
-      display: flex;
-      justify-content: center;
-      background: #9fb3bf;
+      width: 390px;
+      min-height: 100%;
+      margin: 0;
+      overflow-x: hidden;
+      background: #7f9eae;
     }
 
-    .app {
-      width: 900px;
+    body { display: block; }
+
+    .phone {
+      width: 390px;
       min-height: 100vh;
       overflow: hidden;
-      background:
-        radial-gradient(circle at 18px 18px, rgba(82, 125, 146, 0.08) 0 2px, transparent 2.5px),
-        radial-gradient(circle at 52px 44px, rgba(82, 125, 146, 0.06) 0 3px, transparent 3.5px),
-        linear-gradient(135deg, rgba(255,255,255,0.24), rgba(255,255,255,0));
-      background-color: #d7e4ea;
-      background-size: 72px 72px, 88px 88px, 100% 100%;
-      box-shadow: 0 0 28px rgba(27, 49, 61, 0.28);
+      background: #d9e7ed;
+      box-shadow: 0 0 24px rgba(28, 50, 62, 0.32);
     }
 
-    .topbar {
-      height: 78px;
-      padding: 0 22px;
+    .statusbar {
+      height: 24px;
+      padding: 0 12px;
       display: flex;
       align-items: center;
-      gap: 15px;
-      background: #ffffff;
-      border-bottom: 1px solid #dce5ea;
-      box-shadow: 0 2px 10px rgba(44, 73, 88, 0.12);
+      justify-content: space-between;
+      color: #fff;
+      background: #456d8c;
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0.1px;
     }
 
-    .back {
-      width: 28px;
-      height: 28px;
-      color: #6d7f8a;
-      font-size: 31px;
-      line-height: 24px;
-      font-weight: 300;
-    }
-
-    .group-avatar {
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      display: grid;
-      place-items: center;
-      color: white;
-      font-weight: 750;
-      font-size: 17px;
-      letter-spacing: 0.4px;
-      background: linear-gradient(145deg, #52b8f4, #248bd3);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.28);
-    }
-
-    .title-block { flex: 1; min-width: 0; }
-    .title {
-      font-size: 19px;
-      line-height: 24px;
-      font-weight: 720;
-      letter-spacing: -0.15px;
-    }
-    .subtitle {
-      margin-top: 2px;
-      color: #7a8b95;
-      font-size: 13px;
-    }
-
-    .top-actions {
+    .status-icons {
       display: flex;
       align-items: center;
-      gap: 22px;
-      color: #738792;
+      gap: 7px;
     }
 
-    .search {
-      width: 21px;
-      height: 21px;
-      border: 2px solid currentColor;
-      border-radius: 50%;
+    .signal {
+      display: flex;
+      align-items: flex-end;
+      gap: 1px;
+      height: 11px;
+    }
+    .signal i {
+      display: block;
+      width: 2px;
+      border-radius: 1px;
+      background: #fff;
+    }
+    .signal i:nth-child(1) { height: 3px; }
+    .signal i:nth-child(2) { height: 5px; }
+    .signal i:nth-child(3) { height: 8px; }
+    .signal i:nth-child(4) { height: 11px; }
+
+    .wifi {
+      width: 13px;
+      height: 10px;
+      border: 2px solid #fff;
+      border-left-color: transparent;
+      border-right-color: transparent;
+      border-bottom-color: transparent;
+      border-radius: 50% 50% 0 0;
       position: relative;
     }
-    .search::after {
+    .wifi::after {
       content: "";
       position: absolute;
-      width: 9px;
-      height: 2px;
-      right: -7px;
-      bottom: -4px;
-      border-radius: 2px;
-      background: currentColor;
-      transform: rotate(45deg);
+      left: 4px;
+      top: 4px;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: #fff;
     }
-    .menu { font-size: 25px; line-height: 1; transform: translateY(-2px); }
+
+    .battery {
+      width: 19px;
+      height: 9px;
+      padding: 1px;
+      border: 1px solid rgba(255,255,255,0.9);
+      border-radius: 2px;
+      position: relative;
+    }
+    .battery::before {
+      content: "";
+      display: block;
+      width: 13px;
+      height: 5px;
+      border-radius: 1px;
+      background: #fff;
+    }
+    .battery::after {
+      content: "";
+      position: absolute;
+      right: -3px;
+      top: 2px;
+      width: 2px;
+      height: 4px;
+      border-radius: 0 1px 1px 0;
+      background: rgba(255,255,255,0.9);
+    }
+
+    .appbar {
+      height: 58px;
+      padding: 0 8px 0 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #fff;
+      background: #517da2;
+      box-shadow: 0 2px 5px rgba(39, 66, 82, 0.3);
+      position: relative;
+      z-index: 5;
+    }
+
+    .icon-button {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      color: currentColor;
+    }
+    .icon-button svg { width: 23px; height: 23px; fill: currentColor; }
+    .back svg { width: 25px; height: 25px; }
+
+    .chat-avatar {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      color: #fff;
+      border-radius: 50%;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,0.2), transparent 42%),
+        linear-gradient(145deg, #54b9ef, #2788cb);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.35px;
+    }
+
+    .chat-heading {
+      min-width: 0;
+      flex: 1;
+    }
+    .chat-title {
+      overflow: hidden;
+      color: #fff;
+      font-size: 16px;
+      line-height: 20px;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .chat-subtitle {
+      margin-top: 1px;
+      color: rgba(255,255,255,0.76);
+      font-size: 12px;
+      line-height: 15px;
+    }
+
+    .app-actions {
+      display: flex;
+      align-items: center;
+      margin-left: 2px;
+    }
+    .app-actions .icon-button { width: 32px; }
+    .app-actions svg { width: 20px; height: 20px; }
+
+    .pinned {
+      height: 48px;
+      padding: 6px 10px 6px 12px;
+      display: grid;
+      grid-template-columns: 3px 1fr 24px;
+      gap: 9px;
+      align-items: center;
+      background: rgba(255,255,255,0.97);
+      border-bottom: 1px solid #d4dde2;
+      box-shadow: 0 1px 3px rgba(42, 68, 81, 0.12);
+      position: relative;
+      z-index: 4;
+    }
+    .pinned-line {
+      width: 3px;
+      height: 34px;
+      border-radius: 3px;
+      background: #49a5e6;
+    }
+    .pinned-copy { min-width: 0; }
+    .pinned-title {
+      color: #3b91cc;
+      font-size: 12px;
+      line-height: 15px;
+      font-weight: 700;
+    }
+    .pinned-text {
+      overflow: hidden;
+      color: #4d5f69;
+      font-size: 12px;
+      line-height: 16px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pinned-close {
+      color: #8fa0aa;
+      font-size: 24px;
+      font-weight: 300;
+      text-align: center;
+      transform: translateY(-1px);
+    }
+
+    .chat {
+      position: relative;
+      overflow: hidden;
+      background: #d9e7ed;
+    }
+
+    .wallpaper {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
 
     .messages {
-      padding: 22px 56px 34px;
+      position: relative;
+      z-index: 1;
+      padding: 10px 8px 18px;
     }
 
-    .date-row {
+    .date-row,
+    .service-row,
+    .unread-row {
       display: flex;
       justify-content: center;
-      margin: 11px 0 18px;
+      clear: both;
     }
+    .date-row { margin: 8px 0 10px; }
+    .service-row { margin: 7px 0 10px; }
+    .unread-row { margin: 12px -8px; }
 
     .date-pill,
-    .system-pill {
-      color: white;
-      background: rgba(86, 116, 132, 0.68);
-      box-shadow: 0 1px 2px rgba(37, 59, 71, 0.16);
-      backdrop-filter: blur(4px);
+    .service-pill {
+      max-width: 310px;
+      padding: 5px 10px;
+      color: #fff;
+      border-radius: 12px;
+      background: rgba(83, 113, 129, 0.66);
+      box-shadow: 0 1px 1px rgba(37, 61, 73, 0.2);
+      backdrop-filter: blur(3px);
+      text-align: center;
+      text-shadow: 0 1px 1px rgba(40, 62, 72, 0.18);
     }
-
     .date-pill {
-      padding: 6px 13px;
-      border-radius: 15px;
-      font-size: 13px;
+      font-size: 12px;
+      line-height: 16px;
       font-weight: 650;
     }
-
-    .system-row {
-      display: flex;
-      justify-content: center;
-      margin: 4px 0 20px;
+    .service-pill {
+      font-size: 11.5px;
+      line-height: 16px;
     }
 
-    .system-pill {
-      max-width: 590px;
-      padding: 8px 15px;
-      border-radius: 14px;
-      font-size: 13px;
-      line-height: 18px;
-      text-align: center;
+    .unread-line {
+      width: 100%;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      color: #4c94c4;
+      background: rgba(255,255,255,0.94);
+      border-top: 1px solid rgba(116,155,177,0.26);
+      border-bottom: 1px solid rgba(116,155,177,0.26);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1px;
     }
 
     .message-row {
+      position: relative;
       display: flex;
-      margin: 7px 0;
+      width: 100%;
+      margin: 2px 0;
+    }
+    .message-row.in {
+      justify-content: flex-start;
+      padding-left: 36px;
     }
     .message-row.out { justify-content: flex-end; }
+    .message-row.group-start { margin-top: 7px; }
+    .message-row.group-end { margin-bottom: 7px; }
+
+    .sender-avatar {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 2px rgba(34, 56, 68, 0.24);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
 
     .bubble {
       position: relative;
       width: fit-content;
-      max-width: 650px;
-      min-width: 180px;
-      padding: 9px 13px 8px;
-      border-radius: 10px;
-      box-shadow: 0 1px 2px rgba(35, 55, 67, 0.16);
+      max-width: 306px;
+      min-width: 72px;
+      padding: 6px 8px 5px;
+      border-radius: 8px;
+      box-shadow: 0 1px 1px rgba(38, 61, 72, 0.2);
     }
-    .message-row.in .bubble {
-      background: #ffffff;
-      border-bottom-left-radius: 3px;
+    .message-row.in .bubble { background: #fff; }
+    .message-row.out .bubble { background: #e1ffc7; }
+    .message-row.in.group-start .bubble { border-top-left-radius: 8px; }
+    .message-row.out.group-start .bubble { border-top-right-radius: 8px; }
+
+    .message-row.in.group-end .bubble::before,
+    .message-row.out.group-end .bubble::before {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      width: 11px;
+      height: 13px;
+      filter: drop-shadow(0 1px 0 rgba(38,61,72,0.16));
     }
-    .message-row.out .bubble {
-      background: #e2f8d5;
-      border-bottom-right-radius: 3px;
+    .message-row.in.group-end .bubble::before {
+      left: -7px;
+      background: #fff;
+      clip-path: polygon(100% 0, 100% 100%, 0 100%);
+    }
+    .message-row.out.group-end .bubble::before {
+      right: -7px;
+      background: #e1ffc7;
+      clip-path: polygon(0 0, 100% 100%, 0 100%);
     }
 
-    .sender {
-      margin-bottom: 3px;
-      font-size: 13px;
-      line-height: 16px;
+    .sender-name {
+      margin: 0 0 2px;
+      font-size: 12px;
+      line-height: 15px;
       font-weight: 750;
     }
-    .message-row.out .sender { color: #2d8a59; }
 
-    .text {
-      font-size: 16px;
-      line-height: 22px;
-      letter-spacing: -0.05px;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
+    .forwarded {
+      margin-bottom: 4px;
+      color: #3e96cb;
+      font-size: 11.5px;
+      line-height: 15px;
+      font-weight: 650;
     }
 
     .reply {
-      margin: 1px 0 7px;
-      padding: 5px 9px 6px;
-      border-left: 3px solid #56a8dc;
-      border-radius: 4px;
-      background: rgba(75, 146, 187, 0.08);
+      margin: 0 0 5px;
+      padding: 4px 7px 4px 8px;
+      border-left: 3px solid #4a9bd0;
+      border-radius: 3px;
+      background: rgba(80, 157, 207, 0.08);
     }
     .message-row.out .reply {
-      border-left-color: #50a26f;
-      background: rgba(62, 142, 87, 0.08);
+      border-left-color: #63aa42;
+      background: rgba(94, 164, 67, 0.08);
     }
     .reply-sender {
-      color: #3e91c2;
-      font-size: 12px;
-      line-height: 15px;
-      font-weight: 760;
+      color: #3d91c4;
+      font-size: 11px;
+      line-height: 14px;
+      font-weight: 750;
     }
-    .message-row.out .reply-sender { color: #3d955e; }
+    .message-row.out .reply-sender { color: #4c9b3e; }
     .reply-text {
-      margin-top: 1px;
-      color: #546671;
-      font-size: 12px;
-      line-height: 16px;
-      white-space: nowrap;
+      max-width: 260px;
       overflow: hidden;
+      color: #53646e;
+      font-size: 11px;
+      line-height: 14px;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    .code {
-      margin-top: 7px;
-      padding: 9px 11px;
-      color: #314451;
-      background: rgba(35, 72, 91, 0.08);
-      border-radius: 6px;
-      font: 13px/19px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    .message-text {
+      font-size: 14px;
+      line-height: 18px;
+      letter-spacing: -0.04px;
+      overflow-wrap: anywhere;
       white-space: pre-wrap;
     }
 
-    .attachment {
+    .code {
+      margin-top: 6px;
+      padding: 7px 8px;
+      color: #304552;
+      border-radius: 5px;
+      background: rgba(46, 76, 93, 0.08);
+      font: 11.5px/16px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    .file-card,
+    .link-card {
+      margin-top: 5px;
       display: grid;
-      grid-template-columns: 43px 1fr;
-      gap: 10px;
       align-items: center;
-      margin-top: 3px;
-      padding: 7px 9px 7px 7px;
-      border-radius: 8px;
-      background: rgba(56, 132, 176, 0.08);
+      gap: 8px;
+      border-radius: 6px;
+      background: rgba(67, 139, 180, 0.07);
+    }
+    .file-card {
+      grid-template-columns: 38px 1fr;
+      padding: 6px;
     }
     .file-icon {
-      width: 43px;
-      height: 43px;
+      width: 38px;
+      height: 38px;
       display: grid;
       place-items: center;
-      color: white;
+      color: #fff;
       border-radius: 50%;
-      background: #4ca7da;
-      font-size: 12px;
-      font-weight: 800;
+      background: #52a9dc;
+      font-size: 9px;
+      font-weight: 850;
     }
-    .file-name { font-size: 14px; font-weight: 700; }
-    .file-meta { margin-top: 2px; color: #6c7e88; font-size: 12px; }
+    .file-name,
+    .link-title {
+      color: #22323c;
+      font-size: 12px;
+      line-height: 15px;
+      font-weight: 700;
+    }
+    .file-meta,
+    .link-description {
+      margin-top: 1px;
+      color: #71818a;
+      font-size: 10.5px;
+      line-height: 14px;
+    }
+    .link-card {
+      grid-template-columns: 3px 1fr;
+      padding: 5px 7px 6px 0;
+    }
+    .link-accent {
+      width: 3px;
+      align-self: stretch;
+      border-radius: 3px;
+      background: #4a9ed2;
+    }
 
-    .meta {
-      min-height: 15px;
-      margin-top: 3px;
+    .photo-card {
+      width: 280px;
+      height: 145px;
+      margin: -2px -4px 5px;
+      overflow: hidden;
+      position: relative;
+      border-radius: 7px;
+      background:
+        radial-gradient(circle at 73% 25%, #fff3ad 0 14px, transparent 15px),
+        linear-gradient(155deg, transparent 0 43%, rgba(19, 80, 104, 0.25) 44% 45%, transparent 46%),
+        linear-gradient(25deg, #90d1e7 0 38%, #5aa6c7 39% 58%, #3d7f9f 59% 100%);
+    }
+    .photo-card::before,
+    .photo-card::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      width: 170px;
+      height: 75px;
+      border-radius: 70% 70% 0 0;
+      background: rgba(19, 83, 91, 0.34);
+    }
+    .photo-card::before { left: -32px; transform: rotate(8deg); }
+    .photo-card::after { right: -32px; transform: rotate(-8deg); }
+    .photo-label {
+      position: absolute;
+      left: 10px;
+      bottom: 9px;
+      z-index: 2;
+      padding: 4px 7px;
+      color: #fff;
+      border-radius: 4px;
+      background: rgba(27, 51, 65, 0.56);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .voice-card {
+      min-width: 235px;
+      margin-top: 2px;
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+    .voice-play {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      border-radius: 50%;
+      background: #4ea5d7;
+      font-size: 14px;
+      transform: rotate(-90deg);
+    }
+    .waveform {
+      height: 18px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .waveform i {
+      width: 2px;
+      border-radius: 2px;
+      background: #73a7c4;
+    }
+    .voice-meta {
+      margin-top: 1px;
+      color: #71818a;
+      font-size: 10px;
+    }
+
+    .poll-card { margin-top: 4px; min-width: 270px; }
+    .poll-question {
+      font-size: 13px;
+      line-height: 17px;
+      font-weight: 700;
+    }
+    .poll-subtitle {
+      margin-top: 2px;
+      color: #6a7a83;
+      font-size: 10.5px;
+    }
+    .poll-option {
+      margin-top: 7px;
+      display: grid;
+      grid-template-columns: 20px 1fr;
+      gap: 7px;
+      align-items: center;
+      font-size: 12px;
+      line-height: 15px;
+    }
+    .poll-radio {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #52a4d4;
+      border-radius: 50%;
+    }
+
+    .message-meta {
+      min-height: 12px;
+      margin-top: 2px;
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      gap: 4px;
-      color: #71818a;
-      font-size: 11px;
-      line-height: 14px;
+      gap: 3px;
+      color: #7b8a92;
+      font-size: 9.5px;
+      line-height: 11px;
+      white-space: nowrap;
     }
-    .checks { color: #42a3dc; font-size: 15px; letter-spacing: -5px; margin-right: 3px; }
+    .edited { color: #86949b; }
+    .checks {
+      color: #3fa4dc;
+      font-size: 12px;
+      line-height: 10px;
+      letter-spacing: -4px;
+      margin-right: 3px;
+    }
 
     .reaction {
       position: absolute;
-      right: 12px;
-      bottom: -16px;
-      padding: 2px 7px;
-      border: 2px solid #d7e4ea;
-      border-radius: 11px;
-      background: white;
-      color: #586a75;
-      font-size: 11px;
-      box-shadow: 0 1px 2px rgba(35, 55, 67, 0.1);
+      right: 7px;
+      bottom: -14px;
+      z-index: 3;
+      padding: 2px 6px;
+      color: #52636d;
+      border: 1px solid rgba(111, 135, 148, 0.28);
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(39, 63, 75, 0.16);
+      font-size: 10px;
+      line-height: 14px;
     }
-    .message-row:has(.reaction) { margin-bottom: 21px; }
+    .message-row:has(.reaction) { margin-bottom: 17px; }
 
+    .composer-wrap {
+      min-height: 62px;
+      padding: 7px 8px 8px;
+      display: grid;
+      grid-template-columns: 1fr 46px;
+      gap: 6px;
+      align-items: end;
+      background: #d9e7ed;
+      border-top: 1px solid rgba(118, 151, 168, 0.22);
+      position: relative;
+    }
     .composer {
-      height: 78px;
-      padding: 12px 26px;
-      display: flex;
+      height: 48px;
+      padding: 0 10px;
+      display: grid;
+      grid-template-columns: 28px 1fr 28px 28px;
+      gap: 5px;
       align-items: center;
-      gap: 13px;
-      background: rgba(255,255,255,0.92);
-      border-top: 1px solid rgba(155, 177, 188, 0.56);
+      color: #84949d;
+      border-radius: 24px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(43, 68, 81, 0.14);
     }
+    .composer .placeholder { font-size: 14px; }
     .composer-icon {
-      color: #71858f;
-      font-size: 25px;
-      line-height: 1;
-    }
-    .composer-field {
-      flex: 1;
-      color: #8a9aa3;
-      font-size: 16px;
-    }
-    .send-button {
-      width: 45px;
-      height: 45px;
       display: grid;
       place-items: center;
-      border-radius: 50%;
-      background: #339bd3;
+      color: #84949d;
+      font-size: 22px;
+      line-height: 1;
     }
-    .send-button svg { width: 23px; height: 23px; fill: white; transform: translateX(-1px); }
+    .composer-icon svg { width: 21px; height: 21px; fill: currentColor; }
+    .mic {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      border-radius: 50%;
+      background: #4ca5d7;
+      box-shadow: 0 1px 3px rgba(38, 91, 120, 0.3);
+    }
+    .mic svg { width: 22px; height: 22px; fill: currentColor; }
+
+    .scroll-button {
+      position: absolute;
+      right: 12px;
+      bottom: 70px;
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      color: #76909e;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.96);
+      box-shadow: 0 1px 4px rgba(39, 65, 78, 0.26);
+      font-size: 20px;
+    }
   </style>
 </head>
 <body>
-  <main class="app" aria-label="Synthetic Telegram group chat">
-    <header class="topbar">
-      <div class="back" aria-hidden="true">&#8249;</div>
-      <div class="group-avatar">AL</div>
-      <div class="title-block">
-        <div class="title">Aurora Launch Crew</div>
-        <div class="subtitle">6 members, 4 online</div>
+  <main class="phone" aria-label="Fully synthetic Telegram-style group chat">
+    <div class="statusbar" aria-hidden="true">
+      <span>10:58</span>
+      <div class="status-icons">
+        <div class="signal"><i></i><i></i><i></i><i></i></div>
+        <div class="wifi"></div>
+        <span>92%</span>
+        <div class="battery"></div>
       </div>
-      <div class="top-actions" aria-hidden="true">
-        <div class="search"></div>
-        <div class="menu">&#8942;</div>
+    </div>
+
+    <header class="appbar">
+      <div class="icon-button back" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>
+      </div>
+      <div class="chat-avatar">AL</div>
+      <div class="chat-heading">
+        <div class="chat-title">Aurora Launch Room</div>
+        <div class="chat-subtitle">12 members, 5 online</div>
+      </div>
+      <div class="app-actions" aria-hidden="true">
+        <div class="icon-button"><svg viewBox="0 0 24 24"><path d="M17 10.5V6c0-1.1-.9-2-2-2H5C3.9 4 3 4.9 3 6v12c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-4.5l4 4v-11z"/></svg></div>
+        <div class="icon-button"><svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.7 5.1 6.5 6.5l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.5 21 3 13.5 3 4.2c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.2 1z"/></svg></div>
+        <div class="icon-button"><svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg></div>
       </div>
     </header>
 
-    <section id="messages" class="messages"></section>
+    <div class="pinned">
+      <div class="pinned-line"></div>
+      <div class="pinned-copy">
+        <div class="pinned-title">Pinned Message</div>
+        <div class="pinned-text">Launch checklist · owner matrix · rollback steps</div>
+      </div>
+      <div class="pinned-close" aria-hidden="true">×</div>
+    </div>
 
-    <footer class="composer">
-      <div class="composer-icon" aria-hidden="true">&#128206;</div>
-      <div class="composer-field">Message</div>
-      <div class="composer-icon" aria-hidden="true">&#9786;</div>
-      <div class="send-button" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d="M2.1 3.4 21 11.3c.8.3.8 1.4 0 1.7L2.1 20.8c-.7.3-1.4-.4-1.1-1.1l2.6-6.2 9.5-1.4-9.5-1.5L1 4.5c-.3-.7.4-1.4 1.1-1.1Z"/></svg>
+    <section class="chat">
+      <svg class="wallpaper" aria-hidden="true">
+        <defs>
+          <pattern id="telegram-doodles" width="112" height="112" patternUnits="userSpaceOnUse">
+            <g fill="none" stroke="#6f9aae" stroke-width="1.15" opacity="0.12" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 15h18l-9 8zM21 23v8"/>
+              <circle cx="79" cy="19" r="8"/><path d="M75 19h8M79 15v8"/>
+              <path d="M45 48c7-8 16-8 23 0-7 8-16 8-23 0z"/><circle cx="56.5" cy="48" r="3"/>
+              <path d="M15 74l8-8 8 8-8 8zM82 71c8 0 14 5 14 11H68c0-6 6-11 14-11z"/>
+              <path d="M45 92h16l-2 8H47zM52 92v-6"/>
+              <path d="M98 43l5 3-5 3zM8 103c4-5 9-5 13 0"/>
+            </g>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#telegram-doodles)"/>
+      </svg>
+      <div id="messages" class="messages"></div>
+      <div class="scroll-button" aria-hidden="true">⌄</div>
+    </section>
+
+    <footer class="composer-wrap">
+      <div class="composer">
+        <div class="composer-icon" aria-hidden="true">☺</div>
+        <div class="placeholder">Message</div>
+        <div class="composer-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5a4.5 4.5 0 0 1-9 0V5a3 3 0 0 1 6 0v11.5a1.5 1.5 0 0 1-3 0V6H9v10.5a3 3 0 0 0 6 0V5a4.5 4.5 0 0 0-9 0v12.5a6 6 0 0 0 12 0V6z"/></svg>
+        </div>
+        <div class="composer-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M9 3 7.2 5H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2h-3.2L15 3zm3 14a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2.2a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6z"/></svg>
+        </div>
+      </div>
+      <div class="mic" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5.3-3a5.3 5.3 0 0 1-10.6 0H5a7 7 0 0 0 6 6.9V21H8v2h8v-2h-3v-3.1A7 7 0 0 0 19 11z"/></svg>
       </div>
     </footer>
   </main>
 
+  <script id="fixture-json" type="application/json"></script>
   <script>
-    const items = [
-      { type: "date", text: "Tuesday, August 4" },
-      { type: "system", text: "This is a fictional conversation created for the Agent Vision Toolkit OCR demo." },
-      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "09:12", text: "Good morning! This thread is for the Aurora beta launch review. Please keep every decision in the chat so the handoff stays searchable." },
-      { side: "out", sender: "You", time: "09:14", text: "Morning. I will collect the final copy, QA status, release owner, and rollback notes here." },
-      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "09:16", text: "Web dashboard build 0.9.7 is on staging. The empty-state illustration and export button are both fixed." },
-      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "09:18", text: "Mobile QA is green on iOS 19. The Android keyboard still covers the last field on smaller screens." },
-      { side: "out", sender: "You", time: "09:20", reply: { sender: "Lena Ortiz", text: "The Android keyboard still covers the last field" }, text: "Can we treat that as the only release blocker?" },
-      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "09:21", text: "Yes. Everything else is either passed or cosmetic." },
-      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "09:24", text: "I can patch the keyboard inset before lunch. I will post a new APK and the exact commit hash." },
-      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "09:27", text: "Copy review is complete. Please use “Create workspace” instead of “Start workspace” in the onboarding button." },
-      { side: "out", sender: "You", time: "09:29", text: "Confirmed. I updated the release checklist and tagged the string as final.", reaction: "&#128077; 3" },
-      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "09:33", text: "For the launch email, the subject line should be: Aurora beta is ready for your team." },
-      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "09:35", text: "And the preview text should be: Plan, review, and ship from one shared workspace." },
-      { side: "out", sender: "You", time: "09:38", text: "Both lines are locked. No more copy changes after 16:00 today unless they fix a factual error." },
-      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "09:43", text: "Staging health check:", code: "status: ready\nregion: eu-west\nbuild: 0.9.7\nerrors: 0" },
-      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "09:47", text: "API latency is stable at 182 ms p95. The alert threshold remains 450 ms." },
-      { side: "out", sender: "You", time: "09:50", reply: { sender: "Noah Wilson", text: "API latency is stable at 182 ms p95" }, text: "Great. Please add that number to the operations note." },
-      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "09:52", text: "Done. I also documented the rollback command and database backup timestamp." },
-      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "10:01", text: "Who is the release owner during the first two hours?" },
-      { side: "out", sender: "You", time: "10:03", text: "I am the release owner from 14:00 to 16:00 UTC. Noah is the infrastructure backup." },
-      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "10:04", text: "Confirmed. I will stay in the incident channel during that window." },
-      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "10:11", text: "Uploading the updated test matrix now.", file: { name: "aurora-beta-test-matrix.pdf", meta: "184 KB PDF" } },
-      { side: "out", sender: "You", time: "10:14", text: "Received. The matrix has 46 passed cases, 1 blocked case, and 3 deferred accessibility checks." },
-      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "10:19", text: "The accessibility checks must stay visible in the launch notes. Please do not hide them under “known issues.”" },
-      { side: "out", sender: "You", time: "10:21", text: "Agreed. I created a separate Accessibility follow-up section with an owner and due date." },
-      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "10:25", text: "Perfect. Customer support also needs a one-paragraph summary before tomorrow morning." },
-      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "10:31", text: "Small detail: the CSV export filename now uses the workspace name and UTC date, for example aurora-team_2026-08-04.csv." },
-      { side: "out", sender: "You", time: "10:34", text: "That naming format is clear. Add one test for spaces and non-ASCII workspace names." },
-      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "10:36", text: "Added. Spaces become hyphens, while Unicode letters remain unchanged." },
-      { type: "date", text: "Wednesday, August 5" },
-      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "08:42", text: "Morning update: the nightly backup completed at 02:15 UTC and restore verification passed." },
-      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "08:46", text: "Android build 0.9.8 is ready. The keyboard inset issue is fixed on 360 px, 390 px, and 412 px widths." },
-      { side: "out", sender: "You", time: "08:48", reply: { sender: "Lena Ortiz", text: "The keyboard inset issue is fixed" }, text: "Excellent. Please rerun onboarding, invite flow, and billing settings before we clear the blocker." },
-      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "09:17", text: "Retest complete:\n• Onboarding: passed\n• Invite flow: passed\n• Billing settings: passed\n• Screen rotation: passed" },
-      { side: "out", sender: "You", time: "09:19", text: "Release blocker cleared. Marking mobile QA as green." },
-      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "09:23", text: "The support summary is approved: Aurora beta gives teams one place to plan work, review decisions, and prepare releases." },
-      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "09:26", text: "Please preserve the serial comma in “plan work, review decisions, and prepare releases.”" },
-      { side: "out", sender: "You", time: "09:28", text: "Confirmed. The approved sentence is copied verbatim into the support brief." },
-      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "09:41", text: "Production build is compiling now. Expected artifact time is 10:05 UTC." },
-      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "09:44", text: "Monitoring dashboard is open. Error rate, latency, queue depth, and login failures are pinned." },
-      { side: "out", sender: "You", time: "09:47", text: "Before release, confirm these four values:\n1. Error rate below 1%\n2. p95 latency below 450 ms\n3. Queue depth below 500\n4. Login failures below 20 per minute" },
-      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "09:50", text: "Confirmed. Current values are 0.12%, 176 ms, 43 jobs, and 2 login failures per minute." },
-      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "10:06", text: "Production artifact is ready.", code: "artifact: aurora-web-1.0.0\nsha256: 8f2c4d71b6a9\ncreated: 2026-08-05 10:05 UTC" },
-      { side: "out", sender: "You", time: "10:08", text: "Checksum recorded. Start the deployment at 10:15 UTC." },
-      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "10:10", text: "Launch email is scheduled for 10:45 UTC, thirty minutes after deployment begins." },
-      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "10:12", text: "Help center article is published but unlisted. We will make it public after the health check." },
-      { side: "out", sender: "You", time: "10:15", text: "Deployment started." },
-      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "10:22", text: "25% complete. Metrics are normal and there are no new application errors." },
-      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "10:29", text: "75% complete. One cache node restarted automatically; traffic was unaffected." },
-      { side: "out", sender: "You", time: "10:34", text: "Deployment complete. Beginning the fifteen-minute health check now." },
-      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "10:38", text: "Smoke test passed on web, iOS, and Android. Login, workspace creation, invite, and export all work." },
-      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "10:49", text: "Health check passed. Error rate is 0.09% and p95 latency is 188 ms." },
-      { side: "out", sender: "You", time: "10:51", text: "Aurora 1.0 is officially live. Thank you, everyone!", reaction: "&#127881; 5" },
-      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "10:53", text: "Launch email sent. I will post engagement numbers in this thread tomorrow." },
-      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "10:55", text: "Help center article is public, and the support team has the approved response template." },
-      { side: "out", sender: "You", time: "10:58", text: "Final handoff:\n• Release owner: You\n• Infrastructure backup: Noah Wilson\n• QA owner: Lena Ortiz\n• Copy owner: Priya Shah\n• Product owner: Maya Chen\n• Engineering owner: Ethan Brooks" },
-      { type: "system", text: "Maya Chen pinned “Aurora 1.0 is officially live.”" }
-    ];
+    const people = {
+      "Maya Chen": { color: "#b3579a", avatar: "MC", gradient: "linear-gradient(145deg,#d77bbb,#a9478b)" },
+      "Ethan Brooks": { color: "#3188c3", avatar: "EB", gradient: "linear-gradient(145deg,#67b6e5,#2c83bc)" },
+      "Lena Ortiz": { color: "#d16f36", avatar: "LO", gradient: "linear-gradient(145deg,#ee9b63,#c9632e)" },
+      "Noah Wilson": { color: "#3e9a5d", avatar: "NW", gradient: "linear-gradient(145deg,#6fbd82,#368b52)" },
+      "Priya Shah": { color: "#835fc1", avatar: "PS", gradient: "linear-gradient(145deg,#a88add,#7653b3)" },
+      "Jon Bell": { color: "#c15a5f", avatar: "JB", gradient: "linear-gradient(145deg,#df8085,#ae4d53)" },
+      "Sofia Reyes": { color: "#258f8e", avatar: "SR", gradient: "linear-gradient(145deg,#62b9b6,#23817f)" },
+      "You": { color: "#4c9b3e", avatar: "YO", gradient: "linear-gradient(145deg,#79b96b,#47943a)" }
+    };
+
+    const msg = (sender, time, text, extra = {}) => ({
+      type: "message",
+      sender,
+      side: sender === "You" ? "out" : "in",
+      time,
+      text,
+      ...extra
+    });
+    const service = (text) => ({ type: "system", text });
+    const unread = (text) => ({ type: "unread", text });
+    const items = [];
+    const addDay = (label, records) => {
+      items.push({ type: "date", text: label }, ...records);
+    };
+
+    addDay("Friday, July 31", [
+      service("This is a fully synthetic conversation created for the Agent Vision Toolkit OCR demo."),
+      msg("Maya Chen", "08:31", "Good morning. I opened this group so every Aurora launch decision stays in one searchable thread."),
+      msg("You", "08:33", "Perfect. I will keep the owner matrix, QA status, copy approvals, release commands, and rollback notes here."),
+      msg("Ethan Brooks", "08:36", "The web release branch is cut from main. Current staging version is 0.9.4."),
+      msg("Lena Ortiz", "08:38", "Mobile coverage will include iOS 19 and Android at 360 px, 390 px, and 412 px widths."),
+      msg("Priya Shah", "08:42", "I am reviewing onboarding, billing, empty states, notification emails, and the help center article."),
+      msg("Noah Wilson", "08:46", "Infrastructure checklist is ready. Backups, restore verification, alerts, and rollback access are all assigned."),
+      msg("Maya Chen", "08:49", "Please record decisions as plain messages, not only reactions, so support can audit them later."),
+      msg("You", "08:51", "Understood. I pinned the master checklist and added the release window: Thursday, August 6, 10:15 UTC."),
+      msg("Ethan Brooks", "09:02", "First decision: exports keep CSV and PDF. We are not adding XLSX in this release."),
+      msg("Priya Shah", "09:06", "Copy decision: use “Create workspace” everywhere. Remove the older “Start workspace” label."),
+      msg("You", "09:08", "Both decisions are logged. I also added them to the regression checklist."),
+      msg("Lena Ortiz", "09:14", "One blocker on Android: the keyboard covers the final company-size field on smaller screens."),
+      msg("You", "09:16", "Is that the only functional blocker?", { reply: { sender: "Lena Ortiz", text: "the keyboard covers the final company-size field" } }),
+      msg("Lena Ortiz", "09:17", "Yes. The remaining findings are cosmetic spacing issues and one low-contrast disabled icon."),
+      msg("Noah Wilson", "09:24", "I created the production dashboard. It tracks error rate, p95 latency, queue depth, login failures, and cache restarts."),
+      msg("Maya Chen", "09:29", "Customer support needs a one-paragraph summary and a list of known issues before Monday."),
+      msg("Priya Shah", "09:33", "Draft summary: Aurora gives teams one place to plan work, review decisions, and prepare releases."),
+      msg("You", "09:36", "Keep the serial comma. That sentence is approved for the support brief.", { reaction: "👍 4" }),
+      msg("Ethan Brooks", "09:44", "The repository now includes a release-notes template and a script that prints the deployed commit."),
+      msg("Ethan Brooks", "09:45", "Sample output:", { code: "version: 0.9.4\ncommit: 42c7a19\nchannel: staging\nstatus: ready" }),
+      msg("Noah Wilson", "09:51", "That format works for operations. Please add the UTC build timestamp on the final artifact."),
+      msg("You", "09:54", "Added. Owners for today: Ethan web, Lena mobile QA, Priya copy, Noah infrastructure, Maya product, me release coordination."),
+      service("Maya Chen pinned “Launch checklist · owner matrix · rollback steps”.")
+    ]);
+
+    addDay("Monday, August 3", [
+      msg("Maya Chen", "08:07", "Morning check-in. Today we need final onboarding copy, mobile blocker progress, and the beta invitation plan."),
+      msg("Lena Ortiz", "08:12", "The Android inset patch is in review. I will post a signed build after the noon test run."),
+      msg("Ethan Brooks", "08:15", "Web build 0.9.5 is on staging. Empty-state illustration, export button, and keyboard navigation are fixed."),
+      msg("Priya Shah", "08:19", "I found three copies of “Start workspace” in old email templates. Replacing them now."),
+      msg("You", "08:22", "Please include filenames in the follow-up so we can verify none were missed."),
+      msg("Priya Shah", "08:26", "Files are welcome.html, invite-reminder.html, and trial-day-5.html."),
+      msg("Sofia Reyes", "08:31", "Support macros are ready. I added answers for account invites, exports, and mobile keyboard behavior."),
+      msg("Maya Chen", "08:36", "Thanks, Sofia. Keep the keyboard answer internal until the patched build passes QA."),
+      msg("Noah Wilson", "08:42", "Nightly database backup completed at 02:15 UTC. Restore verification finished in 6 minutes 41 seconds."),
+      msg("You", "08:45", "Record that as the baseline restore time for launch day."),
+      msg("Ethan Brooks", "09:03", "CSV filenames now use the workspace name and UTC date: aurora-team_2026-08-03.csv."),
+      msg("You", "09:06", "Add tests for spaces, punctuation, emoji, and non-ASCII workspace names."),
+      msg("Ethan Brooks", "09:10", "Added. Spaces become hyphens; Unicode letters remain unchanged; unsupported punctuation is removed."),
+      msg("Lena Ortiz", "09:18", "Android build 0.9.6 is uploaded. The keyboard no longer covers the final field on all three target widths."),
+      msg("Lena Ortiz", "09:19", "Please use this package for retest:", { file: { name: "aurora-android-0.9.6.apk", meta: "42.8 MB · Android package", label: "APK" } }),
+      msg("You", "09:23", "Downloaded. Running onboarding, invite flow, billing settings, rotation, and resume-from-background."),
+      msg("Jon Bell", "09:32", "Analytics event names are frozen. The dashboard has signup_started, workspace_created, invite_sent, and export_completed."),
+      msg("Maya Chen", "09:37", "Can we distinguish failed exports without adding a new event?"),
+      msg("Jon Bell", "09:41", "Yes. export_completed has status=success or status=failure plus a normalized error_code."),
+      msg("You", "09:44", "Approved. Document the allowed error codes before the release candidate is built."),
+      msg("Priya Shah", "10:02", "The beta invitation subject is “Aurora beta is ready for your team”. Preview text is “Plan, review, and ship from one shared workspace”."),
+      msg("Maya Chen", "10:06", "Those lines are final. No copy changes after 16:00 unless they correct a factual error."),
+      msg("You", "10:09", "Copy freeze recorded for 16:00 today.", { reaction: "✅ 5" }),
+      msg("Sofia Reyes", "10:21", "Support would like screenshots for workspace creation and CSV export."),
+      msg("You", "10:25", "I will attach updated screenshots after web build 0.9.6 is deployed."),
+      msg("Ethan Brooks", "11:04", "Staging deployment complete. The browser title, favicon, and invite deep link now use the Aurora name."),
+      msg("Noah Wilson", "11:08", "Health check is clean: 0.18% error rate, 184 ms p95, queue depth 37."),
+      msg("Lena Ortiz", "11:16", "Mobile retest passed all five flows. I am clearing the Android blocker."),
+      msg("You", "11:18", "Great. Mobile QA is green; accessibility follow-ups remain visible but are not launch blockers."),
+      service("You changed the group photo.")
+    ]);
+
+    addDay("Tuesday, August 4", [
+      msg("Maya Chen", "08:24", "Today is release-candidate day. Please post only verified numbers and link every artifact to an owner."),
+      msg("Ethan Brooks", "08:28", "Web RC build started from commit 71d8f42. Expected staging artifact at 09:05 UTC."),
+      msg("Noah Wilson", "08:32", "Monitoring alerts are temporarily set to launch thresholds for the full rehearsal."),
+      msg("Priya Shah", "08:36", "Help center draft is complete. I still need the final screenshot for the export section."),
+      msg("You", "08:41", "I will capture it after the RC health check and send both light and dark browser crops."),
+      msg("Jon Bell", "08:47", "Analytics validation passed in staging. All four events include workspace_id, user_role, and client_version."),
+      msg("Ethan Brooks", "09:07", "RC artifact is ready.", { code: "artifact: aurora-web-0.9.7-rc1\nsha256: c2a04d91f773\ncreated: 2026-08-04 09:06 UTC\ncommit: 71d8f42" }),
+      msg("You", "09:11", "Checksum recorded. Beginning the release-candidate checklist now."),
+      msg("Lena Ortiz", "09:18", "Web smoke test passed in Chrome, Safari, and Firefox."),
+      msg("Sofia Reyes", "09:22", "Support preview environment loads correctly and the internal macros link to the new article."),
+      msg("Noah Wilson", "09:27", "Staging health check:", { code: "error_rate: 0.12%\np95_latency: 179 ms\nqueue_depth: 41\nlogin_failures: 3/min\ncache_restarts: 0" }),
+      msg("Maya Chen", "09:31", "All values are inside the release limits. Continue the rehearsal."),
+      msg("You", "09:36", "Before rehearsal deploy, confirm the four hard gates:", { poll: { question: "Are all launch gates green?", options: ["QA and accessibility notes", "Monitoring and backups", "Copy and support readiness", "Rollback owner and command"] } }),
+      msg("Lena Ortiz", "09:43", "QA and accessibility notes confirmed."),
+      msg("Noah Wilson", "09:44", "Monitoring, backups, rollback owner, and command confirmed."),
+      msg("Priya Shah", "09:45", "Copy and support readiness confirmed."),
+      msg("You", "09:48", "All gates are green. Starting rehearsal deployment."),
+      msg("Noah Wilson", "09:55", "25% complete. Metrics are normal."),
+      msg("Noah Wilson", "10:02", "50% complete. One worker recycled cleanly; queue depth stayed below 60."),
+      msg("Noah Wilson", "10:09", "75% complete. No new application errors."),
+      msg("You", "10:14", "Rehearsal deployment complete. Beginning the fifteen-minute health check."),
+      msg("Lena Ortiz", "10:19", "Post-deploy smoke test passed on web, iOS, and Android."),
+      msg("Jon Bell", "10:23", "Production-like events are arriving with the expected release candidate version."),
+      msg("Noah Wilson", "10:29", "Health check passed. Error rate 0.10%, p95 latency 181 ms."),
+      msg("Maya Chen", "10:33", "Rehearsal approved. Keep the same order and owners for Thursday."),
+      msg("You", "10:36", "I wrote the exact timeline into the pinned checklist and added a thirty-minute hold between deploy start and launch email."),
+      msg("Priya Shah", "10:48", "Updated help center screenshot is ready.", { photo: { label: "Aurora export preview" }, text: "The export article now shows workspace selection, CSV download, and the success toast." }),
+      msg("Sofia Reyes", "10:52", "Looks good. The support team can use this version."),
+      msg("Ethan Brooks", "11:06", "I also tested rollback in staging. The previous artifact restored in 2 minutes 18 seconds."),
+      msg("Noah Wilson", "11:10", "That is below our five-minute target. I added the timing to the operations note."),
+      msg("You", "11:14", "Uploading the consolidated rehearsal report.", { file: { name: "aurora-rehearsal-report.pdf", meta: "286 KB · PDF document", label: "PDF" } }),
+      msg("Maya Chen", "11:18", "Approved. Nice work, everyone.", { reaction: "🎉 6" })
+    ]);
+
+    addDay("Wednesday, August 5", [
+      msg("Maya Chen", "08:16", "Final preparation day. No feature work today; only release blockers, documentation, and verified fixes."),
+      msg("Ethan Brooks", "08:20", "Production build 1.0.0 is queued. Dependencies match the rehearsed lockfile."),
+      msg("Lena Ortiz", "08:24", "Final device matrix started. I will rerun login, onboarding, invite, billing, export, and logout."),
+      msg("Priya Shah", "08:28", "The launch email, help center article, and response template are locked."),
+      msg("Sofia Reyes", "08:31", "Support staffing is confirmed from 10:30 to 14:30 UTC tomorrow."),
+      msg("Noah Wilson", "08:35", "Production backup completed at 02:17 UTC. Restore verification passed in 6 minutes 36 seconds."),
+      msg("You", "08:39", "Please keep a second backup snapshot until the post-launch review is complete."),
+      msg("Noah Wilson", "08:42", "Done. Retention exception expires Friday at 18:00 UTC."),
+      msg("Jon Bell", "08:47", "Launch dashboard is shared with product and support. It updates every five minutes."),
+      msg("Maya Chen", "08:51", "Pin the dashboard link under the release checklist, not in a separate message."),
+      msg("You", "08:54", "Updated the pinned item."),
+      msg("Ethan Brooks", "09:03", "Production artifact build is running. Current stage: asset optimization."),
+      msg("Lena Ortiz", "09:09", "iOS final matrix passed 18 of 18 cases."),
+      msg("Lena Ortiz", "09:13", "Android final matrix passed 20 of 20 cases."),
+      msg("You", "09:16", "Please attach the signed matrix for the record."),
+      msg("Lena Ortiz", "09:20", "Uploading now.", { file: { name: "aurora-final-device-matrix.pdf", meta: "194 KB · PDF document", label: "PDF" } }),
+      msg("Priya Shah", "09:25", "Accessibility follow-up remains unchanged: focus order in one settings dialog and two low-contrast disabled icons."),
+      msg("Maya Chen", "09:28", "Keep those items in a separate visible section. Do not hide them under general known issues."),
+      msg("You", "09:31", "Confirmed. Each follow-up has an owner and due date."),
+      msg("Ethan Brooks", "09:42", "Production artifact is ready.", { code: "artifact: aurora-web-1.0.0\nsha256: 8f2c4d71b6a9\ncreated: 2026-08-05 09:41 UTC\ncommit: a661be2" }),
+      msg("Noah Wilson", "09:46", "Checksum matches the build record. Artifact copied to the production release bucket."),
+      msg("You", "09:49", "Release artifact accepted. No rebuild unless a blocker is declared."),
+      msg("Sofia Reyes", "09:55", "Support handoff checklist is complete. Escalation route is support → release owner → infrastructure backup."),
+      msg("Maya Chen", "10:01", "Who covers the first two launch hours?"),
+      msg("You", "10:04", "I am release owner from 10:00 to 12:30 UTC. Noah is infrastructure backup. Maya owns customer communication."),
+      msg("Noah Wilson", "10:06", "Confirmed. I will stay in the incident bridge for the full window."),
+      msg("Priya Shah", "10:12", "Launch email is scheduled for 10:45 UTC, thirty minutes after deployment begins."),
+      msg("Sofia Reyes", "10:16", "Help center article is published but unlisted. We will make it public after the health check."),
+      msg("You", "10:21", "Everything is staged. Tomorrow we follow the pinned timeline without improvising."),
+      msg("Maya Chen", "10:24", "Agreed. Any schedule change must be written here and acknowledged by the release owner."),
+      msg("Ethan Brooks", "10:31", "I recorded a short explanation of the artifact and rollback flow.", { voice: { duration: "0:42" } }),
+      msg("You", "10:36", "Received. I added the same steps as text to the checklist for searchability."),
+      service("Noah Wilson enabled slow mode for 10 seconds.")
+    ]);
+
+    addDay("Thursday, August 6", [
+      msg("Maya Chen", "09:30", "Launch day. Please use short, factual updates and include numbers whenever possible."),
+      msg("You", "09:32", "Release room is active. Current plan: deploy 10:15, health check 10:30, email 10:45."),
+      msg("Noah Wilson", "09:35", "Production dashboard is open. All launch alerts are armed."),
+      msg("Lena Ortiz", "09:38", "QA devices are online and signed into clean test accounts."),
+      msg("Priya Shah", "09:40", "Launch email and article remain unchanged from yesterday's approved versions."),
+      msg("Sofia Reyes", "09:42", "Support queue is staffed. No unusual ticket volume this morning."),
+      msg("Ethan Brooks", "09:45", "Final artifact recheck passed. SHA-256 ends in b6a9."),
+      msg("You", "09:48", "Before release, confirm these four values:\n1. Error rate below 1%\n2. p95 latency below 450 ms\n3. Queue depth below 500\n4. Login failures below 20 per minute"),
+      msg("Noah Wilson", "09:51", "Confirmed: 0.11% error rate, 174 ms p95, queue depth 39, and 2 login failures per minute."),
+      msg("Maya Chen", "09:54", "Product approval is green."),
+      msg("Lena Ortiz", "09:55", "QA approval is green."),
+      msg("Priya Shah", "09:56", "Copy approval is green."),
+      msg("Sofia Reyes", "09:57", "Support approval is green."),
+      msg("Noah Wilson", "09:58", "Infrastructure approval is green."),
+      msg("Ethan Brooks", "09:59", "Engineering approval is green."),
+      msg("You", "10:00", "All owners confirmed. Release is authorized.", { reaction: "✅ 7" }),
+      msg("Maya Chen", "10:04", "No changes to customer communication. Holding until deployment starts."),
+      msg("Noah Wilson", "10:09", "One final backup marker recorded. No pending maintenance tasks."),
+      msg("You", "10:12", "Three-minute warning. Please stop nonessential production actions."),
+      unread("18 unread messages"),
+      msg("You", "10:15", "Deployment started."),
+      msg("Noah Wilson", "10:18", "10% complete. New pods are healthy."),
+      msg("Noah Wilson", "10:22", "25% complete. Metrics are normal and there are no new application errors."),
+      msg("Ethan Brooks", "10:25", "Static assets are serving from the new release. Cache hit rate is stable."),
+      msg("Noah Wilson", "10:27", "50% complete. Queue depth is 44."),
+      msg("Lena Ortiz", "10:29", "Early smoke check passed: login and workspace creation both work."),
+      msg("Noah Wilson", "10:31", "75% complete. One cache node restarted automatically; traffic was unaffected."),
+      msg("You", "10:34", "Deployment complete. Beginning the fifteen-minute health check now."),
+      msg("Jon Bell", "10:36", "Production events show client_version 1.0.0 and normal conversion volume."),
+      msg("Lena Ortiz", "10:38", "Full smoke test passed on web, iOS, and Android. Login, workspace creation, invite, billing, and export all work."),
+      msg("Noah Wilson", "10:41", "Five-minute metrics: 0.10% error rate, 182 ms p95, queue depth 48."),
+      msg("Sofia Reyes", "10:43", "No launch-related support tickets so far."),
+      msg("Priya Shah", "10:44", "Launch email is ready. Waiting for release-owner confirmation."),
+      msg("You", "10:45", "Health check is still green. Send the launch email and publish the help center article."),
+      msg("Maya Chen", "10:47", "Launch email sent."),
+      msg("Sofia Reyes", "10:48", "Help center article is public and the response template is active."),
+      msg("Noah Wilson", "10:49", "Fifteen-minute health check passed. Error rate is 0.09% and p95 latency is 188 ms."),
+      msg("You", "10:51", "Aurora 1.0 is officially live. Thank you, everyone!", { reaction: "🎉 9" }),
+      msg("Maya Chen", "10:53", "Congratulations! I will post engagement numbers here after the first hour."),
+      msg("Ethan Brooks", "10:56", "Release tag v1.0.0 is pushed and the build pipeline is locked."),
+      msg("Lena Ortiz", "11:02", "Post-launch mobile check passed on both stores' production builds."),
+      msg("Jon Bell", "11:07", "First twenty minutes: signup starts are normal, workspace creation is 4% above the rehearsal baseline."),
+      msg("Noah Wilson", "11:13", "No alert threshold has fired. Cache restarts remain at one and traffic is balanced."),
+      msg("Sofia Reyes", "11:18", "Two tickets arrived, both about invitation emails. The approved macro resolved them."),
+      msg("Priya Shah", "11:22", "I corrected one typo in the internal support note only. Public copy is unchanged."),
+      msg("You", "11:27", "Thanks. Continue monitoring until the 12:15 handoff."),
+      msg("Maya Chen", "11:36", "First-hour update: email open rate 42%, click rate 18%, no unusual unsubscribe activity."),
+      msg("Jon Bell", "11:41", "Activation funnel is stable. Export completion success rate is 99.4%."),
+      msg("Noah Wilson", "11:46", "Infrastructure remains healthy: 0.08% error rate, 186 ms p95, queue depth 35."),
+      msg("Lena Ortiz", "11:52", "No new QA reports from support or beta customers."),
+      msg("You", "12:00", "Beginning final handoff. Keep monitoring, but the active release window ends at 12:15."),
+      msg("You", "12:04", "Final handoff:\n• Release owner: You\n• Infrastructure backup: Noah Wilson\n• QA owner: Lena Ortiz\n• Copy owner: Priya Shah\n• Product owner: Maya Chen\n• Engineering owner: Ethan Brooks\n• Support owner: Sofia Reyes\n• Analytics owner: Jon Bell"),
+      msg("Noah Wilson", "12:08", "Operations handoff accepted. Standard alert rotation resumes at 12:15."),
+      msg("Maya Chen", "12:10", "Product handoff accepted. Next review is Friday at 15:00 UTC."),
+      msg("You", "12:15", "Release window closed. All launch gates remain green."),
+      service("Maya Chen pinned “Aurora 1.0 is officially live.”")
+    ]);
 
     window.demoMessages = items;
 
@@ -408,42 +967,115 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
 
-    const renderMessage = (item) => {
+    const expectedContent = (item) => {
+      const blocks = [];
+      if (item.photo) blocks.push(item.photo.label);
+      if (item.text) blocks.push(item.text);
+      if (item.code) blocks.push(item.code);
+      if (item.file) blocks.push(`${item.file.name}\n${item.file.meta}`);
+      if (item.voice) blocks.push(`Voice message · ${item.voice.duration}`);
+      if (item.poll) blocks.push(`${item.poll.question}\nAnonymous Poll\n${item.poll.options.map(option => `• ${option}`).join("\n")}`);
+      return blocks.join("\n");
+    };
+
+    const records = items
+      .map(item => {
+        if (item.type === "date" || item.type === "system" || item.type === "unread") {
+          return {
+            speaker: "system",
+            timestamp: "",
+            content: item.text,
+            quoted_speaker: "",
+            quoted_content: ""
+          };
+        }
+        return {
+          speaker: item.sender,
+          timestamp: item.time,
+          content: expectedContent(item),
+          quoted_speaker: item.reply?.sender || "",
+          quoted_content: item.reply?.text || ""
+        };
+      });
+    document.getElementById("fixture-json").textContent = JSON.stringify(records);
+
+    const initials = (name) => people[name]?.avatar || name.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase();
+    const voiceBars = [5,9,13,7,16,11,6,14,18,9,12,7,15,10,5,13,17,8,11,6,14,9,16,7,12,5,10,15];
+
+    const renderMessage = (item, index) => {
       if (item.type === "date") {
         return `<div class="date-row"><div class="date-pill">${escapeHtml(item.text)}</div></div>`;
       }
       if (item.type === "system") {
-        return `<div class="system-row"><div class="system-pill">${escapeHtml(item.text)}</div></div>`;
+        return `<div class="service-row"><div class="service-pill">${escapeHtml(item.text)}</div></div>`;
       }
+      if (item.type === "unread") {
+        return `<div class="unread-row"><div class="unread-line">${escapeHtml(item.text)}</div></div>`;
+      }
+
+      const previous = items[index - 1];
+      const next = items[index + 1];
+      const sameAs = other => other && other.type === "message" && other.sender === item.sender && other.side === item.side;
+      const groupStart = !sameAs(previous);
+      const groupEnd = !sameAs(next);
+      const person = people[item.sender] || people["Maya Chen"];
+      const avatar = item.side === "in" && groupEnd
+        ? `<div class="sender-avatar" style="background:${person.gradient}">${escapeHtml(initials(item.sender))}</div>`
+        : "";
+      const sender = item.side === "in" && groupStart
+        ? `<div class="sender-name" style="color:${person.color}">${escapeHtml(item.sender)}</div>`
+        : "";
+      const forwarded = item.forwarded
+        ? `<div class="forwarded">Forwarded from ${escapeHtml(item.forwarded)}</div>`
+        : "";
       const reply = item.reply ? `
         <div class="reply">
           <div class="reply-sender">${escapeHtml(item.reply.sender)}</div>
           <div class="reply-text">${escapeHtml(item.reply.text)}</div>
         </div>` : "";
+      const photo = item.photo ? `
+        <div class="photo-card"><div class="photo-label">${escapeHtml(item.photo.label)}</div></div>` : "";
+      const text = item.text ? `<div class="message-text">${escapeHtml(item.text)}</div>` : "";
       const code = item.code ? `<div class="code">${escapeHtml(item.code)}</div>` : "";
       const file = item.file ? `
-        <div class="attachment">
-          <div class="file-icon">PDF</div>
+        <div class="file-card">
+          <div class="file-icon">${escapeHtml(item.file.label)}</div>
           <div><div class="file-name">${escapeHtml(item.file.name)}</div><div class="file-meta">${escapeHtml(item.file.meta)}</div></div>
         </div>` : "";
+      const link = item.link ? `
+        <div class="link-card">
+          <div class="link-accent"></div>
+          <div><div class="link-title">${escapeHtml(item.link.title)}</div><div class="link-description">${escapeHtml(item.link.description)}</div></div>
+        </div>` : "";
+      const voice = item.voice ? `
+        <div class="voice-card">
+          <div class="voice-play">▲</div>
+          <div><div class="waveform">${voiceBars.map(height => `<i style="height:${height}px"></i>`).join("")}</div><div class="voice-meta">Voice message · ${escapeHtml(item.voice.duration)}</div></div>
+        </div>` : "";
+      const poll = item.poll ? `
+        <div class="poll-card">
+          <div class="poll-question">${escapeHtml(item.poll.question)}</div>
+          <div class="poll-subtitle">Anonymous Poll</div>
+          ${item.poll.options.map(option => `<div class="poll-option"><div class="poll-radio"></div><div>${escapeHtml(option)}</div></div>`).join("")}
+        </div>` : "";
       const reaction = item.reaction ? `<div class="reaction">${item.reaction}</div>` : "";
-      const checks = item.side === "out" ? `<span class="checks">&#10003;&#10003;</span>` : "";
-      const color = item.color || "#2d8a59";
+      const edited = item.edited ? `<span class="edited">edited</span>` : "";
+      const checks = item.side === "out" ? `<span class="checks">✓✓</span>` : "";
+
       return `
-        <div class="message-row ${item.side}">
+        <div class="message-row ${item.side} ${groupStart ? "group-start" : ""} ${groupEnd ? "group-end" : ""}">
+          ${avatar}
           <article class="bubble">
-            <div class="sender" style="color:${color}">${escapeHtml(item.sender)}</div>
-            ${reply}
-            <div class="text">${escapeHtml(item.text)}</div>
-            ${code}
-            ${file}
-            <div class="meta"><span>${escapeHtml(item.time)}</span>${checks}</div>
+            ${sender}${forwarded}${reply}${photo}${text}${code}${file}${link}${voice}${poll}
+            <div class="message-meta">${edited}<span>${escapeHtml(item.time)}</span>${checks}</div>
             ${reaction}
           </article>
         </div>`;
     };
 
     document.getElementById("messages").innerHTML = items.map(renderMessage).join("");
+    document.body.dataset.contentHeight = String(document.documentElement.scrollHeight);
+    document.body.dataset.recordCount = String(records.length);
   </script>
 </body>
 </html>

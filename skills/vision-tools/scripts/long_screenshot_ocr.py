@@ -31,7 +31,7 @@ except ImportError:  # Optional dependency; handled by main().
 ANALYSIS_WIDTH = 900
 SAFE_OCCUPANCY_LEVEL = 20.0
 # Bump when the OCR output contract changes so --resume cannot reuse stale results.
-OCR_PROMPT_VERSION = 2
+OCR_PROMPT_VERSION = 5
 
 
 @dataclass(frozen=True)
@@ -459,11 +459,19 @@ def ocr_prompt(mode: str, index: int, total: int, custom: str | None) -> str:
             '"quoted_content":""}]}. '
             "Give every message a speaker and copy the visible nickname exactly; never replace "
             "it with roles such as customer, support, me, or other. If the screenshot shows a "
-            "question-mark square glyph in a nickname, preserve it as Unicode U+25A1. Merge "
+            "question-mark square glyph in a nickname, preserve it as Unicode U+25A1. When a "
+            "chat UI clearly marks an outgoing self-message by alignment and bubble style but "
+            "omits its nickname, use You as the speaker. Ignore app chrome such as the status "
+            "bar, chat title, pinned-message banner, and composer. Inside the chat history, "
+            "transcribe every date separator, service notice, and unread divider as a system "
+            "message. Merge "
             "screen-width wrapping back into the same message. Each rounded message bubble is "
             "exactly one message: keep code blocks, bullet lists, attachment filenames, and file "
-            "metadata inside that bubble's content instead of creating a second message. Preserve "
-            "intentional code and list line breaks. Put replied-to text in "
+            "metadata inside that bubble's content instead of creating a second message. Put file "
+            "and voice-card titles and metadata on separate lines. For polls, include the visible "
+            "poll label and write each option as a bullet line. For photo messages, include visible "
+            "overlay text before the caption. Preserve intentional code and list line breaks. "
+            "Put replied-to text in "
             "quoted_speaker and quoted_content while keeping the new message in speaker and "
             "content. Fill timestamp only when the entire timestamp is clearly visible; "
             "otherwise leave it empty. message_type must be message, system, image, or file. "
@@ -482,7 +490,7 @@ def ocr_prompt(mode: str, index: int, total: int, custom: str | None) -> str:
     return instructions + chunk_note + custom_note
 
 
-def join_visual_wraps(content: str) -> str:
+def join_visual_wraps(content: str, preserve_lines: bool = False) -> str:
     content = content.replace("\r\n", "\n").replace("\r", "\n").strip()
     if not content:
         return ""
@@ -494,6 +502,10 @@ def join_visual_wraps(content: str) -> str:
         lines = [re.sub(r"[ \t]+", " ", line.strip()) for line in paragraph.splitlines()]
         lines = [line for line in lines if line]
         if not lines:
+            continue
+        structured_card = any(line.casefold() == "anonymous poll" for line in lines)
+        if preserve_lines or structured_card:
+            normalized.append("\n".join(lines))
             continue
         merged = lines[0]
         for line in lines[1:]:
@@ -540,12 +552,15 @@ def parse_chat_messages(raw_text: str) -> tuple[ChatMessage, ...]:
     for record in records:
         if not isinstance(record, dict):
             continue
-        content = join_visual_wraps(str(record.get("content") or ""))
-        if not content:
-            continue
         message_type = str(record.get("message_type") or "message").strip().lower()
         if message_type not in {"message", "system", "image", "file"}:
             message_type = "message"
+        content = join_visual_wraps(
+            str(record.get("content") or ""),
+            preserve_lines=message_type in {"image", "file"},
+        )
+        if not content:
+            continue
         speaker = str(record.get("speaker") or "").strip()
         speaker = re.sub(r"\u25a1\s+\u3002", "\u25a1\u3002", speaker)
         if message_type == "system":
