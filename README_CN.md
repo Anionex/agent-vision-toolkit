@@ -81,6 +81,15 @@
 
 *左：作为输入的手绘参考；右：依据该手绘稿还原出的 JupyterLab 工作区界面。完整流程见 [UI 还原 playbook](skills/vision-tools/references/restore-ui.md)。由 Codex 搭配 `deepseek-v4-flash` 实际执行。*
 
+### 信息图还原：从截图到 HTML
+
+<p align="center">
+  <img src="assets/infographic-restore-reference.png" alt="模型训练流程信息图原始截图" width="49%">
+  <img src="assets/infographic-restore-result.png" alt="使用 HTML 和 CSS 复刻的模型训练流程信息图" width="49%">
+</p>
+
+*左：原始信息图截图；右：使用 HTML/CSS 复刻的可编辑结果。*
+
 <p align="center">
   <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
   <img src="assets/effect-4.jpg" alt="DeepSeek V4 用 glance/ground 定位屏幕元素自主游玩国际象棋" width="49%">
