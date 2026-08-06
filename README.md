@@ -72,7 +72,7 @@ Beyond giving an agent tools, the included `vision-tools` skill provides end-to-
 
 ## Real-world Effects
 
-### Long-chat OCR: 900 x 6000 screenshot to a clean transcript
+### Long-chat OCR: 780 x 31186 Telegram-style screenshot to a clean transcript
 
 <p align="center">
   <a href="examples/long-screenshot-ocr/telegram-chat-long.png">
@@ -80,7 +80,7 @@ Beyond giving an agent tools, the included `vision-tools` skill provides end-to-
   </a>
 </p>
 
-The privacy-safe fixture is generated entirely from local HTML. In the checked-in reference run, the workflow split it into four chunks, merged a 128 px fallback overlap, and recovered all **57/57 records** with no differences in speaker, timestamp, body, or reply metadata. [Open the full input, transcript, and reproduction steps →](examples/long-screenshot-ocr/)
+The privacy-safe fixture is generated entirely from local HTML and includes Telegram-style app chrome, wallpaper, bubble tails, avatars, replies, files, a poll, a photo card, reactions, and an unread divider. In the checked-in reference run, the workflow split it into 21 chunks with 20 safe boundaries and recovered all **180/180 records** in order, with no missing/extra messages and no speaker, timestamp, or reply-field differences. [Open the full input, transcript, and reproduction steps →](examples/long-screenshot-ocr/)
 
 ### UI restoration: sketch to interface
 
