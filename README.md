@@ -76,7 +76,7 @@ Beyond giving an agent tools, the included `vision-tools` skill provides end-to-
 
 <p align="center">
   <a href="examples/long-screenshot-ocr/telegram-chat-long.png">
-    <img src="examples/long-screenshot-ocr/telegram-chat-preview.png" alt="Full-length overview of the English Telegram chat with the complete screenshot and five readable checkpoints" width="680">
+    <img src="examples/long-screenshot-ocr/telegram-chat-overview.png" alt="Full-length overview of the English Telegram chat with the complete screenshot and five readable checkpoints" width="680">
   </a>
 </p>
 

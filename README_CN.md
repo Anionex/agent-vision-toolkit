@@ -76,7 +76,7 @@
 
 <p align="center">
   <a href="examples/long-screenshot-ocr/telegram-chat-long.png">
-    <img src="examples/long-screenshot-ocr/telegram-chat-preview.png" alt="包含完整长图缩略轨道和五个可读检查点的英文 Telegram 聊天总览" width="680">
+    <img src="examples/long-screenshot-ocr/telegram-chat-overview.png" alt="包含完整长图缩略轨道和五个可读检查点的英文 Telegram 聊天总览" width="680">
   </a>
 </p>
 

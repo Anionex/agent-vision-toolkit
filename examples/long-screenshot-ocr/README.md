@@ -6,7 +6,7 @@ original full-resolution PNG.
 
 <p align="center">
   <a href="telegram-chat-long.png">
-    <img src="telegram-chat-preview.png" alt="Full-length overview of the English Telegram launch chat with five readable checkpoints" width="680">
+    <img src="telegram-chat-overview.png" alt="Full-length overview of the English Telegram launch chat with five readable checkpoints" width="680">
   </a>
 </p>
 
@@ -16,8 +16,8 @@ original full-resolution PNG.
 |---|---|
 | [`telegram-chat.html`](telegram-chat.html) | Deterministic, offline source for the fictional English conversation. |
 | [`telegram-chat-long.png`](telegram-chat-long.png) | The generated 780 x 31186 input screenshot. |
-| [`telegram-chat-preview.html`](telegram-chat-preview.html) | Deterministic source for the full-length README overview. |
-| [`telegram-chat-preview.png`](telegram-chat-preview.png) | The complete screenshot as a vertical rail plus five readable checkpoints. |
+| [`telegram-chat-overview.html`](telegram-chat-overview.html) | Deterministic source for the full-length README overview. |
+| [`telegram-chat-overview.png`](telegram-chat-overview.png) | The complete screenshot as a vertical rail plus five readable checkpoints. |
 | [`telegram-chat-ocr.md`](telegram-chat-ocr.md) | Merged Markdown transcript produced by the long-screenshot OCR workflow. |
 
 ## Checked-in reference run
@@ -78,10 +78,10 @@ To regenerate the full-length README overview:
 
 ```bash
 python3 skills/vision-tools/scripts/html_shot.py \
-  examples/long-screenshot-ocr/telegram-chat-preview.html \
+  examples/long-screenshot-ocr/telegram-chat-overview.html \
   --width 390 \
   --height 2600 \
   --scale 2 \
   --wait-ms 200 \
-  -o examples/long-screenshot-ocr/telegram-chat-preview.png
+  -o examples/long-screenshot-ocr/telegram-chat-overview.png
 ```
