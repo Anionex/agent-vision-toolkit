@@ -14,20 +14,21 @@
 [![Extensions](https://img.shields.io/badge/-Extensions-3178C6?style=flat-square)](https://github.com/Anionex/agent-vision-toolkit/tree/main/extensions)
 [![Shell](https://img.shields.io/badge/-Shell-4EAA25?style=flat-square&logo=gnubash&logoColor=white)](https://github.com/Anionex/agent-vision-toolkit/tree/main/bin)
 
-**What it thinks is what it sees — give any text-only coding agent eyes: image Q&A, OCR, screenshot understanding, visual grounding, and image-to-SVG, as a vision toolkit plus a skill, with optional drop-in integration for Codex, Claude Code, Pi, Oh My Pi, and OpenCode.**
+**What it thinks is what it sees — give any text-only coding agent eyes: image Q&A, long-screenshot OCR, frontend UI restoration, and GUI automation, as a vision toolkit plus a skill, with optional drop-in integration for Codex, Claude Code, Pi, Oh My Pi, and OpenCode.**
 
 🌐 [**中文**](README_CN.md) ｜ **English**
 
 </div>
 
-If your coding agent runs on a text-only model like DeepSeek V4, it can't look at images — screenshots, mockups, diagrams, and error dialogs are all dead ends. This repository gives it eyes in two layers:
+If your agent already runs on a text-only model such as DeepSeek but is held back by the lack of multimodality — unable to see images, with every attempt to use an image tool blocked by the system — this repository provides tools, skills, and proxy integrations that let text-only models handle visual tasks on equal or even better footing. The goal is to make the experience of using a text-model agent as seamless as using a multimodal one, and ultimately let a tool-equipped text-model agent outperform a native multimodal agent that does not use this toolkit and its methods.
 
-1. **The toolkit** — five CLIs, plus a skill that teaches your agent when to reach for each one. Works in any agent with a shell.
-2. **Seamless integration** *(optional upgrade)* — a transparent local proxy and single-file native extensions, so **pasted images and built-in image tools work too**, with no tool call and no extra prompting.
+This repository provides two kinds of components:
+1. **Vision tool CLIs** — multiple CLIs, plus a skill that teaches the agent when to use each one. Any agent that can invoke a shell can use them.
+2. **Seamless integration** *(optional upgrade)* — a transparent local proxy and single-file native plugins, so **images we paste and the agent's built-in image tools both work seamlessly**, with no extra tool installation or additional prompting.
 
 All code has been verified in real Codex + DeepSeek sessions, and the same pipeline has been live-verified end-to-end in Claude Code, Pi, Oh My Pi, and OpenCode.
 
-> If this project helps you, feel free to star🌟 & fork.
+> If this project helps you or gives you some inspiration, feel free to star🌟 & fork.
 
 <details>
 <summary><b>Contents</b></summary>
@@ -40,25 +41,25 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 - [Upgrade: Seamless Integration](#upgrade-seamless-integration)
 - [How It Works](#how-it-works)
 - [Configuration](#configuration)
-- [Privacy, Data Flow, and Cost](#privacy-data-flow-and-cost)
 - [FAQ](#faq)
-- [Community and Support](#community-and-support)
-- [Support the Project](#support-the-project)
+- [Community](#community)
+- [Sponsorship](#sponsorship)
 
 </details>
 
 
 ## Highlights
 
-- **Descriptions target the current question**: every image gets a focus hint — a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking — so the description covers the details this turn actually needs instead of being a generic caption.
-- **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
-- **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
-- **A practical methodology for visual work**: the skill teaches the agent what to inspect, which tool to choose, how to proceed step by step, and how to verify the result across different visual tasks.
+- **More than image descriptions — it captures what the LLM actually cares about**: every image gets a focus hint. A pasted image uses the text from its own message, while an image fetched through `view_image` uses the model's stated reason for looking. The resulting description covers the details needed for the current turn instead of producing a generic caption.
+- **Both pasted images and built-in image tools work**: the agent can understand images pasted directly as well as images opened through its built-in tools.
+- **Parallel multi-image parsing**: multiple images in one request are sent to the vision model concurrently, so N images take roughly the latency of one instead of being processed one by one.
+- **A battle-tested methodology for visual tasks**: the included skill teaches the agent what to inspect, which tool to choose, what sequence to follow, and how to verify the final result.
 
 
 ## Use-case Playbooks
 
-Beyond giving an agent tools, the included `vision-tools` skill provides end-to-end playbooks it can follow: when to use each workflow, which tools to call, and how to verify the result.
+The included `vision-tools` skill contains complete playbooks that an agent can follow directly.
+Each playbook explains when to use the workflow, which tools to call and in what order, and how to verify the result:
 
 | Use case | What the agent learns to do |
 |---|---|
@@ -91,7 +92,7 @@ Beyond giving an agent tools, the included `vision-tools` skill provides end-to-
 
 **The easiest install: hand it to your agent.** Paste this into your coding agent:
 
-> Read https://github.com/Anionex/agent-vision-toolkit and set it up on this machine: the vision toolkit and skill, plus the seamless integration per AGENT_INSTALL.md if my host supports it.
+> Read https://github.com/Anionex/agent-vision-toolkit and set it up on this machine: the vision toolkit and skill, plus the seamless integration in AGENT_INSTALL.md if the agent product I use supports it.
 
 The only thing you need to prepare is an OpenAI-compatible vision API (key, base URL, model name) — the agent does the rest.
 
@@ -132,7 +133,7 @@ Or copy `skills/vision-tools/` into your agent's skills directory (e.g. `~/.code
 Each tool answers one kind of question, so the calling agent — which holds the full context — picks the right one instead of guessing at a single overloaded command.
 
 <details>
-<summary><b><code>glance</code> — "what does it show?"</b></summary>
+<summary><b><code>glance</code> — "what does this image look like?"</b></summary>
 
 Ask a question about an image directly, or transcribe its text.
 
@@ -162,7 +163,7 @@ python3 skills/vision-tools/scripts/long_screenshot_ocr.py long-chat.png --mode 
 </details>
 
 <details>
-<summary><b><code>ground</code> — "where is X?"</b></summary>
+<summary><b><code>ground</code> — "where is the object I want?"</b></summary>
 
 Locate an object or region and get a bounding box in original pixel coordinates:
 
@@ -179,7 +180,7 @@ It analyzes one full image per call. With `--region X1,Y1,X2,Y2` it searches onl
 </details>
 
 <details>
-<summary><b><code>detect</code> — "what's here?"</b></summary>
+<summary><b><code>detect</code> — "what is in the image, and where?"</b></summary>
 
 Inventory the elements of an image (or a region) — a numbered list with exact visible text and pixel boxes:
 
@@ -200,7 +201,7 @@ A full-screen pass is a fast first draft; for completeness on dense screens, inv
 </details>
 
 <details>
-<summary><b><code>trace</code> — "what's the exact shape?"</b></summary>
+<summary><b><code>trace</code> — "what is its exact shape and outline?"</b></summary>
 
 `trace` vectorizes an image (or a cropped region) into SVG **locally and deterministically** — coordinates come from the actual pixels, not from a vision model's estimates. Use it for exact shape geometry: reproducing icons/logos as SVG, reading a diagram's layout, or measuring elements. Requires the optional `vtracer` (and `pillow` for `--region`).
 
@@ -212,7 +213,7 @@ trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 </details>
 
 <details>
-<summary><b><code>crop</code> — "cut that box out"</b></summary>
+<summary><b><code>crop</code> — "crop this image region for reuse"</b></summary>
 
 `crop` cuts a pixel box out of an image into its own file — the same
 X1,Y1,X2,Y2 coordinates `ground`/`detect` print, clamped to the image
@@ -228,7 +229,7 @@ crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 
 ## Upgrade: Seamless Integration
 
-The toolkit covers everything your agent decides to look at. It cannot cover images the **user pastes** — those reach the model before any tool can run. That gap is what this layer closes: images become text on the wire, so pasting a screenshot just works, and the agent's built-in image tool (`view_image`, `Read`) stops erroring out.
+This layer makes screenshots pasted into an agent work directly, while also preventing errors when the agent calls its built-in image tools.
 
 | Agent | How | Status |
 |---|---|---|
@@ -238,13 +239,13 @@ The toolkit covers everything your agent decides to look at. It cannot cover ima
 | **OpenCode** | one-file native plugin ([`extensions/opencode/`](extensions/opencode/)) | ✅ verified |
 | Any agent with a shell | the toolkit above — no integration needed | ✅ |
 
-All entry points share the same describe layer — the focus hint, the verbatim-transcription contract, the re-query channel note, and the per-(image, prompt) cache — and the same three `VISION_*` env vars.
+All entry points share one configuration: configure it once and use it everywhere.
 
 ### Descriptions that keep the task in view
 
-Most vision wrappers simply turn an image into a generic description and leave the text model to recover the original task afterward.
+Most vision bridges for text-only models simply ask a multimodal model to turn an image into a generic description, then hand that description to the text model and expect it to reconstruct the information it needs. That adds another semantic layer where some information is inevitably lost — the source of the common belief that stitched-together vision solutions must suffer a large performance penalty.
 
-This one preserves **why the agent is looking**. It extracts the viewing intent from the user message or the assistant's stated reason for calling `view_image`, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step—not a generic "detailed description." Lower cost, higher accuracy, and faster response times.
+To address this, `agent-vision-toolkit` tries to recover **why the agent wants to look at the image**. It extracts the viewing intent from the user message or from the model's stated reason for calling a built-in image tool, then passes that intent to the vision model as a **focus hint**. The result is a task-aware description that emphasizes what matters for the current step instead of producing a generic "detailed description" — at lower cost, with higher accuracy and faster responses.
 
 <p align="center">
   <img src="assets/focus-hint-comparison-1.png"
@@ -255,9 +256,9 @@ This one preserves **why the agent is looking**. It extracts the viewing intent 
        width="49%">
 </p>
 
-### Installing it
+### Installation and usage
 
-This layer is also agent-installed — the Quick Start prompt already covers it, and there is deliberately no one-click installer because deployment depends on your machine's actual config. The steps your agent follows are in the **[Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a restart, just paste an image or let the model call its built-in image tool. Pi, Oh My Pi, and OpenCode use the single-file [native extensions](extensions/) instead of the proxy — see the per-host READMEs there.
+The project can be installed by your agent — the prompt in Quick Start already covers it. This repository does not provide a one-click installer; the steps the agent should follow are in the **[Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a restart, paste an image directly or let the model call its built-in image tool. Pi, Oh My Pi, and OpenCode use single-file [native extensions](extensions/) instead of the proxy; see the documentation for each agent.
 
 
 ## How It Works
@@ -274,12 +275,6 @@ Codex -> 127.0.0.1:19100 -> your existing text-only upstream
                    -> vision prompt -> text description -> image replaced
 ```
 
-The vision prompt is not a fixed "describe this image". The proxy attaches a **focus hint** so the description covers what actually matters right now: a pasted image carries the user's request, while an image fetched via `view_image` carries the assistant's own stated reason for looking (falling back to the user text when the tool was called silently). Descriptions are cached per (image, prompt); both hint sources sit in the immutable conversation history, so the same image is described once and then hits the cache on every later turn.
-
-The proxy identifies the request dialect from the body shape alone — OpenAI Responses (Codex) or Anthropic Messages (Claude Code) — so one instance serves both, with no per-host configuration. For Claude Code the two image paths are pastes and `Read` on an image file; the hint policy is the same.
-
-The first model response only asks Codex to call `view_image`. After Codex executes the tool locally, the second request carries the image; the proxy converts image to text on this request path. If the catalog explicitly declares support for `text` only, Codex's handler rejects the tool first, so `image` is appended to the existing entry only in that case.
-
 </details>
 
 ## Configuration
@@ -287,7 +282,7 @@ The first model response only asks Codex to call `view_image`. After Codex execu
 <details>
 <summary><b>Environment variables</b></summary>
 
-Only these env vars are required, for both the toolkit and the proxy:
+The toolkit and proxy use only these environment variables; just three are required:
 
 | Variable | Required | Description |
 |---|---:|---|
@@ -296,22 +291,13 @@ Only these env vars are required, for both the toolkit and the proxy:
 | `VISION_MODEL` | Yes | Multimodal model name |
 | `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
 
-Upstream authentication is still sent by your agent and passed through by the proxy, so there's no need to store it again in the env.
-
 </details>
 
 ## Prerequisites
 
-- A coding agent already working with a text-only model (e.g. DeepSeek V4)
-- Python 3.11+
+- A coding agent already working with a model, including a text-only model such as DeepSeek V4
 - An OpenAI-compatible vision API that supports `/chat/completions` and `image_url`
-
-## Privacy, Data Flow, and Cost
-
-- Model-based operations send images to the OpenAI-compatible endpoint configured by `VISION_BASE_URL`; local tools such as `trace` and `crop` do not upload them.
-- The text-only upstream receives the rewritten request with that description, not the original image. Its existing model name and authentication headers are forwarded unchanged.
-- The proxy does not log request bodies, images, prompts, conversations, or API keys. Optional logs contain operational metadata only.
-- Descriptions are cached in memory per image and prompt, then discarded when the process restarts. Each uncached pair may create one billable request under the configured vision provider's pricing and data-retention terms.
+- No other configuration is required
 
 ## FAQ
 
@@ -333,10 +319,10 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 ## Limitations
 
 - This is an image-to-text layer; it doesn't hand vision tokens directly to the text model.
-- Description quality depends on the configured vision model.
+- Overall visual-task quality is determined jointly by the primary LLM and the multimodal LLM.
 - The proxy's cache lives only inside its process and is cleared on restart.
 
-## Community and Support
+## Community
 
 - Setup and usage help: [Support guide](SUPPORT.md) and the repository's issue forms
 - Bug reports and feature requests: [Issues](https://github.com/Anionex/agent-vision-toolkit/issues/new/choose)
@@ -344,12 +330,9 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 - Security reports: [Security policy](SECURITY.md)
 - Community standards: [Code of Conduct](CODE_OF_CONDUCT.md)
 - User-facing changes: [Changelog](CHANGELOG.md)
-- Funding and sponsorship: [Funding](FUNDING.md)
 
-## Support the Project
+## Sponsorship
 
-If agent-vision-toolkit saves you time, you can support it by starring, sharing, contributing, or sponsoring its continued development. See [FUNDING.md](FUNDING.md) for funding channels and how sponsorship is used.
+Open source is not easy. If agent-vision-toolkit saves you time, you are welcome to star it, share it, contribute, or [sponsor the project](FUNDING.md).
 
----
-
-Made by [Anionex](https://github.com/Anionex) with codex
+I'm [Anionex](https://anionex.me/), an AI-native developer who once ranked No. 4 on GitHub's global developer trending list, with more than 16k stars across my projects. If you would like to follow my future work, [follow me on GitHub](https://github.com/Anionex).

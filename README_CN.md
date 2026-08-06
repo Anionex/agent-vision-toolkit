@@ -41,10 +41,9 @@
 - [升级：无缝接入](#升级无缝接入)
 - [工作原理](#工作原理)
 - [配置](#配置)
-- [隐私、数据流与费用](#隐私数据流与费用)
 - [常见问题](#常见问题)
-- [社区与支持](#社区与支持)
-- [支持项目](#支持项目)
+- [社区](#社区)
+- [赞助](#赞助)
 
 </details>
 
@@ -333,4 +332,4 @@ Codex（携带原有 Authorization）
 
 开源不易。如果 agent-vision-toolkit 为你节省了时间，欢迎 Star、分享、参与贡献，[或赞助项目～](FUNDING.md)。
 
-我是[anionex](https://anionex.me/)，一名ai原生开发者，曾上榜github全球开发者趋势榜第4名，总star数超过了16k。如果你想了解我后续的更多工作，欢迎[关注我]～(https://github.com/Anionex)
+我是 [Anionex](https://anionex.me/)，一名 AI 原生开发者，曾上榜 GitHub 全球开发者趋势榜第 4 名，总 Star 数超过 16k。如果你想了解我后续的更多工作，欢迎[关注我](https://github.com/Anionex)～
