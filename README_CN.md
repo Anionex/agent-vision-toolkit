@@ -32,6 +32,7 @@
 
 | 用例 | Agent 会如何完成 |
 |---|---|
+| [识别长截图、聊天记录与滚动页面](skills/vision-tools/references/long-screenshot-ocr.md) | 避开文字寻找安全切口，按顺序逐块 OCR，保留聊天发言人、时间和引用关系，只合并确实重复的内容，并标出需要复查的边界。 |
 | [根据截图或设计稿还原 UI](skills/vision-tools/references/restore-ui.md) | 优先复用项目已有组件和素材，再结合原生 UI 代码、截图素材、渲染截图与视觉对比，逐轮对齐页面或组件。 |
 | [还原图标、Logo、插画等图形素材](skills/vision-tools/references/restore-graphic.md) | 从原图提取透明 PNG；需要可编辑或无损缩放时重建 SVG，并验证形状、颜色和透明边缘。 |
 | [把草图、示意图或白板转成结构化代码](skills/vision-tools/references/restore-structure.md) | 识别节点、文字、连线与方向，输出可编辑的 Mermaid、Graphviz 或其他结构化表示。 |
@@ -95,7 +96,7 @@ git clone https://github.com/Anionex/agent-vision-toolkit.git
 export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # 写进 shell 配置以持久生效
 ```
 
-`glance` 只需要 Python 3.11+；`ground`/`detect`/`crop` 需要 `pillow`，`trace` 需要 `vtracer`——只在你要用这些工具时，把它们装进一个隔离的 venv。
+`glance` 只需要 Python 3.11+；`ground`/`detect`/`crop` 和长截图 OCR 用例需要 `pillow`，`trace` 需要 `vtracer`——只在你要用这些工具时，把它们装进一个隔离的 venv。
 
 **3. 安装 skill**，让 agent 知道这些工具的存在以及如何组合使用：
 
@@ -128,6 +129,13 @@ glance screenshot.png --ocr
 用户名
 密码
 登录
+```
+
+遇到滚动长截图或聊天记录时，skill 内置的工作流会寻找安全切口，调用
+`glance` 逐块 OCR，合并重叠内容，并生成边界复查报告：
+
+```bash
+python3 skills/vision-tools/scripts/long_screenshot_ocr.py long-chat.png --mode chat -o long-chat.ocr.md
 ```
 
 ### `ground` —— “X 在哪？”
@@ -275,6 +283,7 @@ Codex（携带原有 Authorization）
 | `detect.py` / `bin/detect` | 元素盘点 CLI（与 ground 共用实现） |
 | `bin/trace` | 本地图转 SVG 描摹 CLI（精确形状几何，不调视觉 API） |
 | `bin/crop` | 本地区域裁剪 CLI（像素盒转图片文件，不调视觉 API） |
+| `skills/vision-tools/scripts/long_screenshot_ocr.py` | 安全切分长截图、调用 `glance` 逐块 OCR、合并重叠内容并生成边界审计 |
 | `skills/vision-tools/` | skill：工具手册、由粗到细的方法论、按场景的 playbook |
 | `vision_client.py` | 代理与 CLI 共用的视觉 API 客户端 |
 | `vision_proxy.py` | 本地图片改写代理与 SSE 转发 |
@@ -288,6 +297,7 @@ Codex（携带原有 Authorization）
 | `tests/test_vision_client.py` | 视觉客户端重试与 `glance` 测试 |
 | `tests/test_ground.py` | `ground` 坐标解析和共享配置测试 |
 | `tests/test_detect.py` | `detect` 盘点与区域坐标映射测试 |
+| `tests/test_long_screenshot_ocr.py` | 长截图切分、合并、调用编排与断点复用测试 |
 
 ## 限制
 

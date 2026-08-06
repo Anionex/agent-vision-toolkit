@@ -5,10 +5,10 @@ description: >-
   target, pixel box), detect (element inventory), trace (image to SVG
   geometry), crop (cut a pixel box to a file), and scripts/html_shot.py (HTML
   file to image). Use for any task involving an image — questions, text,
-  locating elements, comparing, rebuilding as HTML/SVG, digitizing a sketch
-  or diagram, reading values off a chart, operating a GUI from screenshots —
-  and to re-check an image yourself when a description you were given lacks a
-  detail.
+  splitting and transcribing long screenshots or chat histories, locating elements,
+  comparing, rebuilding as HTML/SVG, digitizing a sketch or diagram, reading
+  values off a chart, operating a GUI from screenshots — and to re-check an
+  image yourself when a description you were given lacks a detail.
 ---
 
 # vision-tools
@@ -26,6 +26,7 @@ Pick the tool by the question you are answering:
 | "Where are all the Xs?" — every instance of a kind | `detect` |
 | "What is its exact shape, size, offset?" | `trace` |
 | "Cut this box out as its own image file" | `crop` |
+| "OCR this long screenshot / scrolling page / chat history" | `scripts/long_screenshot_ocr.py` |
 | "Extract the icon/logo foreground as transparent PNG — manual region or auto (cropped+scaled screenshots)" | `scripts/extract_fg.py` |
 | "Turn this HTML file into a screenshot" | `scripts/html_shot.py` |
 | "Which colours dominate a region, and which palette value fits it?" | `scripts/dominant_colors.py` |
@@ -53,6 +54,7 @@ work is not hand-coded differently every time:
 - vectorize to SVG → `trace`
 - locate / inventory elements → `ground` / `detect`
 - describe / OCR an image → `glance`
+- safely split, OCR, and merge a long screenshot → `scripts/long_screenshot_ocr.py`
 - HTML file to a screenshot → `scripts/html_shot.py`
 
 Hand-written Pillow is only for what none of them return: a relation
@@ -81,6 +83,20 @@ But "what changed between these two?" is not a glance question. A one-word
 badge or a small shift is a rounding error to a vision model and exact to
 `scripts/pixel_diff.py`. Diff first to get the box, then `glance --region`
 that box to read what the change actually is.
+
+For a tall scrolling screenshot, do not send the whole image through one OCR
+call and accept the model's downscaling loss. Run the long-screenshot workflow,
+which finds low-content cut bands, invokes `glance` on each chunk, uses
+structured extraction for chat histories, merges only duplicated overlap, and
+writes a boundary audit:
+
+```bash
+python3 scripts/long_screenshot_ocr.py work/page.png -o work/page.ocr.md
+python3 scripts/long_screenshot_ocr.py work/chat.png --mode chat --resume -o work/chat.ocr.md
+```
+
+Read `references/long-screenshot-ocr.md` before using it. It defines the
+verification pass for unsafe cuts and chat-message boundaries.
 
 ## ground — locate a named target
 
@@ -276,6 +292,7 @@ sequence, and how to tell you got it right.
 
 | The job | Read |
 |---|---|
+| OCR a long screenshot, scrolling page, or chat history without losing text at chunk boundaries | `references/long-screenshot-ocr.md` |
 | Rebuild a page or component as HTML/CSS, or align an existing UI with its reference image | `references/restore-ui.md` |
 | Extract or rebuild an icon, logo, illustration, or other isolated graphic as transparent PNG/SVG | `references/restore-graphic.md` |
 | Turn a sketch, diagram, or whiteboard into Mermaid, Graphviz, or another structured representation | `references/restore-structure.md` |

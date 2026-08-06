@@ -32,6 +32,7 @@ Beyond giving an agent tools, the included `vision-tools` skill provides end-to-
 
 | Use case | What the agent learns to do |
 |---|---|
+| [Extract long screenshots, chat histories, and scrolling pages](skills/vision-tools/references/long-screenshot-ocr.md) | Find low-content cut bands, OCR each chunk in order, preserve chat speakers/timestamps/quotes, merge only duplicated overlap, and surface risky boundaries for verification. |
 | [Rebuild a UI from a screenshot or design](skills/vision-tools/references/restore-ui.md) | Reuse project components and assets first, then combine code-native UI, extracted visuals, rendered screenshots, and visual comparison to align a page or component. |
 | [Restore an icon, logo, illustration, or other graphic](skills/vision-tools/references/restore-graphic.md) | Extract a transparent PNG from the source image, or rebuild an editable/scalable SVG when needed, then verify shape, color, and alpha edges. |
 | [Turn a sketch, diagram, or whiteboard into structured code](skills/vision-tools/references/restore-structure.md) | Recover nodes, labels, connections, and directions as editable Mermaid, Graphviz, or another structured representation. |
@@ -95,7 +96,7 @@ git clone https://github.com/Anionex/agent-vision-toolkit.git
 export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # add to your shell profile to persist
 ```
 
-`glance` needs nothing beyond Python 3.11+; `ground`/`detect`/`crop` need `pillow` and `trace` needs `vtracer` — install those into an isolated venv only if you want those tools.
+`glance` needs nothing beyond Python 3.11+; `ground`/`detect`/`crop` and the long-screenshot OCR playbook need `pillow`, while `trace` needs `vtracer` — install those into an isolated venv only if you want those tools.
 
 **3. Install the skill** so your agent knows the tools exist and how to combine them:
 
@@ -128,6 +129,14 @@ The dominant colors of this image are **white and light gray, with light blue ac
 Username
 Password
 Login
+```
+
+For a scrolling screenshot or chat history, the skill includes a workflow that
+finds safe cut bands, OCRs the chunks with `glance`, merges overlap, and writes
+a boundary audit:
+
+```bash
+python3 skills/vision-tools/scripts/long_screenshot_ocr.py long-chat.png --mode chat -o long-chat.ocr.md
 ```
 
 ### `ground` — "where is X?"
@@ -277,6 +286,7 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 | `detect.py` / `bin/detect` | Element-inventory CLI (shares the ground machinery) |
 | `bin/trace` | Local image-to-SVG tracing CLI (exact shape geometry, no vision API) |
 | `bin/crop` | Local region-crop CLI (pixel box to image file, no vision API) |
+| `skills/vision-tools/scripts/long_screenshot_ocr.py` | Safe long-screenshot splitting, chunk OCR through `glance`, overlap merge, and boundary audit |
 | `skills/vision-tools/` | The skill: tool manual, coarse-to-fine method, per-scenario playbooks |
 | `vision_client.py` | Vision API client shared by the proxy and the CLIs |
 | `vision_proxy.py` | Local image-rewriting proxy and SSE forwarding |
@@ -290,6 +300,7 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 | `tests/test_vision_client.py` | Vision client retry and `glance` tests |
 | `tests/test_ground.py` | `ground` coordinate parsing and shared config tests |
 | `tests/test_detect.py` | `detect` inventory and region coordinate-mapping tests |
+| `tests/test_long_screenshot_ocr.py` | Long-screenshot splitting, merge, orchestration, and resume tests |
 
 ## Limitations
 
