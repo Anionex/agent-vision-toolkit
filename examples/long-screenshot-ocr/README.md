@@ -1,23 +1,13 @@
-# Synthetic Telegram long-screenshot OCR demo
+# Telegram long-screenshot OCR demo
 
-The overview keeps the complete **31,186 px** screenshot visible in the left
-rail and enlarges five checkpoints from start to finish. Click it to open the
-original full-resolution PNG.
-
-<p align="center">
-  <a href="telegram-chat-long.png">
-    <img src="telegram-chat-overview.png" alt="Full-length overview of the English Telegram launch chat with five readable checkpoints" width="680">
-  </a>
-</p>
+**[Open the full 780 x 31,186 Telegram screenshot →](telegram-chat-long.png)**
 
 ## Artifacts
 
 | File | Purpose |
 |---|---|
-| [`telegram-chat.html`](telegram-chat.html) | Deterministic, offline source for the fictional English conversation. |
+| [`telegram-chat.html`](telegram-chat.html) | Deterministic, offline source for the English conversation. |
 | [`telegram-chat-long.png`](telegram-chat-long.png) | The generated 780 x 31186 input screenshot. |
-| [`telegram-chat-overview.html`](telegram-chat-overview.html) | Deterministic source for the full-length README overview. |
-| [`telegram-chat-overview.png`](telegram-chat-overview.png) | The complete screenshot as a vertical rail plus five readable checkpoints. |
 | [`telegram-chat-ocr.md`](telegram-chat-ocr.md) | Merged Markdown transcript produced by the long-screenshot OCR workflow. |
 
 ## Checked-in reference run
@@ -26,7 +16,7 @@ The reference run on **August 6, 2026** produced the following result:
 
 | Check | Result |
 |---|---:|
-| Synthetic source records | 180 |
+| Source records | 180 |
 | Extracted records | 180 |
 | OCR chunks | 21 |
 | Split boundaries | 20 |
@@ -34,7 +24,7 @@ The reference run on **August 6, 2026** produced the following result:
 | Missing or extra records | **0** |
 | Speaker, timestamp, and reply-field differences | **0** |
 | Content matches after whitespace/punctuation normalization | **180/180** |
-| Presentation-only differences | 4 (2 smart-quote substitutions, 2 blank-line choices) |
+| Presentation-only differences | 5 (2 smart-quote substitutions, 3 blank-line choices) |
 
 The source intentionally uses a much more recognizable Telegram-style mobile
 layout: Android status and app bars, a pinned-message banner, doodle wallpaper,
@@ -62,7 +52,7 @@ The chunk directory will contain the 21 images, structured OCR sidecars,
 new run with the checked-in reference transcript and inspect every boundary the
 audit marks for review.
 
-To regenerate the input screenshot from the offline HTML fixture:
+To regenerate the input screenshot from the offline HTML source:
 
 ```bash
 python3 skills/vision-tools/scripts/html_shot.py \
@@ -72,16 +62,4 @@ python3 skills/vision-tools/scripts/html_shot.py \
   --scale 2 \
   --wait-ms 100 \
   -o examples/long-screenshot-ocr/telegram-chat-long.png
-```
-
-To regenerate the full-length README overview:
-
-```bash
-python3 skills/vision-tools/scripts/html_shot.py \
-  examples/long-screenshot-ocr/telegram-chat-overview.html \
-  --width 390 \
-  --height 2600 \
-  --scale 2 \
-  --wait-ms 200 \
-  -o examples/long-screenshot-ocr/telegram-chat-overview.png
 ```

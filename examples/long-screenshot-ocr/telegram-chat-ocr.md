@@ -1,6 +1,6 @@
 **system**: Friday, July 31
 
-**system**: This is a fully synthetic conversation created for the Agent Vision Toolkit OCR demo.
+**system**: Maya Chen created Aurora Launch Room and added the release coordination team.
 
 **Maya Chen** (08:31): Good morning. I opened this group so every Aurora launch decision stays in one searchable thread.
 
@@ -134,6 +134,7 @@ aurora-android-0.9.6.apk
 **Jon Bell** (08:47): Analytics validation passed in staging. All four events include workspace_id, user_role, and client_version.
 
 **Ethan Brooks** (09:07): RC artifact is ready.
+
 artifact: aurora-web-0.9.7-rc1
 sha256: c2a04d91f773
 created: 2026-08-04 09:06 UTC

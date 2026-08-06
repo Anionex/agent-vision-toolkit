@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Synthetic Telegram Group Chat - Long Screenshot OCR Demo</title>
+  <title>Telegram Group Chat - Long Screenshot OCR Demo</title>
   <style>
     :root {
       color-scheme: light;
@@ -668,7 +668,7 @@
   </style>
 </head>
 <body>
-  <main class="phone" aria-label="Fully synthetic Telegram-style group chat">
+  <main class="phone" aria-label="Telegram-style group chat">
     <div class="statusbar" aria-hidden="true">
       <span>10:58</span>
       <div class="status-icons">
@@ -741,7 +741,7 @@
     </footer>
   </main>
 
-  <script id="fixture-json" type="application/json"></script>
+  <script id="reference-json" type="application/json"></script>
   <script>
     const people = {
       "Maya Chen": { color: "#b3579a", avatar: "MC", gradient: "linear-gradient(145deg,#d77bbb,#a9478b)" },
@@ -770,7 +770,7 @@
     };
 
     addDay("Friday, July 31", [
-      service("This is a fully synthetic conversation created for the Agent Vision Toolkit OCR demo."),
+      service("Maya Chen created Aurora Launch Room and added the release coordination team."),
       msg("Maya Chen", "08:31", "Good morning. I opened this group so every Aurora launch decision stays in one searchable thread."),
       msg("You", "08:33", "Perfect. I will keep the owner matrix, QA status, copy approvals, release commands, and rollback notes here."),
       msg("Ethan Brooks", "08:36", "The web release branch is cut from main. Current staging version is 0.9.4."),
@@ -997,7 +997,7 @@
           quoted_content: item.reply?.text || ""
         };
       });
-    document.getElementById("fixture-json").textContent = JSON.stringify(records);
+    document.getElementById("reference-json").textContent = JSON.stringify(records);
 
     const initials = (name) => people[name]?.avatar || name.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase();
     const voiceBars = [5,9,13,7,16,11,6,14,18,9,12,7,15,10,5,13,17,8,11,6,14,9,16,7,12,5,10,15];
