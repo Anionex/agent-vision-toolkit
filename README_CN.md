@@ -42,6 +42,15 @@
 
 ## 实际效果
 
+### UI 还原：从手绘稿到成品界面
+
+<p align="center">
+  <img src="assets/ui-restore-sketch.png" alt="作为 UI 还原参考的手绘 JupyterLab 界面" width="49%">
+  <img src="assets/ui-restore-result.png" alt="依据手绘参考还原出的 JupyterLab 工作区界面" width="49%">
+</p>
+
+*左：作为输入的手绘参考；右：依据该手绘稿还原出的 JupyterLab 工作区界面。完整流程见 [UI 还原 playbook](skills/vision-tools/references/restore-ui.md)。*
+
 <p align="center">
   <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
   <img src="assets/effect-4.jpg" alt="DeepSeek V4 用 glance/ground 定位屏幕元素自主游玩国际象棋" width="49%">

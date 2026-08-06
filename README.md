@@ -42,6 +42,15 @@ Beyond giving an agent tools, the included `vision-tools` skill provides end-to-
 
 ## Real-world Effects
 
+### UI restoration: sketch to interface
+
+<p align="center">
+  <img src="assets/ui-restore-sketch.png" alt="Hand-drawn JupyterLab interface used as a UI restoration reference" width="49%">
+  <img src="assets/ui-restore-result.png" alt="Restored JupyterLab workspace made from the hand-drawn reference" width="49%">
+</p>
+
+*Left: the hand-drawn reference. Right: the restored JupyterLab workspace made from it. See the [UI restoration playbook](skills/vision-tools/references/restore-ui.md) for the workflow.*
+
 <p align="center">
   <img src="assets/effect-3.jpg" alt="Multi-round image Q&A with the optional glance CLI" width="49%">
   <img src="assets/effect-4.jpg" alt="DeepSeek V4 playing chess by locating screen elements with glance/ground" width="49%">
