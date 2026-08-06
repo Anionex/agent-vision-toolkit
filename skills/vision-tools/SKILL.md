@@ -18,6 +18,7 @@ Pick the tool by the question you are answering:
 | "Where are all the Xs?" — every instance of a kind | `detect` |
 | "What is its exact shape, size, offset?" | `trace` |
 | "Cut this box out as its own image file" | `crop` |
+| "Extract the icon/logo foreground from a region as transparent PNG" | `scripts/extract_fg.py` |
 | "Turn this HTML file into a screenshot" | `scripts/html_shot.py` |
 | "Which colours dominate a region, and which palette value fits it?" | `scripts/dominant_colors.py` |
 | A relation none of them return — a gap, a distance between two located things | code over the pixels (Pillow) |
@@ -135,13 +136,18 @@ ship-vs-hand-write call.
 ```bash
 crop <image> --region X1,Y1,X2,Y2             # writes <image-stem>.crop.png next to the input
 crop <image> --region X1,Y1,X2,Y2 -o out.png
+crop <image> --region X1,Y1,X2,Y2 --scale 4   # upscale the cut-out 4x (LANCZOS) first
 ```
 
 The same X1,Y1,X2,Y2 pixel boxes `ground`/`detect` print, clamped to the
 image bounds. Once a box is worth keeping — the same crop is about to feed
 `pixel_diff`, `dominant_colors`, and `trace` in turn — cut it to a file
 once and reuse it, instead of re-cropping in memory on every call.
-Requires the optional `pillow`.
+`--scale N` upscales the cut-out before writing (default output name becomes
+`<image-stem>.crop@Nx.png`): for icons too small for `ground`/`trace` to see
+clearly, crop with `--scale 4`, then run `ground`/`trace` on the upscaled
+file — coordinates it returns are in the upscaled grid, divide by `N` to map
+back to the original image. Requires the optional `pillow`.
 
 ## html_shot — render an HTML file to an image (local, needs a Chrome-family browser)
 

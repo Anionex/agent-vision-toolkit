@@ -91,12 +91,41 @@ def test_cli_crop_errors():
         assert missing.returncode != 0 and "not found" in missing.stderr
 
 
+def test_cli_crop_scale():
+    cli = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "bin", "crop")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        source = _make_source(temp_dir)
+        result = subprocess.run([sys.executable, cli, source, "--region", "50,30,150,70",
+                                 "--scale", "4"],
+                                text=True, capture_output=True, check=True)
+        # Default output name carries the scale factor when scale > 1.
+        output = os.path.join(temp_dir, "shot.crop@4x.png")
+        assert os.path.isfile(output), result.stderr
+        assert f"wrote {output} (400x160)" in result.stdout
+        with Image.open(output) as crop:
+            assert crop.size == (400, 160)
+            # A pixel inside the red block stays red after upscaling.
+            assert crop.getpixel((20, 20)) == (255, 0, 0)
+        # Explicit -o wins over the scaled default name.
+        custom = os.path.join(temp_dir, "scaled.png")
+        subprocess.run([sys.executable, cli, source, "--region", "50,30,150,70",
+                        "--scale", "2", "-o", custom],
+                       text=True, capture_output=True, check=True)
+        with Image.open(custom) as crop:
+            assert crop.size == (200, 80)
+        # Reject bad scale values.
+        bad = subprocess.run([sys.executable, cli, source, "--region", "50,30,150,70",
+                              "--scale", "0"], text=True, capture_output=True)
+        assert bad.returncode != 0 and "--scale" in bad.stderr
+
+
 def main():
     test_region_parsing()
     test_clamp_box()
     test_cli_crop_default_output()
     test_cli_crop_custom_output_and_clamping()
     test_cli_crop_errors()
+    test_cli_crop_scale()
     subprocess.run([sys.executable,
                     os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "bin", "crop"),
                     "--help"], check=True, stdout=subprocess.DEVNULL)

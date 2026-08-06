@@ -40,7 +40,12 @@ def main() -> None:
                         help="pixel box to cut out (e.g. a box from ground); clamped to the image bounds")
     parser.add_argument("-o", "--output",
                         help="write the crop here (default: <image-stem>.crop.png next to the input)")
+    parser.add_argument("--scale", type=int, default=1, metavar="N",
+                        help="upscale the cut-out N times (LANCZOS) before writing; "
+                             "use 2-4 for small icons before ground/trace")
     args = parser.parse_args()
+    if args.scale < 1:
+        parser.exit(1, "crop: --scale must be >= 1\n")
 
     try:
         from PIL import Image
@@ -66,13 +71,19 @@ def main() -> None:
                   file=sys.stderr)
         if args.output:
             output = Path(args.output).expanduser()
+        elif args.scale > 1:
+            output = source.with_name(source.stem + f".crop@{args.scale}x.png")
         else:
             output = source.with_name(source.stem + ".crop.png")
         try:
-            image.crop(box).save(output)
+            crop = image.crop(box)
+            if args.scale > 1:
+                crop = crop.resize((crop.width * args.scale, crop.height * args.scale),
+                                   resample=Image.LANCZOS)
+            crop.save(output)
         except OSError as exc:
             parser.exit(1, f"crop: cannot write {output}: {exc}\n")
-    print(f"wrote {output} ({box[2] - box[0]}x{box[3] - box[1]})")
+    print(f"wrote {output} ({(box[2] - box[0]) * args.scale}x{(box[3] - box[1]) * args.scale})")
 
 
 if __name__ == "__main__":
