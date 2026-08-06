@@ -5,8 +5,6 @@
 [![GitHub stars](https://img.shields.io/github/stars/Anionex/agent-vision-toolkit?style=flat-square&logo=github)](https://github.com/Anionex/agent-vision-toolkit/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Anionex/agent-vision-toolkit?style=flat-square&logo=github)](https://github.com/Anionex/agent-vision-toolkit/forks)
 [![License: MIT](https://img.shields.io/github/license/Anionex/agent-vision-toolkit?style=flat-square&color=4EAA25)](https://github.com/Anionex/agent-vision-toolkit/blob/main/LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/Anionex/agent-vision-toolkit/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Anionex/agent-vision-toolkit/actions/workflows/ci.yml)
-[![Sponsor](https://img.shields.io/badge/Sponsor-Anionex-EA4AAA?style=flat-square&logo=githubsponsors)](https://github.com/sponsors/Anionex)
 
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-Standard-green?style=flat-square)](https://agentskills.io)
 [![Extensions](https://img.shields.io/badge/-Extensions-3178C6?style=flat-square)](https://github.com/Anionex/agent-vision-toolkit/tree/main/extensions)
@@ -30,9 +28,9 @@
 <details>
 <summary><b>目录</b></summary>
 
+- [亮点](#亮点)
 - [用例技能](#用例技能)
 - [实际效果](#实际效果)
-- [亮点](#亮点)
 - [快速开始](#快速开始)
 - [工具](#工具)
 - [升级：无缝接入](#升级无缝接入)
@@ -44,6 +42,17 @@
 - [支持项目](#支持项目)
 
 </details>
+
+
+## 亮点
+
+- **不只是看图描述，是获取llm真正关注的内容**：每张图都会附上 focus hint，贴图用它自己那条消息的文字，`view_image` 取回的图用模型自述的看图动机，描述因此覆盖这一轮真正要用到的细节，而不是一段通用 caption。
+- **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图。
+- **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
+- **视觉模型只负责看，不替你推理**：它只转写和描述图片内容，不直接回答问题，结论仍由你的编程模型基于描述得出。
+- **由粗到细**：首轮描述是地图，不是完整答案——描述里缺了你要的细节时，用 `glance -q` 追问、用 `ground --region` 放大。
+- **精确几何留在本地**：`trace` 不经过视觉 API，数字来自真实像素，而不是模型自信的估计。
+- **后续可能加入的更多视觉工具**
 
 
 ## 用例技能
@@ -94,17 +103,6 @@
 </p>
 
 *左：DeepSeek V4 回答 UI 背景风格问题并对比相近风格；右：DeepSeek V4 根据截图排查字段名称不符预期的 bug。*
-
-
-## 亮点
-
-- **不只是看图描述，是获取llm真正关注的内容**：每张图都会附上 focus hint，贴图用它自己那条消息的文字，`view_image` 取回的图用模型自述的看图动机，描述因此覆盖这一轮真正要用到的细节，而不是一段通用 caption。
-- **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图。
-- **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
-- **视觉模型只负责看，不替你推理**：它只转写和描述图片内容，不直接回答问题，结论仍由你的编程模型基于描述得出。
-- **由粗到细**：首轮描述是地图，不是完整答案——描述里缺了你要的细节时，用 `glance -q` 追问、用 `ground --region` 放大。
-- **精确几何留在本地**：`trace` 不经过视觉 API，数字来自真实像素，而不是模型自信的估计。
-- **后续可能加入的更多视觉工具**
 
 
 ## 快速开始
@@ -320,31 +318,6 @@ Codex（携带原有 Authorization）
 
 因此不要修改 Codex 原有的认证配置，也不要在代理 env 中重复保存上游的 API key。代理 env 只需配置 `VISION_API_KEY`、`VISION_BASE_URL` 和 `VISION_MODEL`。
 
-## 文件清单
-
-| 文件 | 作用 |
-|---|---|
-| `bin/glance` | 图片描述、问答和 OCR CLI |
-| `ground.py` / `bin/ground` | 图片目标定位 CLI |
-| `detect.py` / `bin/detect` | 元素盘点 CLI（与 ground 共用实现） |
-| `bin/trace` | 本地图转 SVG 描摹 CLI（精确形状几何，不调视觉 API） |
-| `bin/crop` | 本地区域裁剪 CLI（像素盒转图片文件，不调视觉 API） |
-| `skills/vision-tools/scripts/long_screenshot_ocr.py` | 安全切分长截图、调用 `glance` 逐块 OCR、合并重叠内容并生成边界审计 |
-| `skills/vision-tools/` | skill：工具手册、由粗到细的方法论、按场景的 playbook |
-| `vision_client.py` | 代理与 CLI 共用的视觉 API 客户端 |
-| `vision_proxy.py` | 本地图片改写代理与 SSE 转发 |
-| `extensions/pi/vision.ts` | Pi 与 Oh My Pi 的单文件原生 extension |
-| `extensions/opencode/vision.ts` | OpenCode 的单文件原生 plugin |
-| `AGENT_INSTALL.md` | Agent 的安装与验证步骤 |
-| `tests/test_image_rewrite_shapes.py` | 图片结构、并发、缓存及失败行为测试 |
-| `tests/test_anthropic_rewrite.py` | Anthropic Messages（Claude Code）改写路径测试 |
-| `tests/test_extensions.mjs` | Pi / Oh My Pi / OpenCode extension 测试（node 或 bun） |
-| `tests/smoke_test_proxy.py` | 代理透传、鉴权和流式协议测试 |
-| `tests/test_vision_client.py` | 视觉客户端重试与 `glance` 测试 |
-| `tests/test_ground.py` | `ground` 坐标解析和共享配置测试 |
-| `tests/test_detect.py` | `detect` 盘点与区域坐标映射测试 |
-| `tests/test_long_screenshot_ocr.py` | 长截图切分、合并、调用编排与断点复用测试 |
-
 ## 限制
 
 - 这是图片转文字的一层，不会把视觉 token 直接交给纯文本模型。
@@ -359,10 +332,11 @@ Codex（携带原有 Authorization）
 - 安全问题：[安全策略](SECURITY.md)
 - 社区规范：[行为准则](CODE_OF_CONDUCT.md)
 - 用户可见变更：[更新日志](CHANGELOG.md)
+- 赞助与资金用途：[Funding](FUNDING.md)
 
 ## 支持项目
 
-如果 agent-vision-toolkit 为你节省了时间，欢迎 Star、分享、参与贡献，或通过 [GitHub Sponsors 赞助 Anionex](https://github.com/sponsors/Anionex)。赞助主要用于视觉模型 API 实测、跨平台验证与持续维护。
+如果 agent-vision-toolkit 为你节省了时间，欢迎 Star、分享、参与贡献，或赞助项目继续开发。赞助渠道与资金用途见 [FUNDING.md](FUNDING.md)。
 
 ---
 Made by [Anionex](https://github.com/Anionex) with codex

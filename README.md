@@ -5,8 +5,6 @@
 [![GitHub stars](https://img.shields.io/github/stars/Anionex/agent-vision-toolkit?style=flat-square&logo=github)](https://github.com/Anionex/agent-vision-toolkit/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Anionex/agent-vision-toolkit?style=flat-square&logo=github)](https://github.com/Anionex/agent-vision-toolkit/forks)
 [![License: MIT](https://img.shields.io/github/license/Anionex/agent-vision-toolkit?style=flat-square&color=4EAA25)](https://github.com/Anionex/agent-vision-toolkit/blob/main/LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/Anionex/agent-vision-toolkit/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Anionex/agent-vision-toolkit/actions/workflows/ci.yml)
-[![Sponsor](https://img.shields.io/badge/Sponsor-Anionex-EA4AAA?style=flat-square&logo=githubsponsors)](https://github.com/sponsors/Anionex)
 
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-Standard-green?style=flat-square)](https://agentskills.io)
 [![Extensions](https://img.shields.io/badge/-Extensions-3178C6?style=flat-square)](https://github.com/Anionex/agent-vision-toolkit/tree/main/extensions)
@@ -30,9 +28,9 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 <details>
 <summary><b>Contents</b></summary>
 
+- [Highlights](#highlights)
 - [Use-case Playbooks](#use-case-playbooks)
 - [Real-world Effects](#real-world-effects)
-- [Highlights](#highlights)
 - [Quick Start](#quick-start)
 - [The Tools](#the-tools)
 - [Upgrade: Seamless Integration](#upgrade-seamless-integration)
@@ -44,6 +42,17 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 - [Support the Project](#support-the-project)
 
 </details>
+
+
+## Highlights
+
+- **Descriptions target the current question**: every image gets a focus hint — a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking — so the description covers the details this turn actually needs instead of being a generic caption.
+- **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
+- **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
+- **The vision model only looks, it doesn't reason for you**: it transcribes and describes, leaving the conclusion to your coding model.
+- **Coarse to fine**: the first description is a map, not the whole answer — `glance -q` and `ground --region` are the follow-up channel when a detail wasn't covered.
+- **Exact geometry stays local**: `trace` never calls a vision API, so numbers come from pixels rather than from a model's confident estimate.
+- **More vision tools may be added later**
 
 
 ## Use-case Playbooks
@@ -94,17 +103,6 @@ The privacy-safe fixture is generated entirely from local HTML. In the checked-i
 </p>
 
 *Left: DeepSeek V4 answers a UI style question with similar-style comparisons. Right: DeepSeek V4 debugs a field-name mismatch from a screenshot.*
-
-
-## Highlights
-
-- **Descriptions target the current question**: every image gets a focus hint — a pasted image carries its own message's text, an image fetched via `view_image` carries the assistant's stated reason for looking — so the description covers the details this turn actually needs instead of being a generic caption.
-- **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
-- **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
-- **The vision model only looks, it doesn't reason for you**: it transcribes and describes, leaving the conclusion to your coding model.
-- **Coarse to fine**: the first description is a map, not the whole answer — `glance -q` and `ground --region` are the follow-up channel when a detail wasn't covered.
-- **Exact geometry stays local**: `trace` never calls a vision API, so numbers come from pixels rather than from a model's confident estimate.
-- **More vision tools may be added later**
 
 
 ## Quick Start
@@ -323,31 +321,6 @@ Codex (carrying the original Authorization)
 
 So don't modify Codex's existing auth config, and don't store the upstream API key again in the proxy env. The proxy env only needs `VISION_API_KEY`, `VISION_BASE_URL`, and `VISION_MODEL`.
 
-## File Listing
-
-| File | Purpose |
-|---|---|
-| `bin/glance` | Image description, Q&A, and OCR CLI |
-| `ground.py` / `bin/ground` | Image target-grounding CLI |
-| `detect.py` / `bin/detect` | Element-inventory CLI (shares the ground machinery) |
-| `bin/trace` | Local image-to-SVG tracing CLI (exact shape geometry, no vision API) |
-| `bin/crop` | Local region-crop CLI (pixel box to image file, no vision API) |
-| `skills/vision-tools/scripts/long_screenshot_ocr.py` | Safe long-screenshot splitting, chunk OCR through `glance`, overlap merge, and boundary audit |
-| `skills/vision-tools/` | The skill: tool manual, coarse-to-fine method, per-scenario playbooks |
-| `vision_client.py` | Vision API client shared by the proxy and the CLIs |
-| `vision_proxy.py` | Local image-rewriting proxy and SSE forwarding |
-| `extensions/pi/vision.ts` | Single-file native extension for Pi and Oh My Pi |
-| `extensions/opencode/vision.ts` | Single-file native plugin for OpenCode |
-| `AGENT_INSTALL.md` | Installation and verification steps for agents |
-| `tests/test_image_rewrite_shapes.py` | Tests for image structures, concurrency, caching, and failure behavior |
-| `tests/test_anthropic_rewrite.py` | Tests for the Anthropic Messages (Claude Code) rewrite path |
-| `tests/test_extensions.mjs` | Tests for the Pi / Oh My Pi / OpenCode extensions (node or bun) |
-| `tests/smoke_test_proxy.py` | Tests for proxy pass-through, auth, and streaming protocol |
-| `tests/test_vision_client.py` | Vision client retry and `glance` tests |
-| `tests/test_ground.py` | `ground` coordinate parsing and shared config tests |
-| `tests/test_detect.py` | `detect` inventory and region coordinate-mapping tests |
-| `tests/test_long_screenshot_ocr.py` | Long-screenshot splitting, merge, orchestration, and resume tests |
-
 ## Limitations
 
 - This is an image-to-text layer; it doesn't hand vision tokens directly to the text model.
@@ -362,10 +335,11 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 - Security reports: [Security policy](SECURITY.md)
 - Community standards: [Code of Conduct](CODE_OF_CONDUCT.md)
 - User-facing changes: [Changelog](CHANGELOG.md)
+- Funding and sponsorship: [Funding](FUNDING.md)
 
 ## Support the Project
 
-If agent-vision-toolkit saves you time, you can support it by starring, sharing, contributing, or [sponsoring Anionex](https://github.com/sponsors/Anionex). Sponsorship helps fund vision API evaluations, cross-platform verification, and ongoing maintenance.
+If agent-vision-toolkit saves you time, you can support it by starring, sharing, contributing, or sponsoring its continued development. See [FUNDING.md](FUNDING.md) for funding channels and how sponsorship is used.
 
 ---
 

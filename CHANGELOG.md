@@ -11,3 +11,4 @@ The project has not published a tagged release yet. Until the first release, cha
 - Community contribution, conduct, support, and security policies.
 - Structured issue forms and a pull request template.
 - GitHub funding configuration and continuous integration checks.
+- A bilingual funding policy and sponsorship-use statement.
