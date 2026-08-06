@@ -43,7 +43,7 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 - [Configuration](#configuration)
 - [FAQ](#faq)
 - [Community](#community)
-- [Sponsorship](#sponsorship)
+- [About](#about)
 
 </details>
 
@@ -90,14 +90,20 @@ Each playbook explains when to use the workflow, which tools to call and in what
 
 ## Quick Start
 
-**The easiest install: hand it to your agent.** Paste this into your coding agent:
+**The easiest way to install it is to send this to your agent:**
 
-> Read https://github.com/Anionex/agent-vision-toolkit and set it up on this machine: the vision toolkit and skill, plus the seamless integration in AGENT_INSTALL.md if the agent product I use supports it.
+> Follow the instructions in https://github.com/Anionex/agent-vision-toolkit to install the vision toolkit and skill locally. If the env file is not configured, open it and guide me through the setup.
 
-The only thing you need to prepare is an OpenAI-compatible vision API (key, base URL, model name) — the agent does the rest.
+**If you also want the optional seamless proxy service, send this:**
+
+> Follow https://github.com/Anionex/agent-vision-toolkit/blob/main/AGENT_INSTALL.md to install the optional vision proxy service or extension for the agent application we are currently using. If the env file is not configured, open it and guide me through the setup.
+
+All you need to prepare is an OpenAI-compatible multimodal API base URL, API key, and model name. After installation, the agent will guide you through configuring all three values in the env file.
+
+> After installing the optional integration and restarting the agent, paste an image directly or let the model call its built-in image tool. Pi, Oh My Pi, and OpenCode use single-file [native extensions](extensions/) rather than the proxy; see each agent's documentation.
 
 <details>
-<summary><b>Prefer to install by hand?</b> Three steps.</summary>
+<summary><b>Three-step manual installation</b></summary>
 
 **1. Point it at a vision API** — three env vars in `~/.config/agent-vision-toolkit/env` (`chmod 600`):
 
@@ -130,7 +136,7 @@ Or copy `skills/vision-tools/` into your agent's skills directory (e.g. `~/.code
 
 ## The Tools
 
-Each tool answers one kind of question, so the calling agent — which holds the full context — picks the right one instead of guessing at a single overloaded command.
+A set of visual tools designed for agents, letting them choose freely based on the situation:
 
 <details>
 <summary><b><code>glance</code> — "what does this image look like?"</b></summary>
@@ -239,7 +245,7 @@ This layer makes screenshots pasted into an agent work directly, while also prev
 | **OpenCode** | one-file native plugin ([`extensions/opencode/`](extensions/opencode/)) | ✅ verified |
 | Any agent with a shell | the toolkit above — no integration needed | ✅ |
 
-All entry points share one configuration: configure it once and use it everywhere.
+All entry points share one configuration. Configure it once and use it everywhere.
 
 ### Descriptions that keep the task in view
 
@@ -255,11 +261,6 @@ To address this, `agent-vision-toolkit` tries to recover **why the agent wants t
        alt="Generic image descriptions compared with task-aware vision using a focus hint - Part 2"
        width="49%">
 </p>
-
-### Installation and usage
-
-The project can be installed by your agent — the prompt in Quick Start already covers it. This repository does not provide a one-click installer; the steps the agent should follow are in the **[Agent Installation Guide](AGENT_INSTALL.md)**. After installation and a restart, paste an image directly or let the model call its built-in image tool. Pi, Oh My Pi, and OpenCode use single-file [native extensions](extensions/) instead of the proxy; see the documentation for each agent.
-
 
 ## How It Works
 
@@ -331,8 +332,8 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 - Community standards: [Code of Conduct](CODE_OF_CONDUCT.md)
 - User-facing changes: [Changelog](CHANGELOG.md)
 
-## Sponsorship
+## About
 
-Open source is not easy. If agent-vision-toolkit saves you time, you are welcome to star it, share it, contribute, or [sponsor the project](FUNDING.md).
+If agent-vision-toolkit saves you time, you are welcome to star it, share it, contribute, or [sponsor the project](FUNDING.md).
 
-I'm [Anionex](https://anionex.me/), an AI-native developer who once ranked No. 4 on GitHub's global developer trending list, with more than 16k stars across my projects. If you would like to follow my future work, [follow me on GitHub](https://github.com/Anionex).
+I'm [anionex](https://anionex.me/), an AI-native developer who once ranked No. 4 on GitHub's global developer trending list, with more than 16k stars across my projects. If you would like to follow my future work, [follow me on GitHub](https://github.com/Anionex).

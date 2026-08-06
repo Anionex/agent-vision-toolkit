@@ -43,7 +43,7 @@
 - [配置](#配置)
 - [常见问题](#常见问题)
 - [社区](#社区)
-- [赞助](#赞助)
+- [关于](#关于)
 
 </details>
 
@@ -90,14 +90,20 @@
 
 ## 快速开始
 
-**最简单的安装方式：交给你的 agent。** 把这句话发给你的 coding agent：
+**最简单的安装方式，是把这句话发给 agent：**
 
-> 请阅读 https://github.com/Anionex/agent-vision-toolkit ，在本机装好视觉工具箱和 skill；如果我使用的agent产品适用，也按 AGENT_INSTALL.md 部署无缝接入。
+> 根据 https://github.com/Anionex/agent-vision-toolkit 仓库指引，在本地装好视觉工具箱和 skill；如未配置，请你打开并引导我配置env文件。
 
-你唯一要准备的是一个 OpenAI-compatible 的视觉 API（key、地址、模型名），其余都由 agent 完成。
+**如果需要安装可选的无缝代理服务，也可以发送：**
+
+> 根据 https://github.com/Anionex/agent-vision-toolkit/blob/main/AGENT_INSTALL.md ，为我们当前使用的agent应用安装可选的视觉代理服务/插件；如未配置，请你打开并引导我配置env文件。
+
+唯一要准备的是 OpenAI兼容的多模态模型 API BASE和 API key，以及指定模型名称，发送上述消息安装完毕后，agent将会引导你配置env中完成三项的配置。
+
+> 对于可选代理，安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，可见各 agent的文档。
 
 <details>
-<summary><b>想手动装？</b>三步。</summary>
+<summary><b>三步手动安装</b></summary>
 
 **1. 指向一个视觉 API**——在 `~/.config/agent-vision-toolkit/env` 里写三个环境变量（`chmod 600`）：
 
@@ -130,7 +136,7 @@ npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --c
 
 ## 工具
 
-每个工具回答一类问题，让掌握完整上下文的调用方 agent 去选择，而不是让它对着一个大而全的命令猜参数。
+为 agent 设计的一组视觉工具，能够让他根据不同情况自由选择：
 
 <details>
 <summary><b><code>glance</code> —— “这张图看起来长什么样?”</b></summary>
@@ -237,7 +243,7 @@ crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 | **OpenCode** | 单文件原生 plugin（[`extensions/opencode/`](extensions/opencode/)） | ✅ 已验证 |
 | 任何有 shell 的 agent | 上面的工具箱——无需接入 | ✅ |
 
-所有入口共享配置。一次配置，多处使用。
+所有入口共享配置。一次配置好后即可多处使用。
 
 ### 让描述始终对着当前任务
 
@@ -253,10 +259,6 @@ crop screenshot.png --region 1563,514,1668,621 -o send-button.png
        alt="通用图片描述与带 focus hint 的任务感知视觉的对比 - 下半部分"
        width="49%">
 </p>
-
-### 安装使用
-
-本项目可以交给 agent 安装——快速开始里那句话已经覆盖了它；本仓库不提供一键安装器，agent 遵循的步骤在 **[Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，可见各 agent的文档。
 
 
 ## 工作原理
@@ -328,8 +330,8 @@ Codex（携带原有 Authorization）
 - 社区规范：[行为准则](CODE_OF_CONDUCT.md)
 - 用户可见变更：[更新日志](CHANGELOG.md)
 
-## 赞助
+## 关于
 
-开源不易。如果 agent-vision-toolkit 为你节省了时间，欢迎 Star、分享、参与贡献，[或赞助项目～](FUNDING.md)。
+如果 agent-vision-toolkit 为你节省了时间，欢迎 Star、分享、参与贡献，[或赞助项目～](FUNDING.md)。
 
-我是 [Anionex](https://anionex.me/)，一名 AI 原生开发者，曾上榜 GitHub 全球开发者趋势榜第 4 名，总 Star 数超过 16k。如果你想了解我后续的更多工作，欢迎[关注我](https://github.com/Anionex)～
+我是 [anionex](https://anionex.me/)，一名 AI 原生开发者，曾上榜 GitHub 全球开发者趋势榜第 4 名，总 Star 数超过 16k。如果你想了解我后续的更多工作，欢迎[关注我](https://github.com/Anionex)～
