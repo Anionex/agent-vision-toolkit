@@ -14,20 +14,21 @@
 [![Extensions](https://img.shields.io/badge/-Extensions-3178C6?style=flat-square)](https://github.com/Anionex/agent-vision-toolkit/tree/main/extensions)
 [![Shell](https://img.shields.io/badge/-Shell-4EAA25?style=flat-square&logo=gnubash&logoColor=white)](https://github.com/Anionex/agent-vision-toolkit/tree/main/bin)
 
-**所想即所见——给任意纯文本 coding agent 装上眼睛：图片问答、OCR、截图分析、视觉定位、图转 SVG，一套视觉工具箱加一个 skill，并可选无缝接入 Codex、Claude Code、Pi、Oh My Pi、OpenCode。**
+**所想即所见——给任意纯文本 coding agent 装上眼睛：图片问答、长图OCR、前端UI还原、GUI自动化，一套视觉工具箱加一个 skill，并可选无缝接入 Codex、Claude Code、Pi、Oh My Pi、OpenCode。**
 
 🌐 **中文** ｜ [**English**](README.md)
 
 </div>
 
-如果你的 coding agent 接的是 DeepSeek V4 这类纯文本模型，它就没法看图——截图、设计稿、示意图、报错弹窗全是死路。本仓库分两层给它装上眼睛：
+如果你的 agent 已经接入 deepseek 这样的纯文本模型 ，却苦恼于模型没有多模态，不能看图、每次调用看图都会被系统拦下，本仓库提供了一套工具、技能和代理方案，让纯文本模型也能对等地甚至更好地完成各类视觉任务，尽量让纯文本模型agent的交互体验和多模态模型的交互体验保持一致，最终做到在工具加持下，文本模型agent的多模态任务能力反超不使用该仓库工具和技能的原生多模态agent。
 
-1. **工具箱** —— 五个 CLI，外加一个 skill 告诉 agent 什么时候该用哪个。任何有 shell 的 agent 都能用。
-2. **无缝接入**（可选升级）—— 透明本地代理与单文件原生 extension，让**用户粘贴的图片和 agent 内置看图工具也能工作**，不需要额外的工具调用，也不需要额外提示词。
+本仓库提供两类内容：
+1. **视觉工具CLIs**：多个 CLI，外加一个 skill 告诉 agent 什么时候该用哪个。任何能调用 shell 的 agent 都能使用。
+2. **无缝接入**（可选升级）：透明本地代理与单文件原生插件，让**我们粘贴的图片和 agent 内置的看图工具也能完美工作**，不需要额外的工具安装，也不需要额外提示词。
 
 所有代码均已在真实 Codex + DeepSeek 会话中验证过，同一套管线也在 Claude Code、Pi、Oh My Pi、OpenCode 中完成了真机端到端验证。
 
-> 如果项目对你有用，欢迎 star🌟 & fork。
+> 如果项目对你有用或为你带来了一些启发，欢迎 star🌟 & fork。
 
 <details>
 <summary><b>目录</b></summary>
@@ -51,14 +52,15 @@
 ## 亮点
 
 - **不只是看图描述，是获取llm真正关注的内容**：每张图都会附上 focus hint，贴图用它自己那条消息的文字，`view_image` 取回的图用模型自述的看图动机，描述因此覆盖这一轮真正要用到的细节，而不是一段通用 caption。
-- **贴图和 `view_image` 都支持**：直接粘贴图片（`message.content`）和模型调用 `view_image`（`function_call_output.output`）两种结构都能看图。
-- **多图并行看图**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，不必逐张等待。
-- **提供一套看图方法论**：skill 会告诉 agent 面对不同视觉任务时应该看什么、选择哪个工具、按什么步骤推进，以及最后如何验证结果。
+- **直接粘贴图片和内置看图都支持**：直接粘贴图片，和模型调用内置工具两种方式，都能看图。
+- **多图并行解析**：一次请求里的多张图并发调用视觉模型，N 张图约等于 1 张图的延迟，速度翻倍。
+- **一套经过实战验证的视觉任务方法论**：项目提供的skill，会告诉 agent 面对不同视觉任务时应该看什么、选择哪个工具、按什么步骤推进，以及最后如何验证结果。
 
 
 ## 用例技能
 
-除了给 agent 提供看图工具，随项目提供的 `vision-tools` skill 还内置了可直接照着执行的完整用例：什么时候使用、按什么顺序调用工具、最后如何验收，都写在对应的 playbook 里。
+随项目提供的 `vision-tools` skill 内置了可直接照着执行的完整用例。
+什么时候使用、按什么顺序调用工具、最后如何验收，都写在对应的 playbook 里：
 
 | 用例 | Agent 会如何完成 |
 |---|---|
@@ -91,7 +93,7 @@
 
 **最简单的安装方式：交给你的 agent。** 把这句话发给你的 coding agent：
 
-> 请阅读 https://github.com/Anionex/agent-vision-toolkit ，在本机装好视觉工具箱和 skill；如果我的宿主适用，也按 AGENT_INSTALL.md 部署无缝接入。
+> 请阅读 https://github.com/Anionex/agent-vision-toolkit ，在本机装好视觉工具箱和 skill；如果我使用的agent产品适用，也按 AGENT_INSTALL.md 部署无缝接入。
 
 你唯一要准备的是一个 OpenAI-compatible 的视觉 API（key、地址、模型名），其余都由 agent 完成。
 
@@ -341,11 +343,9 @@ Codex（携带原有 Authorization）
 - 安全问题：[安全策略](SECURITY.md)
 - 社区规范：[行为准则](CODE_OF_CONDUCT.md)
 - 用户可见变更：[更新日志](CHANGELOG.md)
-- 赞助与资金用途：[Funding](FUNDING.md)
 
 ## 支持项目
 
-如果 agent-vision-toolkit 为你节省了时间，欢迎 Star、分享、参与贡献，或赞助项目继续开发。赞助渠道与资金用途见 [FUNDING.md](FUNDING.md)。
+开源不易。如果 agent-vision-toolkit 为你节省了时间，欢迎 Star、分享、参与贡献，[或赞助项目～](FUNDING.md)。
 
----
-Made by [Anionex](https://github.com/Anionex) with codex
+我是[anionex](https://anionex.me/)，一名ai原生开发者，曾上榜github全球开发者趋势榜第4名，总star数超过了16k。如果你想了解我后续的更多工作，欢迎[关注我]～(https://github.com/Anionex)
