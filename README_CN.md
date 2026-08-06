@@ -79,7 +79,7 @@
   <img src="assets/ui-restore-result.png" alt="依据手绘参考还原出的 JupyterLab 工作区界面" width="49%">
 </p>
 
-*左：作为输入的手绘参考；右：依据该手绘稿还原出的 JupyterLab 工作区界面。完整流程见 [UI 还原 playbook](skills/vision-tools/references/restore-ui.md)。*
+*左：作为输入的手绘参考；右：依据该手绘稿还原出的 JupyterLab 工作区界面。完整流程见 [UI 还原 playbook](skills/vision-tools/references/restore-ui.md)。由 Codex 搭配 `deepseek-v4-flash` 实际执行。*
 
 <p align="center">
   <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">

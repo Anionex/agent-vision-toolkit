@@ -79,7 +79,7 @@ When to use them, the order in which to call tools, and how to verify the result
   <img src="assets/ui-restore-result.png" alt="Restored JupyterLab workspace made from the hand-drawn reference" width="49%">
 </p>
 
-*Left: the hand-drawn reference. Right: the restored JupyterLab workspace made from it. See the [UI restoration playbook](skills/vision-tools/references/restore-ui.md) for the workflow.* Exec on codex with deepseek-v4-flash.
+*Left: the hand-drawn reference. Right: the restored JupyterLab workspace made from it. See the [UI restoration playbook](skills/vision-tools/references/restore-ui.md) for the workflow. Executed in Codex with `deepseek-v4-flash`.*
 
 <p align="center">
   <img src="assets/effect-3.jpg" alt="Multi-round image Q&A with the optional glance CLI" width="49%">
