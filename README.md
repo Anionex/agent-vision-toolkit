@@ -72,6 +72,17 @@ When to use them, the order in which to call tools, and how to verify the result
 
 ## Real-world Effects
 
+### Infographic restoration: screenshot to HTML
+
+<p align="center">
+  <img src="assets/infographic-restore-reference.png" alt="Original infographic showing how the model is trained" width="49%">
+  <a href="examples/infographic-restoration/how-is-the-model-trained.html">
+    <img src="assets/infographic-restore-result.png" alt="HTML and CSS reconstruction of the model-training infographic" width="49%">
+  </a>
+</p>
+
+*Left: the original infographic screenshot. Right: an editable reconstruction built with HTML/CSS. [View the HTML source →](examples/infographic-restoration/how-is-the-model-trained.html)*
+
 ### UI restoration: sketch to interface
 
 <p align="center">
@@ -80,15 +91,6 @@ When to use them, the order in which to call tools, and how to verify the result
 </p>
 
 *Left: the hand-drawn reference. Right: the restored JupyterLab workspace made from it. See the [UI restoration playbook](skills/vision-tools/references/restore-ui.md) for the workflow. Executed in Codex with `deepseek-v4-flash`.*
-
-### Infographic restoration: screenshot to HTML
-
-<p align="center">
-  <img src="assets/infographic-restore-reference.png" alt="Original infographic showing how the model is trained" width="49%">
-  <img src="assets/infographic-restore-result.png" alt="HTML and CSS reconstruction of the model-training infographic" width="49%">
-</p>
-
-*Left: the original infographic screenshot. Right: an editable reconstruction built with HTML/CSS.*
 
 <p align="center">
   <img src="assets/effect-3.jpg" alt="Multi-round image Q&A with the optional glance CLI" width="49%">

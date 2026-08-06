@@ -72,6 +72,17 @@
 
 ## 实际效果
 
+### 信息图还原：从截图到 HTML
+
+<p align="center">
+  <img src="assets/infographic-restore-reference.png" alt="模型训练流程信息图原始截图" width="49%">
+  <a href="examples/infographic-restoration/how-is-the-model-trained.html">
+    <img src="assets/infographic-restore-result.png" alt="使用 HTML 和 CSS 复刻的模型训练流程信息图" width="49%">
+  </a>
+</p>
+
+*左：原始信息图截图；右：使用 HTML/CSS 复刻的可编辑结果。[查看 HTML 源文件 →](examples/infographic-restoration/how-is-the-model-trained.html)*
+
 ### UI 还原：从手绘稿到成品界面
 
 <p align="center">
@@ -80,15 +91,6 @@
 </p>
 
 *左：作为输入的手绘参考；右：依据该手绘稿还原出的 JupyterLab 工作区界面。完整流程见 [UI 还原 playbook](skills/vision-tools/references/restore-ui.md)。由 Codex 搭配 `deepseek-v4-flash` 实际执行。*
-
-### 信息图还原：从截图到 HTML
-
-<p align="center">
-  <img src="assets/infographic-restore-reference.png" alt="模型训练流程信息图原始截图" width="49%">
-  <img src="assets/infographic-restore-result.png" alt="使用 HTML 和 CSS 复刻的模型训练流程信息图" width="49%">
-</p>
-
-*左：原始信息图截图；右：使用 HTML/CSS 复刻的可编辑结果。*
 
 <p align="center">
   <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
