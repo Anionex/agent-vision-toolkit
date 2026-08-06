@@ -32,7 +32,7 @@ Beyond giving an agent tools, the included `vision-tools` skill provides end-to-
 
 | Use case | What the agent learns to do |
 |---|---|
-| [Extract long screenshots, chat histories, and scrolling pages](skills/vision-tools/references/long-screenshot-ocr.md) | Find low-content cut bands, OCR each chunk in order, preserve chat speakers/timestamps/quotes, merge only duplicated overlap, and surface risky boundaries for verification. |
+| [Extract long screenshots, chat histories, and scrolling pages](skills/vision-tools/references/long-screenshot-ocr.md) | Find low-content cut bands, OCR each chunk in order, preserve chat speakers/timestamps/quotes, merge only duplicated overlap, and surface risky boundaries for verification. [See the synthetic Telegram run →](examples/long-screenshot-ocr/) |
 | [Rebuild a UI from a screenshot or design](skills/vision-tools/references/restore-ui.md) | Reuse project components and assets first, then combine code-native UI, extracted visuals, rendered screenshots, and visual comparison to align a page or component. |
 | [Restore an icon, logo, illustration, or other graphic](skills/vision-tools/references/restore-graphic.md) | Extract a transparent PNG from the source image, or rebuild an editable/scalable SVG when needed, then verify shape, color, and alpha edges. |
 | [Turn a sketch, diagram, or whiteboard into structured code](skills/vision-tools/references/restore-structure.md) | Recover nodes, labels, connections, and directions as editable Mermaid, Graphviz, or another structured representation. |
@@ -41,6 +41,16 @@ Beyond giving an agent tools, the included `vision-tools` skill provides end-to-
 
 
 ## Real-world Effects
+
+### Long-chat OCR: 900 x 6000 screenshot to a clean transcript
+
+<p align="center">
+  <a href="examples/long-screenshot-ocr/telegram-chat-long.png">
+    <img src="examples/long-screenshot-ocr/telegram-chat-preview.png" alt="Preview of a fully synthetic English Telegram chat used for long-screenshot OCR" width="680">
+  </a>
+</p>
+
+The privacy-safe fixture is generated entirely from local HTML. In the checked-in reference run, the workflow split it into four chunks, merged a 128 px fallback overlap, and recovered all **57/57 records** with no differences in speaker, timestamp, body, or reply metadata. [Open the full input, transcript, and reproduction steps →](examples/long-screenshot-ocr/)
 
 ### UI restoration: sketch to interface
 

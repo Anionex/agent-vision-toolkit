@@ -32,7 +32,7 @@
 
 | 用例 | Agent 会如何完成 |
 |---|---|
-| [识别长截图、聊天记录与滚动页面](skills/vision-tools/references/long-screenshot-ocr.md) | 避开文字寻找安全切口，按顺序逐块 OCR，保留聊天发言人、时间和引用关系，只合并确实重复的内容，并标出需要复查的边界。 |
+| [识别长截图、聊天记录与滚动页面](skills/vision-tools/references/long-screenshot-ocr.md) | 避开文字寻找安全切口，按顺序逐块 OCR，保留聊天发言人、时间和引用关系，只合并确实重复的内容，并标出需要复查的边界。 [查看合成 Telegram 实跑示例 →](examples/long-screenshot-ocr/) |
 | [根据截图或设计稿还原 UI](skills/vision-tools/references/restore-ui.md) | 优先复用项目已有组件和素材，再结合原生 UI 代码、截图素材、渲染截图与视觉对比，逐轮对齐页面或组件。 |
 | [还原图标、Logo、插画等图形素材](skills/vision-tools/references/restore-graphic.md) | 从原图提取透明 PNG；需要可编辑或无损缩放时重建 SVG，并验证形状、颜色和透明边缘。 |
 | [把草图、示意图或白板转成结构化代码](skills/vision-tools/references/restore-structure.md) | 识别节点、文字、连线与方向，输出可编辑的 Mermaid、Graphviz 或其他结构化表示。 |
@@ -41,6 +41,16 @@
 
 
 ## 实际效果
+
+### 长聊天 OCR：900 x 6000 截图转为干净记录
+
+<p align="center">
+  <a href="examples/long-screenshot-ocr/telegram-chat-long.png">
+    <img src="examples/long-screenshot-ocr/telegram-chat-preview.png" alt="用于长截图 OCR 的全合成英文 Telegram 聊天预览" width="680">
+  </a>
+</p>
+
+这个隐私安全的测试样例完全由本地 HTML 生成。仓库中保留的参考实跑结果将长图切为 4 块，在一个边界使用 128 px 兜底重叠，并完整还原 **57/57 条记录**；发言人、时间、正文和引用信息均与合成源一致。[查看完整长图、转写结果和复现步骤 →](examples/long-screenshot-ocr/)
 
 ### UI 还原：从手绘稿到成品界面
 

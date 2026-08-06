@@ -85,6 +85,26 @@ def test_safe_cuts_land_in_blank_bands(mod):
         assert band.getextrema() == ((255, 255), (255, 255), (255, 255)), cut
 
 
+def test_safe_cut_does_not_use_blank_space_inside_a_bubble(mod):
+    image = Image.new("RGB", (900, 900), (218, 230, 235))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((55, 250, 330, 475), radius=12, fill="white")
+    draw.text((69, 270), "Message heading", fill="black")
+    draw.rounded_rectangle((69, 315, 318, 450), radius=8, fill=(238, 241, 242))
+    draw.text((80, 330), "status: ready", fill="black")
+    draw.text((80, 390), "build: 1.0.0", fill="black")
+
+    ranges, _analysis = mod.find_core_ranges(
+        image,
+        "chat",
+        target_height=380,
+        min_height=260,
+        max_height=500,
+    )
+    cut = ranges[0].bottom
+    assert not 250 <= cut <= 475, f"cut {cut} landed inside the message bubble"
+
+
 def test_overlap_policy_and_text_merge(mod):
     with tempfile.TemporaryDirectory() as temp_dir:
         first = make_chunk(mod, temp_dir, 1, bottom_overlap=40)
@@ -159,6 +179,42 @@ def test_chat_json_render_and_message_merge(mod):
     assert mod.normalize_timestamp("2026-08-06 10:30") == "2026-08-06 10:30"
     assert mod.normalize_timestamp("2026-08-06 10:3") == ""
     assert mod.normalize_timestamp("[clipped]") == ""
+
+
+def test_chat_overlap_uses_richer_boundary_messages(mod):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        first = make_chunk(mod, temp_dir, 1, bottom_overlap=64)
+        second = make_chunk(mod, temp_dir, 2, top_overlap=64)
+        prior_messages = (
+            mod.ChatMessage(
+                "Priya Shah",
+                "Help center article is published but unlisted.",
+                "10:12",
+            ),
+            mod.ChatMessage("You", "Deployment started."),
+        )
+        repeated_messages = (
+            mod.ChatMessage(
+                "[unreadable speaker]",
+                "Help center article is published but unlisted.",
+                "10:12",
+            ),
+            mod.ChatMessage("You", "Deployment started.", "10:15"),
+            mod.ChatMessage("Noah Wilson", "25% complete.", "10:22"),
+        )
+        merged, boundaries = mod.merge_transcripts(
+            [
+                mod.Transcript(first, "", Path("one.json"), False, prior_messages),
+                mod.Transcript(second, "", Path("two.json"), False, repeated_messages),
+            ]
+        )
+        assert merged.count("Help center article is published") == 1, merged
+        assert merged.count("Deployment started") == 1, merged
+        assert "**Priya Shah** (10:12)" in merged, merged
+        assert "**You** (10:15): Deployment started." in merged, merged
+        assert "[unreadable speaker]" not in merged, merged
+        assert boundaries[0]["removed_items"] == 2
+        assert boundaries[0]["method"] == "message-fuzzy"
 
 
 def test_resume_fingerprint_tracks_mode_and_prompt(mod):
@@ -341,15 +397,60 @@ def test_cli_chat_mode_uses_structured_messages():
         assert all(str(item["ocr"]).endswith(".ocr.json") for item in manifest["chunks"])
 
 
+def test_cli_chat_mode_retries_invalid_json_once():
+    with tempfile.TemporaryDirectory() as temp_dir_raw:
+        temp_dir = Path(temp_dir_raw)
+        source = temp_dir / "chat.png"
+        Image.new("RGB", (220, 260), "white").save(source)
+        state = temp_dir / "attempted"
+        stub = temp_dir / "glance"
+        write_stub(
+            stub,
+            "import json\n"
+            "from pathlib import Path\n"
+            f"state = Path({str(state)!r})\n"
+            "if not state.exists():\n"
+            "    state.write_text('1')\n"
+            "    print('{\\\"messages\\\":[{\\\"speaker\\\":\\\"User\\\"')\n"
+            "else:\n"
+            "    print(json.dumps({'messages': [{'speaker': 'User', "
+            "'content': 'recovered', 'timestamp': '', 'message_type': 'message', "
+            "'quoted_speaker': '', 'quoted_content': ''}]}))\n",
+        )
+        environment = os.environ.copy()
+        environment["PATH"] = str(temp_dir) + os.pathsep + environment.get("PATH", "")
+        output = temp_dir / "chat.md"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                str(source),
+                "--mode",
+                "chat",
+                "-o",
+                str(output),
+            ],
+            text=True,
+            capture_output=True,
+            check=True,
+            env=environment,
+        )
+        assert "retrying chunk 1/1 after invalid chat JSON" in completed.stderr
+        assert output.read_text(encoding="utf-8") == "**User**: recovered\n"
+
+
 def main():
     mod = load_module()
     test_split_sizes(mod)
     test_safe_cuts_land_in_blank_bands(mod)
+    test_safe_cut_does_not_use_blank_space_inside_a_bubble(mod)
     test_overlap_policy_and_text_merge(mod)
     test_chat_json_render_and_message_merge(mod)
+    test_chat_overlap_uses_richer_boundary_messages(mod)
     test_resume_fingerprint_tracks_mode_and_prompt(mod)
     test_cli_split_ocr_merge_and_resume()
     test_cli_chat_mode_uses_structured_messages()
+    test_cli_chat_mode_retries_invalid_json_once()
     subprocess.run([sys.executable, str(SCRIPT), "--help"], check=True, stdout=subprocess.DEVNULL)
     print("LONG SCREENSHOT OCR TEST PASS")
 

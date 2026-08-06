@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Synthetic Telegram Chat - Long Screenshot OCR Demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background: #cddbe3;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      color: #182533;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      background: #9fb3bf;
+    }
+
+    .app {
+      width: 900px;
+      min-height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18px 18px, rgba(82, 125, 146, 0.08) 0 2px, transparent 2.5px),
+        radial-gradient(circle at 52px 44px, rgba(82, 125, 146, 0.06) 0 3px, transparent 3.5px),
+        linear-gradient(135deg, rgba(255,255,255,0.24), rgba(255,255,255,0));
+      background-color: #d7e4ea;
+      background-size: 72px 72px, 88px 88px, 100% 100%;
+      box-shadow: 0 0 28px rgba(27, 49, 61, 0.28);
+    }
+
+    .topbar {
+      height: 78px;
+      padding: 0 22px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      background: #ffffff;
+      border-bottom: 1px solid #dce5ea;
+      box-shadow: 0 2px 10px rgba(44, 73, 88, 0.12);
+    }
+
+    .back {
+      width: 28px;
+      height: 28px;
+      color: #6d7f8a;
+      font-size: 31px;
+      line-height: 24px;
+      font-weight: 300;
+    }
+
+    .group-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-weight: 750;
+      font-size: 17px;
+      letter-spacing: 0.4px;
+      background: linear-gradient(145deg, #52b8f4, #248bd3);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.28);
+    }
+
+    .title-block { flex: 1; min-width: 0; }
+    .title {
+      font-size: 19px;
+      line-height: 24px;
+      font-weight: 720;
+      letter-spacing: -0.15px;
+    }
+    .subtitle {
+      margin-top: 2px;
+      color: #7a8b95;
+      font-size: 13px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      color: #738792;
+    }
+
+    .search {
+      width: 21px;
+      height: 21px;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+      position: relative;
+    }
+    .search::after {
+      content: "";
+      position: absolute;
+      width: 9px;
+      height: 2px;
+      right: -7px;
+      bottom: -4px;
+      border-radius: 2px;
+      background: currentColor;
+      transform: rotate(45deg);
+    }
+    .menu { font-size: 25px; line-height: 1; transform: translateY(-2px); }
+
+    .messages {
+      padding: 22px 56px 34px;
+    }
+
+    .date-row {
+      display: flex;
+      justify-content: center;
+      margin: 11px 0 18px;
+    }
+
+    .date-pill,
+    .system-pill {
+      color: white;
+      background: rgba(86, 116, 132, 0.68);
+      box-shadow: 0 1px 2px rgba(37, 59, 71, 0.16);
+      backdrop-filter: blur(4px);
+    }
+
+    .date-pill {
+      padding: 6px 13px;
+      border-radius: 15px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .system-row {
+      display: flex;
+      justify-content: center;
+      margin: 4px 0 20px;
+    }
+
+    .system-pill {
+      max-width: 590px;
+      padding: 8px 15px;
+      border-radius: 14px;
+      font-size: 13px;
+      line-height: 18px;
+      text-align: center;
+    }
+
+    .message-row {
+      display: flex;
+      margin: 7px 0;
+    }
+    .message-row.out { justify-content: flex-end; }
+
+    .bubble {
+      position: relative;
+      width: fit-content;
+      max-width: 650px;
+      min-width: 180px;
+      padding: 9px 13px 8px;
+      border-radius: 10px;
+      box-shadow: 0 1px 2px rgba(35, 55, 67, 0.16);
+    }
+    .message-row.in .bubble {
+      background: #ffffff;
+      border-bottom-left-radius: 3px;
+    }
+    .message-row.out .bubble {
+      background: #e2f8d5;
+      border-bottom-right-radius: 3px;
+    }
+
+    .sender {
+      margin-bottom: 3px;
+      font-size: 13px;
+      line-height: 16px;
+      font-weight: 750;
+    }
+    .message-row.out .sender { color: #2d8a59; }
+
+    .text {
+      font-size: 16px;
+      line-height: 22px;
+      letter-spacing: -0.05px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .reply {
+      margin: 1px 0 7px;
+      padding: 5px 9px 6px;
+      border-left: 3px solid #56a8dc;
+      border-radius: 4px;
+      background: rgba(75, 146, 187, 0.08);
+    }
+    .message-row.out .reply {
+      border-left-color: #50a26f;
+      background: rgba(62, 142, 87, 0.08);
+    }
+    .reply-sender {
+      color: #3e91c2;
+      font-size: 12px;
+      line-height: 15px;
+      font-weight: 760;
+    }
+    .message-row.out .reply-sender { color: #3d955e; }
+    .reply-text {
+      margin-top: 1px;
+      color: #546671;
+      font-size: 12px;
+      line-height: 16px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .code {
+      margin-top: 7px;
+      padding: 9px 11px;
+      color: #314451;
+      background: rgba(35, 72, 91, 0.08);
+      border-radius: 6px;
+      font: 13px/19px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    .attachment {
+      display: grid;
+      grid-template-columns: 43px 1fr;
+      gap: 10px;
+      align-items: center;
+      margin-top: 3px;
+      padding: 7px 9px 7px 7px;
+      border-radius: 8px;
+      background: rgba(56, 132, 176, 0.08);
+    }
+    .file-icon {
+      width: 43px;
+      height: 43px;
+      display: grid;
+      place-items: center;
+      color: white;
+      border-radius: 50%;
+      background: #4ca7da;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .file-name { font-size: 14px; font-weight: 700; }
+    .file-meta { margin-top: 2px; color: #6c7e88; font-size: 12px; }
+
+    .meta {
+      min-height: 15px;
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      color: #71818a;
+      font-size: 11px;
+      line-height: 14px;
+    }
+    .checks { color: #42a3dc; font-size: 15px; letter-spacing: -5px; margin-right: 3px; }
+
+    .reaction {
+      position: absolute;
+      right: 12px;
+      bottom: -16px;
+      padding: 2px 7px;
+      border: 2px solid #d7e4ea;
+      border-radius: 11px;
+      background: white;
+      color: #586a75;
+      font-size: 11px;
+      box-shadow: 0 1px 2px rgba(35, 55, 67, 0.1);
+    }
+    .message-row:has(.reaction) { margin-bottom: 21px; }
+
+    .composer {
+      height: 78px;
+      padding: 12px 26px;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      background: rgba(255,255,255,0.92);
+      border-top: 1px solid rgba(155, 177, 188, 0.56);
+    }
+    .composer-icon {
+      color: #71858f;
+      font-size: 25px;
+      line-height: 1;
+    }
+    .composer-field {
+      flex: 1;
+      color: #8a9aa3;
+      font-size: 16px;
+    }
+    .send-button {
+      width: 45px;
+      height: 45px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #339bd3;
+    }
+    .send-button svg { width: 23px; height: 23px; fill: white; transform: translateX(-1px); }
+  </style>
+</head>
+<body>
+  <main class="app" aria-label="Synthetic Telegram group chat">
+    <header class="topbar">
+      <div class="back" aria-hidden="true">&#8249;</div>
+      <div class="group-avatar">AL</div>
+      <div class="title-block">
+        <div class="title">Aurora Launch Crew</div>
+        <div class="subtitle">6 members, 4 online</div>
+      </div>
+      <div class="top-actions" aria-hidden="true">
+        <div class="search"></div>
+        <div class="menu">&#8942;</div>
+      </div>
+    </header>
+
+    <section id="messages" class="messages"></section>
+
+    <footer class="composer">
+      <div class="composer-icon" aria-hidden="true">&#128206;</div>
+      <div class="composer-field">Message</div>
+      <div class="composer-icon" aria-hidden="true">&#9786;</div>
+      <div class="send-button" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M2.1 3.4 21 11.3c.8.3.8 1.4 0 1.7L2.1 20.8c-.7.3-1.4-.4-1.1-1.1l2.6-6.2 9.5-1.4-9.5-1.5L1 4.5c-.3-.7.4-1.4 1.1-1.1Z"/></svg>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    const items = [
+      { type: "date", text: "Tuesday, August 4" },
+      { type: "system", text: "This is a fictional conversation created for the Agent Vision Toolkit OCR demo." },
+      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "09:12", text: "Good morning! This thread is for the Aurora beta launch review. Please keep every decision in the chat so the handoff stays searchable." },
+      { side: "out", sender: "You", time: "09:14", text: "Morning. I will collect the final copy, QA status, release owner, and rollback notes here." },
+      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "09:16", text: "Web dashboard build 0.9.7 is on staging. The empty-state illustration and export button are both fixed." },
+      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "09:18", text: "Mobile QA is green on iOS 19. The Android keyboard still covers the last field on smaller screens." },
+      { side: "out", sender: "You", time: "09:20", reply: { sender: "Lena Ortiz", text: "The Android keyboard still covers the last field" }, text: "Can we treat that as the only release blocker?" },
+      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "09:21", text: "Yes. Everything else is either passed or cosmetic." },
+      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "09:24", text: "I can patch the keyboard inset before lunch. I will post a new APK and the exact commit hash." },
+      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "09:27", text: "Copy review is complete. Please use “Create workspace” instead of “Start workspace” in the onboarding button." },
+      { side: "out", sender: "You", time: "09:29", text: "Confirmed. I updated the release checklist and tagged the string as final.", reaction: "&#128077; 3" },
+      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "09:33", text: "For the launch email, the subject line should be: Aurora beta is ready for your team." },
+      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "09:35", text: "And the preview text should be: Plan, review, and ship from one shared workspace." },
+      { side: "out", sender: "You", time: "09:38", text: "Both lines are locked. No more copy changes after 16:00 today unless they fix a factual error." },
+      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "09:43", text: "Staging health check:", code: "status: ready\nregion: eu-west\nbuild: 0.9.7\nerrors: 0" },
+      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "09:47", text: "API latency is stable at 182 ms p95. The alert threshold remains 450 ms." },
+      { side: "out", sender: "You", time: "09:50", reply: { sender: "Noah Wilson", text: "API latency is stable at 182 ms p95" }, text: "Great. Please add that number to the operations note." },
+      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "09:52", text: "Done. I also documented the rollback command and database backup timestamp." },
+      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "10:01", text: "Who is the release owner during the first two hours?" },
+      { side: "out", sender: "You", time: "10:03", text: "I am the release owner from 14:00 to 16:00 UTC. Noah is the infrastructure backup." },
+      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "10:04", text: "Confirmed. I will stay in the incident channel during that window." },
+      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "10:11", text: "Uploading the updated test matrix now.", file: { name: "aurora-beta-test-matrix.pdf", meta: "184 KB PDF" } },
+      { side: "out", sender: "You", time: "10:14", text: "Received. The matrix has 46 passed cases, 1 blocked case, and 3 deferred accessibility checks." },
+      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "10:19", text: "The accessibility checks must stay visible in the launch notes. Please do not hide them under “known issues.”" },
+      { side: "out", sender: "You", time: "10:21", text: "Agreed. I created a separate Accessibility follow-up section with an owner and due date." },
+      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "10:25", text: "Perfect. Customer support also needs a one-paragraph summary before tomorrow morning." },
+      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "10:31", text: "Small detail: the CSV export filename now uses the workspace name and UTC date, for example aurora-team_2026-08-04.csv." },
+      { side: "out", sender: "You", time: "10:34", text: "That naming format is clear. Add one test for spaces and non-ASCII workspace names." },
+      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "10:36", text: "Added. Spaces become hyphens, while Unicode letters remain unchanged." },
+      { type: "date", text: "Wednesday, August 5" },
+      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "08:42", text: "Morning update: the nightly backup completed at 02:15 UTC and restore verification passed." },
+      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "08:46", text: "Android build 0.9.8 is ready. The keyboard inset issue is fixed on 360 px, 390 px, and 412 px widths." },
+      { side: "out", sender: "You", time: "08:48", reply: { sender: "Lena Ortiz", text: "The keyboard inset issue is fixed" }, text: "Excellent. Please rerun onboarding, invite flow, and billing settings before we clear the blocker." },
+      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "09:17", text: "Retest complete:\n• Onboarding: passed\n• Invite flow: passed\n• Billing settings: passed\n• Screen rotation: passed" },
+      { side: "out", sender: "You", time: "09:19", text: "Release blocker cleared. Marking mobile QA as green." },
+      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "09:23", text: "The support summary is approved: Aurora beta gives teams one place to plan work, review decisions, and prepare releases." },
+      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "09:26", text: "Please preserve the serial comma in “plan work, review decisions, and prepare releases.”" },
+      { side: "out", sender: "You", time: "09:28", text: "Confirmed. The approved sentence is copied verbatim into the support brief." },
+      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "09:41", text: "Production build is compiling now. Expected artifact time is 10:05 UTC." },
+      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "09:44", text: "Monitoring dashboard is open. Error rate, latency, queue depth, and login failures are pinned." },
+      { side: "out", sender: "You", time: "09:47", text: "Before release, confirm these four values:\n1. Error rate below 1%\n2. p95 latency below 450 ms\n3. Queue depth below 500\n4. Login failures below 20 per minute" },
+      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "09:50", text: "Confirmed. Current values are 0.12%, 176 ms, 43 jobs, and 2 login failures per minute." },
+      { side: "in", sender: "Ethan Brooks", color: "#3e8ec9", time: "10:06", text: "Production artifact is ready.", code: "artifact: aurora-web-1.0.0\nsha256: 8f2c4d71b6a9\ncreated: 2026-08-05 10:05 UTC" },
+      { side: "out", sender: "You", time: "10:08", text: "Checksum recorded. Start the deployment at 10:15 UTC." },
+      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "10:10", text: "Launch email is scheduled for 10:45 UTC, thirty minutes after deployment begins." },
+      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "10:12", text: "Help center article is published but unlisted. We will make it public after the health check." },
+      { side: "out", sender: "You", time: "10:15", text: "Deployment started." },
+      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "10:22", text: "25% complete. Metrics are normal and there are no new application errors." },
+      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "10:29", text: "75% complete. One cache node restarted automatically; traffic was unaffected." },
+      { side: "out", sender: "You", time: "10:34", text: "Deployment complete. Beginning the fifteen-minute health check now." },
+      { side: "in", sender: "Lena Ortiz", color: "#d07842", time: "10:38", text: "Smoke test passed on web, iOS, and Android. Login, workspace creation, invite, and export all work." },
+      { side: "in", sender: "Noah Wilson", color: "#4e9b65", time: "10:49", text: "Health check passed. Error rate is 0.09% and p95 latency is 188 ms." },
+      { side: "out", sender: "You", time: "10:51", text: "Aurora 1.0 is officially live. Thank you, everyone!", reaction: "&#127881; 5" },
+      { side: "in", sender: "Maya Chen", color: "#b05f9c", time: "10:53", text: "Launch email sent. I will post engagement numbers in this thread tomorrow." },
+      { side: "in", sender: "Priya Shah", color: "#8d68c7", time: "10:55", text: "Help center article is public, and the support team has the approved response template." },
+      { side: "out", sender: "You", time: "10:58", text: "Final handoff:\n• Release owner: You\n• Infrastructure backup: Noah Wilson\n• QA owner: Lena Ortiz\n• Copy owner: Priya Shah\n• Product owner: Maya Chen\n• Engineering owner: Ethan Brooks" },
+      { type: "system", text: "Maya Chen pinned “Aurora 1.0 is officially live.”" }
+    ];
+
+    window.demoMessages = items;
+
+    const escapeHtml = (value) => String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+
+    const renderMessage = (item) => {
+      if (item.type === "date") {
+        return `<div class="date-row"><div class="date-pill">${escapeHtml(item.text)}</div></div>`;
+      }
+      if (item.type === "system") {
+        return `<div class="system-row"><div class="system-pill">${escapeHtml(item.text)}</div></div>`;
+      }
+      const reply = item.reply ? `
+        <div class="reply">
+          <div class="reply-sender">${escapeHtml(item.reply.sender)}</div>
+          <div class="reply-text">${escapeHtml(item.reply.text)}</div>
+        </div>` : "";
+      const code = item.code ? `<div class="code">${escapeHtml(item.code)}</div>` : "";
+      const file = item.file ? `
+        <div class="attachment">
+          <div class="file-icon">PDF</div>
+          <div><div class="file-name">${escapeHtml(item.file.name)}</div><div class="file-meta">${escapeHtml(item.file.meta)}</div></div>
+        </div>` : "";
+      const reaction = item.reaction ? `<div class="reaction">${item.reaction}</div>` : "";
+      const checks = item.side === "out" ? `<span class="checks">&#10003;&#10003;</span>` : "";
+      const color = item.color || "#2d8a59";
+      return `
+        <div class="message-row ${item.side}">
+          <article class="bubble">
+            <div class="sender" style="color:${color}">${escapeHtml(item.sender)}</div>
+            ${reply}
+            <div class="text">${escapeHtml(item.text)}</div>
+            ${code}
+            ${file}
+            <div class="meta"><span>${escapeHtml(item.time)}</span>${checks}</div>
+            ${reaction}
+          </article>
+        </div>`;
+    };
+
+    document.getElementById("messages").innerHTML = items.map(renderMessage).join("");
+  </script>
+</body>
+</html>

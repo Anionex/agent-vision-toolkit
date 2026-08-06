@@ -29,8 +29,9 @@ except ImportError:  # Optional dependency; handled by main().
 
 
 ANALYSIS_WIDTH = 900
+SAFE_OCCUPANCY_LEVEL = 20.0
 # Bump when the OCR output contract changes so --resume cannot reuse stale results.
-OCR_PROMPT_VERSION = 1
+OCR_PROMPT_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -112,16 +113,17 @@ def rolling_mean(values: Sequence[float], radius: int) -> list[float]:
     return result
 
 
-def row_energy(image: "Image.Image") -> tuple[list[float], float]:
-    """Return per-row edge energy using Pillow-only, C-backed image operations."""
+def row_energy(image: "Image.Image") -> tuple[list[float], list[float], float]:
+    """Return per-row edge energy and foreground occupancy with Pillow operations."""
     scale = min(1.0, ANALYSIS_WIDTH / image.width)
     analysis_width = max(1, round(image.width * scale))
     analysis_height = max(1, round(image.height * scale))
-    gray = image.convert("L")
+    analysis = image.convert("RGB")
     if scale < 1.0:
-        gray = gray.resize(
+        analysis = analysis.resize(
             (analysis_width, analysis_height), Image.Resampling.BILINEAR
         )
+    gray = analysis.convert("L")
 
     width, height = gray.size
     shifted_x = Image.new("L", gray.size)
@@ -136,8 +138,39 @@ def row_energy(image: "Image.Image") -> tuple[list[float], float]:
 
     combined = Image.blend(horizontal, vertical, 0.32)
     collapsed = combined.resize((1, height), Image.Resampling.BOX)
-    values = [float(value) for value in collapsed.tobytes()]
-    return rolling_mean(values, max(1, round(3 * scale))), scale
+    edges = [float(value) for value in collapsed.tobytes()]
+
+    border_width = max(1, min(24, width // 18))
+    left = analysis.crop((0, 0, border_width, height)).resize(
+        (1, height), Image.Resampling.BOX
+    )
+    right = analysis.crop((width - border_width, 0, width, height)).resize(
+        (1, height), Image.Resampling.BOX
+    )
+    edge_reference = Image.new("RGB", (2, height))
+    edge_reference.paste(left, (0, 0))
+    edge_reference.paste(right, (1, 0))
+    background = edge_reference.resize((width, height), Image.Resampling.BILINEAR)
+    foreground_difference = ImageChops.difference(analysis, background)
+    red_difference, green_difference, blue_difference = foreground_difference.split()
+    foreground_distance = ImageChops.lighter(
+        ImageChops.lighter(red_difference, green_difference), blue_difference
+    )
+    foreground_mask = foreground_distance.point(
+        lambda value: 255 if value >= 14 else 0,
+        mode="L",
+    )
+    occupancy_column = foreground_mask.resize((1, height), Image.Resampling.BOX)
+    occupancy = [float(value) for value in occupancy_column.tobytes()]
+
+    radius = max(1, round(3 * scale))
+    smoothed_edges = rolling_mean(edges, radius)
+    smoothed_occupancy = rolling_mean(occupancy, radius)
+    energy = [
+        edge_value + occupancy_value * 0.55
+        for edge_value, occupancy_value in zip(smoothed_edges, smoothed_occupancy)
+    ]
+    return energy, smoothed_occupancy, scale
 
 
 def resolve_split_sizes(
@@ -171,6 +204,7 @@ def resolve_split_sizes(
 
 def choose_cut(
     energy: Sequence[float],
+    occupancy: Sequence[float],
     start: int,
     target: int,
     minimum: int,
@@ -191,7 +225,12 @@ def choose_cut(
     normalized = [(value - low) / max(0.001, high - low) for value in local]
 
     threshold = percentile(local, 32 if mode == "chat" else 25)
-    low_rows = [1.0 if value <= threshold else 0.0 for value in energy]
+    low_rows = [
+        1.0
+        if value <= threshold and occupancy[index] <= SAFE_OCCUPANCY_LEVEL
+        else 0.0
+        for index, value in enumerate(energy)
+    ]
     blank_ratio = rolling_mean(low_rows, safe_radius)[lower : upper + 1]
     distance_weight = 0.20 if mode == "chat" else 0.30
 
@@ -200,6 +239,7 @@ def choose_cut(
         key=lambda offset: (
             normalized[offset]
             + abs((lower + offset) - desired) / max(1, maximum - minimum) * distance_weight
+            + occupancy[lower + offset] / 255 * 0.75
             - blank_ratio[offset] * 0.48
         ),
     )
@@ -208,9 +248,17 @@ def choose_cut(
     band_threshold = percentile(local, 40)
     band_left = selected
     band_right = selected
-    while band_left > lower and energy[band_left - 1] <= band_threshold:
+    while (
+        band_left > lower
+        and energy[band_left - 1] <= band_threshold
+        and occupancy[band_left - 1] <= SAFE_OCCUPANCY_LEVEL
+    ):
         band_left -= 1
-    while band_right < upper and energy[band_right + 1] <= band_threshold:
+    while (
+        band_right < upper
+        and energy[band_right + 1] <= band_threshold
+        and occupancy[band_right + 1] <= SAFE_OCCUPANCY_LEVEL
+    ):
         band_right += 1
     if band_right - band_left >= max(4, safe_radius // 2):
         selected = (band_left + band_right) // 2
@@ -237,7 +285,7 @@ def find_core_ranges(
             "safe_band_radius_px": 0.0,
         }
 
-    energy, scale = row_energy(image)
+    energy, occupancy, scale = row_energy(image)
     target = max(1, round(target_height * scale))
     minimum = max(1, round(min_height * scale))
     maximum = max(minimum + 1, round(max_height * scale))
@@ -251,6 +299,7 @@ def find_core_ranges(
             break
         cut, selected_energy, quality, safe_margin = choose_cut(
             energy,
+            occupancy,
             cuts[-1],
             target,
             minimum,
@@ -411,7 +460,10 @@ def ocr_prompt(mode: str, index: int, total: int, custom: str | None) -> str:
             "Give every message a speaker and copy the visible nickname exactly; never replace "
             "it with roles such as customer, support, me, or other. If the screenshot shows a "
             "question-mark square glyph in a nickname, preserve it as Unicode U+25A1. Merge "
-            "screen-width wrapping back into the same message. Put replied-to text in "
+            "screen-width wrapping back into the same message. Each rounded message bubble is "
+            "exactly one message: keep code blocks, bullet lists, attachment filenames, and file "
+            "metadata inside that bubble's content instead of creating a second message. Preserve "
+            "intentional code and list line breaks. Put replied-to text in "
             "quoted_speaker and quoted_content while keeping the new message in speaker and "
             "content. Fill timestamp only when the entire timestamp is clearly visible; "
             "otherwise leave it empty. message_type must be message, system, image, or file. "
@@ -436,7 +488,8 @@ def join_visual_wraps(content: str) -> str:
         return ""
     paragraphs = re.split(r"\n\s*\n", content)
     normalized = []
-    list_pattern = re.compile(r"^(?:[-*+] |\d+[.)] )")
+    list_pattern = re.compile(r"^(?:[-*+\u2022] |\d+[.)] )")
+    code_line_pattern = re.compile(r"^[A-Za-z0-9_.-]+:\s+\S")
     for paragraph in paragraphs:
         lines = [re.sub(r"[ \t]+", " ", line.strip()) for line in paragraph.splitlines()]
         lines = [line for line in lines if line]
@@ -444,7 +497,7 @@ def join_visual_wraps(content: str) -> str:
             continue
         merged = lines[0]
         for line in lines[1:]:
-            if list_pattern.match(line):
+            if list_pattern.match(line) or code_line_pattern.match(line):
                 merged += "\n" + line
                 continue
             separator = (
@@ -557,6 +610,22 @@ def recognition_fingerprint(
     return hashlib.sha256(encoded).hexdigest()
 
 
+def run_glance(command: Sequence[str], timeout: float, chunk_index: int) -> str:
+    completed = subprocess.run(
+        command,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
+        raise RuntimeError(f"chunk {chunk_index}: glance failed: {detail}")
+    text = completed.stdout.strip()
+    if not text:
+        raise RuntimeError(f"chunk {chunk_index}: glance returned an empty transcription")
+    return text
+
+
 def recognize_chunk(
     chunk: Chunk,
     total: int,
@@ -582,28 +651,33 @@ def recognize_chunk(
         return Transcript(chunk, stored, output_path, True)
 
     prompt = ocr_prompt(mode, chunk.index, total, custom_prompt)
-    if mode == "chat":
-        command = [*glance_command, str(chunk.image_path), "--query", prompt]
-    else:
-        command = [*glance_command, str(chunk.image_path), "--ocr", prompt]
-    completed = subprocess.run(
-        command,
-        text=True,
-        capture_output=True,
-        timeout=timeout,
-    )
-    if completed.returncode != 0:
-        detail = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
-        raise RuntimeError(f"chunk {chunk.index}: glance failed: {detail}")
-    text = completed.stdout.strip()
-    if not text:
-        raise RuntimeError(f"chunk {chunk.index}: glance returned an empty transcription")
     messages: tuple[ChatMessage, ...] = ()
     if mode == "chat":
-        try:
-            messages = parse_chat_messages(text)
-        except ValueError as exc:
-            raise RuntimeError(f"chunk {chunk.index}: {exc}") from exc
+        retry_note = (
+            " Return compact valid JSON only. Escape every newline inside a JSON string as "
+            "\\n, close every quote and brace, and do not use a Markdown code fence."
+        )
+        parse_error: ValueError | None = None
+        for attempt in range(2):
+            attempt_prompt = prompt + (retry_note if attempt else "")
+            command = [*glance_command, str(chunk.image_path), "--query", attempt_prompt]
+            text = run_glance(command, timeout, chunk.index)
+            try:
+                messages = parse_chat_messages(text)
+                break
+            except ValueError as exc:
+                parse_error = exc
+                if attempt == 0:
+                    print(
+                        f"retrying chunk {chunk.index}/{total} after invalid chat JSON",
+                        file=sys.stderr,
+                    )
+        else:
+            raise RuntimeError(f"chunk {chunk.index}: {parse_error}") from parse_error
+    else:
+        command = [*glance_command, str(chunk.image_path), "--ocr", prompt]
+        text = run_glance(command, timeout, chunk.index)
+    if mode == "chat":
         stored = json.dumps(
             {"messages": [chat_message_record(message) for message in messages]},
             ensure_ascii=False,
@@ -703,6 +777,72 @@ def message_fingerprint(message: ChatMessage) -> tuple[str, str, str]:
     )
 
 
+def unreadable_speaker(value: str) -> bool:
+    lowered = value.casefold()
+    return not value.strip() or "unreadable" in lowered or "clipped" in lowered
+
+
+def high_confidence_message_match(left: ChatMessage, right: ChatMessage) -> bool:
+    if (left.message_type == "system") != (right.message_type == "system"):
+        return False
+
+    left_speaker, left_content, left_quote = message_fingerprint(left)
+    right_speaker, right_content, right_quote = message_fingerprint(right)
+    speakers_match = (
+        left_speaker == right_speaker
+        or unreadable_speaker(left.speaker)
+        or unreadable_speaker(right.speaker)
+    )
+    timestamps_match = (
+        not left.timestamp
+        or not right.timestamp
+        or left.timestamp == right.timestamp
+    )
+    quotes_match = (
+        not left_quote
+        or not right_quote
+        or left_quote == right_quote
+    )
+    if not speakers_match or not timestamps_match or not quotes_match:
+        return False
+    if left_content == right_content and left_content:
+        return True
+    if min(len(left_content), len(right_content)) < 32:
+        return False
+    return SequenceMatcher(None, left_content, right_content).ratio() >= 0.97
+
+
+def richer_text(left: str, right: str) -> str:
+    def score(value: str) -> tuple[int, int, int]:
+        lowered = value.casefold()
+        marker_penalty = lowered.count("[clipped]") + lowered.count("[unreadable]")
+        return (-marker_penalty, value.count("\n"), len(value))
+
+    return max((left, right), key=score)
+
+
+def merge_duplicate_message(left: ChatMessage, right: ChatMessage) -> ChatMessage:
+    speaker = left.speaker
+    if unreadable_speaker(speaker) and not unreadable_speaker(right.speaker):
+        speaker = right.speaker
+    quoted_speaker = left.quoted_speaker
+    if unreadable_speaker(quoted_speaker) and not unreadable_speaker(right.quoted_speaker):
+        quoted_speaker = right.quoted_speaker
+    return replace(
+        left,
+        speaker=speaker,
+        content=richer_text(left.content, right.content),
+        timestamp=left.timestamp or right.timestamp,
+        message_type=(
+            right.message_type
+            if left.message_type == "message" and right.message_type != "message"
+            else left.message_type
+        ),
+        quoted_speaker=quoted_speaker,
+        quoted_content=richer_text(left.quoted_content, right.quoted_content),
+    )
+
+
 def canonicalize_speakers(messages: Sequence[ChatMessage]) -> list[ChatMessage]:
     def key(value: str) -> str:
         return re.sub(r"[\W_]+", "", value, flags=re.UNICODE).casefold()
@@ -735,14 +875,18 @@ def canonicalize_speakers(messages: Sequence[ChatMessage]) -> list[ChatMessage]:
 
 def find_message_overlap(
     previous: Sequence[ChatMessage], current: Sequence[ChatMessage]
-) -> int:
+) -> tuple[int, str]:
     maximum = min(8, len(previous), len(current))
     for count in range(maximum, 0, -1):
         left = [message_fingerprint(message) for message in previous[-count:]]
         right = [message_fingerprint(message) for message in current[:count]]
         if left == right and any(any(part for part in item) for item in left):
-            return count
-    return 0
+            return count, "message-exact"
+    for count in range(maximum, 0, -1):
+        pairs = zip(previous[-count:], current[:count])
+        if all(high_confidence_message_match(left, right) for left, right in pairs):
+            return count, "message-fuzzy"
+    return 0, "none"
 
 
 def merge_general_transcripts(
@@ -786,18 +930,21 @@ def merge_chat_transcripts(
             continue
         previous_chunk = transcripts[position - 1].chunk
         pixel_overlap = previous_chunk.bottom_overlap + transcript.chunk.top_overlap
-        removed = find_message_overlap(merged, current) if pixel_overlap else 0
+        removed, method = (
+            find_message_overlap(merged, current) if pixel_overlap else (0, "not-needed")
+        )
+        if removed:
+            merged[-removed:] = [
+                merge_duplicate_message(left, right)
+                for left, right in zip(merged[-removed:], current[:removed])
+            ]
         boundaries.append(
             {
                 "after_chunk": previous_chunk.index,
                 "before_chunk": transcript.chunk.index,
                 "removed_items": removed,
                 "unit": "messages",
-                "method": (
-                    "message-exact"
-                    if removed
-                    else ("none" if pixel_overlap else "not-needed")
-                ),
+                "method": method,
             }
         )
         merged.extend(current[removed:])
