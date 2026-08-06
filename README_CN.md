@@ -72,27 +72,6 @@
 
 ## 实际效果
 
-### 长聊天 OCR：780 x 31186 Telegram 风格截图转为干净记录
-
-<p align="center">
-  <a href="examples/long-screenshot-ocr/telegram-chat-long.png">
-    <img src="examples/long-screenshot-ocr/telegram-chat-overview.png" alt="包含完整长图缩略轨道和五个可读检查点的英文 Telegram 聊天总览" width="680">
-  </a>
-</p>
-
-*左侧轨道展示完整的 31,186 px 长截图，右侧五个面板依次放大从开头到结尾的检查点。点击总览图可打开原始全分辨率图片。*
-
-这个测试样例完全由本地 HTML 生成，包含 Telegram 风格的状态栏、顶栏、壁纸、气泡尾巴、头像、回复、文件、投票、图片卡片、表情回应和未读分隔线。仓库中保留的参考实跑结果将长图切为 21 块，在 20 个安全边界处无需重叠，并按顺序完整还原 **180/180 条记录**；没有缺失或多余消息，发言人、时间和引用字段也全部一致。[查看完整长图、转写结果和复现步骤 →](examples/long-screenshot-ocr/)
-
-### UI 还原：从手绘稿到成品界面
-
-<p align="center">
-  <img src="assets/ui-restore-sketch.png" alt="作为 UI 还原参考的手绘 JupyterLab 界面" width="49%">
-  <img src="assets/ui-restore-result.png" alt="依据手绘参考还原出的 JupyterLab 工作区界面" width="49%">
-</p>
-
-*左：作为输入的手绘参考；右：依据该手绘稿还原出的 JupyterLab 工作区界面。完整流程见 [UI 还原 playbook](skills/vision-tools/references/restore-ui.md)。*
-
 <p align="center">
   <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
   <img src="assets/effect-4.jpg" alt="DeepSeek V4 用 glance/ground 定位屏幕元素自主游玩国际象棋" width="49%">

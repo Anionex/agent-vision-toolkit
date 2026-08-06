@@ -72,27 +72,6 @@ Beyond giving an agent tools, the included `vision-tools` skill provides end-to-
 
 ## Real-world Effects
 
-### Long-chat OCR: 780 x 31186 Telegram-style screenshot to a clean transcript
-
-<p align="center">
-  <a href="examples/long-screenshot-ocr/telegram-chat-long.png">
-    <img src="examples/long-screenshot-ocr/telegram-chat-overview.png" alt="Full-length overview of the English Telegram chat with the complete screenshot and five readable checkpoints" width="680">
-  </a>
-</p>
-
-*The left rail shows the complete 31,186 px screenshot; the five panels enlarge checkpoints from start to finish. Click the overview for the original full-resolution input.*
-
-The fixture is generated entirely from local HTML and includes Telegram-style app chrome, wallpaper, bubble tails, avatars, replies, files, a poll, a photo card, reactions, and an unread divider. In the checked-in reference run, the workflow split it into 21 chunks with 20 safe boundaries and recovered all **180/180 records** in order, with no missing/extra messages and no speaker, timestamp, or reply-field differences. [Open the full input, transcript, and reproduction steps →](examples/long-screenshot-ocr/)
-
-### UI restoration: sketch to interface
-
-<p align="center">
-  <img src="assets/ui-restore-sketch.png" alt="Hand-drawn JupyterLab interface used as a UI restoration reference" width="49%">
-  <img src="assets/ui-restore-result.png" alt="Restored JupyterLab workspace made from the hand-drawn reference" width="49%">
-</p>
-
-*Left: the hand-drawn reference. Right: the restored JupyterLab workspace made from it. See the [UI restoration playbook](skills/vision-tools/references/restore-ui.md) for the workflow.*
-
 <p align="center">
   <img src="assets/effect-3.jpg" alt="Multi-round image Q&A with the optional glance CLI" width="49%">
   <img src="assets/effect-4.jpg" alt="DeepSeek V4 playing chess by locating screen elements with glance/ground" width="49%">
