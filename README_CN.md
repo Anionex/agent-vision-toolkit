@@ -23,7 +23,7 @@
 
 所有代码均已在真实 Codex + DeepSeek 会话中验证过，同一套管线也在 Claude Code、Pi、Oh My Pi、OpenCode 中完成了真机端到端验证。
 
-> 如果项目对你有用，欢迎 star🌟 & follow～，我会分享更多的实用工具和技巧
+> 如果项目对你有用，欢迎 star🌟 & fork。
 
 
 ## 用例技能

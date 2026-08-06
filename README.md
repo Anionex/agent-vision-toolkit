@@ -23,7 +23,7 @@ If your coding agent runs on a text-only model like DeepSeek V4, it can't look a
 
 All code has been verified in real Codex + DeepSeek sessions, and the same pipeline has been live-verified end-to-end in Claude Code, Pi, Oh My Pi, and OpenCode.
 
-> If this project helps you, feel free to star🌟 & follow～ I'll keep sharing more practical tools and tips.
+> If this project helps you, feel free to star🌟 & fork.
 
 
 ## Use-case Playbooks
