@@ -15,3 +15,9 @@ CLAUDE.md
 # 仓库根目录的临时/研究产出（注意：skills/vision-tools/work/shot.png 是已跟踪样例图，不在忽略范围）
 /work/
 research/_work/
+
+# 个人文章草稿（与仓库无关，不上传 GitHub）
+psg1.md
+
+# restore 技能的一次性样例截图，不纳入仓库
+skills/vision-tools/index.png
