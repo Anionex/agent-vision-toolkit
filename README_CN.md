@@ -134,7 +134,7 @@ npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --c
 每个工具回答一类问题，让掌握完整上下文的调用方 agent 去选择，而不是让它对着一个大而全的命令猜参数。
 
 <details>
-<summary><b><code>glance</code> —— “图上有什么？”</b></summary>
+<summary><b><code>glance</code> —— “这张图看起来长什么样?”</b></summary>
 
 直接对图片提问，或转写图中的文字。
 
@@ -163,7 +163,7 @@ python3 skills/vision-tools/scripts/long_screenshot_ocr.py long-chat.png --mode 
 </details>
 
 <details>
-<summary><b><code>ground</code> —— “X 在哪？”</b></summary>
+<summary><b><code>ground</code> —— “我想要的这个物体在哪？”</b></summary>
 
 定位图片中的对象或区域，输出原图像素坐标下的边界框：
 
@@ -180,7 +180,7 @@ x1: 1067, y1: 841, x2: 1108, y2: 881
 </details>
 
 <details>
-<summary><b><code>detect</code> —— “这里有些什么？”</b></summary>
+<summary><b><code>detect</code> —— “图片里都有些什么/都在哪里？”</b></summary>
 
 盘点图片（或指定区域）中的元素——输出编号清单，带逐字可见文字和像素框：
 
@@ -201,7 +201,7 @@ detect page.png --region 238,600,953,671
 </details>
 
 <details>
-<summary><b><code>trace</code> —— “精确形状是什么？”</b></summary>
+<summary><b><code>trace</code> —— “这个的精确形状轨迹是什么？”</b></summary>
 
 `trace` 在**本地确定性地**把图片（或裁剪区域）矢量化为 SVG——坐标来自真实像素，不是视觉模型的估计。用于精确形状几何：图标/logo 还原为 SVG、读取示意图布局、测量元素尺寸。需要可选依赖 `vtracer`（`--region` 另需 `pillow`）。
 
@@ -213,7 +213,7 @@ trace screenshot.png --region 1563,514,1668,621 -o icon.svg
 </details>
 
 <details>
-<summary><b><code>crop</code> —— “把这个盒子裁出来”</b></summary>
+<summary><b><code>crop</code> —— “把图片区域裁出来，重新利用”</b></summary>
 
 `crop` 把图片中的像素盒裁成独立文件——就是 `ground`/`detect` 输出的那组
 X1,Y1,X2,Y2 坐标，超出图片边界时自动收敛。同一个盒子接下来要喂给
@@ -228,7 +228,7 @@ crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 
 ## 升级：无缝接入
 
-工具箱覆盖了 agent 自己决定要看的一切。它覆盖不了**用户粘贴**的图片——那些图在任何工具运行之前就已经到达模型。这一层补的就是这个缺口：图片在链路上变成文字，粘贴截图直接可用，agent 内置的看图工具（`view_image`、`Read`）也不再报错。
+这一部分让我们在agent粘贴的截图直接可用，agent 调用内置的看图工具也不再报错。
 
 | Agent | 接入方式 | 状态 |
 |---|---|---|
@@ -238,13 +238,13 @@ crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 | **OpenCode** | 单文件原生 plugin（[`extensions/opencode/`](extensions/opencode/)） | ✅ 已验证 |
 | 任何有 shell 的 agent | 上面的工具箱——无需接入 | ✅ |
 
-所有入口共享同一套描述层——focus hint、逐字转写约定、重查 channel note、（图片, prompt）缓存——以及同样的三个 `VISION_*` 环境变量。
+所有入口共享配置。一次配置，多处使用。
 
 ### 让描述始终对着当前任务
 
-大多数视觉转接方案只是把图片变成一段通用描述，之后再让纯文本模型自己去把原本的任务找回来。
+大多数纯文本模型的视觉转接方案只是用多模态模型把图片变成一段通用描述，之后再丢给纯文本模型，让他自己根据描述拼凑出想要的内容，这中间隔了一层语义；一些东西必然会丢失——也就是这个地方存在的损失，让我们认为缝合方案必然带来巨大的性能损失。
 
-`agent-vision-toolkit` 保留的是 **agent 为什么要看这张图**。它从用户消息、或模型调用 `view_image` 时自述的理由中提取出看图动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容，而不是一段通用的“详细描述”。更低成本，更高的准确率，更快的响应速度。
+为了解决这个问题，`agent-vision-toolkit` 尝试利用和得到 **agent 为什么要看这张图的动机**。它从用户消息、或模型调用 内置看图工具时自述的理由中提取出模型当时看图的动机，再把这个动机作为 **focus hint** 一并交给视觉模型。拿回来的是一段贴合任务的描述，突出当前这一步真正要紧的内容，而不是一段通用的“详细描述”。更低成本，更高的准确率，更快的响应速度。
 
 <p align="center">
   <img src="assets/focus-hint-comparison-cn-1.png"
@@ -255,9 +255,9 @@ crop screenshot.png --region 1563,514,1668,621 -o send-button.png
        width="49%">
 </p>
 
-### 怎么装
+### 安装使用
 
-这一层同样交给 agent 安装——快速开始里那句话已经覆盖了它；本仓库刻意不提供一键安装器，因为部署取决于你这台机器的真实配置。agent 遵循的步骤在 **[Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，见那里各宿主的 README。
+本项目可以交给 agent 安装——快速开始里那句话已经覆盖了它；本仓库不提供一键安装器，agent 遵循的步骤在 **[Agent 安装说明](AGENT_INSTALL.md)**。安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，可见各 agent的文档。
 
 
 ## 工作原理
@@ -273,12 +273,6 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
                    -> 视觉 prompt -> 文字描述 -> 替换图片
 ```
 
-视觉 prompt 不是固定的"请描述这张图"。代理会给视觉模型附上 **focus hint**，让描述围绕当下真正要紧的内容展开：贴图场景用用户的请求做 hint；模型主动调用 `view_image` 的场景，用模型自己说明的看图动机做 hint（没有则回退到用户请求）。描述按（图片, prompt）缓存；两种 hint 都取自不可变的对话历史，同一张图只描述一次，之后每轮都命中缓存。
-
-代理仅凭请求体形态识别方言——OpenAI Responses（Codex）或 Anthropic Messages（Claude Code）——同一个实例同时服务两者，无需按宿主配置。Claude Code 侧的两条图片通道是粘贴图和对图片文件的 `Read`，hint 策略完全相同。
-
-第一次模型响应只要求 Codex 调用 `view_image`。Codex 在本机执行工具后，第二次请求才携带图片；代理在这个请求方向完成图片转文字。若 catalog 明确声明仅支持 `text`，Codex 的 handler 会先拒绝工具，因此只在这一种情况下给现有条目追加 `image`。
-
 </details>
 
 ## 配置
@@ -286,7 +280,7 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 <details>
 <summary><b>环境变量</b></summary>
 
-工具箱与代理都只需要这些环境变量：
+工具箱与代理都只需要这些环境变量，必填的只有3个：
 
 | 变量 | 必需 | 说明 |
 |---|---:|---|
@@ -295,22 +289,13 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 | `VISION_MODEL` | 是 | 多模态模型名 |
 | `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
 
-上游模型的认证继续由 agent 发送并由代理透传，不需要在 env 中重复保存。
-
 </details>
 
 ## 前置条件
 
-- 已接入纯文本模型（如 DeepSeek V4）并可正常使用的 coding agent
-- Python 3.11+
+- 已接入(纯文本)模型（如 DeepSeek V4）并可正常使用的 coding agent
 - 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API
-
-## 隐私、数据流与费用
-
-- 需要模型理解图片的操作会把图片发送到 `VISION_BASE_URL` 所配置的 OpenAI-compatible 接口；`trace`、`crop` 等本地工具不会上传图片。
-- 纯文本上游收到的是包含该描述的改写后请求，而不是原始图片；原有模型名和鉴权请求头会保持不变并原样透传。
-- 代理不会记录请求 body、图片、prompt、对话或 API key；可选日志只包含运行元数据。
-- 描述按图片与 prompt 缓存在内存中，进程重启后清空。每个未命中的组合可能产生一次计费请求，费用与数据保留规则以所配置视觉服务商为准。
+- 没有其他需要的配置
 
 ## 常见问题
 
@@ -332,10 +317,10 @@ Codex（携带原有 Authorization）
 ## 限制
 
 - 这是图片转文字的一层，不会把视觉 token 直接交给纯文本模型。
-- 图片描述质量取决于所配置的视觉模型。
+- 视觉任务的整体质量由主llm+多模态llm共同决定。
 - 代理的缓存只存在于进程内，重启后清空。
 
-## 社区与支持
+## 社区
 
 - 安装与使用帮助：[支持说明](SUPPORT.md) 与仓库 Issue 表单
 - Bug 与功能建议：[Issues](https://github.com/Anionex/agent-vision-toolkit/issues/new/choose)
@@ -344,7 +329,7 @@ Codex（携带原有 Authorization）
 - 社区规范：[行为准则](CODE_OF_CONDUCT.md)
 - 用户可见变更：[更新日志](CHANGELOG.md)
 
-## 支持项目
+## 赞助
 
 开源不易。如果 agent-vision-toolkit 为你节省了时间，欢迎 Star、分享、参与贡献，[或赞助项目～](FUNDING.md)。
 
