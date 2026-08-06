@@ -2,7 +2,7 @@
 
 ## 中文
 
-agent-vision-toolkit 以 MIT License 开源。如果项目为你节省了时间，可以通过 [GitHub Sponsors](https://github.com/sponsors/Anionex) 支持持续开发。
+agent-vision-toolkit 以 MIT License 开源。如果项目为你节省了时间，可以通过 [爱发电](https://ifdian.net/a/anionex) 支持持续开发。
 
 一次性赞助或组织赞助可发送邮件到 `davidyang042@gmail.com`，标题注明 `agent-vision-toolkit sponsorship`。
 
@@ -19,7 +19,7 @@ agent-vision-toolkit 以 MIT License 开源。如果项目为你节省了时间�
 
 ## English
 
-agent-vision-toolkit is open source under the MIT License. If it saves you time, you can support its continued development through [GitHub Sponsors](https://github.com/sponsors/Anionex).
+agent-vision-toolkit is open source under the MIT License. If it saves you time, you can support its continued development through [Afdian](https://ifdian.net/a/anionex).
 
 For one-time or organization sponsorship, contact `davidyang042@gmail.com` with the subject `agent-vision-toolkit sponsorship`.
 
