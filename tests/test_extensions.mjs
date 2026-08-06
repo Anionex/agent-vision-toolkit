@@ -68,7 +68,7 @@ const IMG = { type: "image", data: "AAAA", mimeType: "image/png" };
   check("pi: pasted image is rewritten with its own message's text as hint",
     content[2]?.text === "[vision model description] DESC"
       && prompts[0]?.includes("login page look broken")
-      && prompts[0]?.includes("Do not answer the user's request yourself"),
+      && prompts[0]?.includes("Do not complete the request yourself"),
     { content, prompts });
   check("pi: channel note lands once before the first image",
     content[1]?.text?.startsWith("[vision proxy]")
@@ -94,7 +94,7 @@ const IMG = { type: "image", data: "AAAA", mimeType: "image/png" };
   check("pi: tool-result image rides the assistant's closing thinking paragraph",
     prompts[0]?.includes("确认按钮颜色")
       && !prompts[0]?.includes("翻了一遍日志")
-      && prompts[0]?.includes("decided to view")
+      && prompts[0]?.includes("latest user or assistant request")
       && !prompts[0]?.includes("修复登录页样式"),
     prompts);
 }
