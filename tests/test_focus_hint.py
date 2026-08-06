@@ -46,7 +46,7 @@ def test_hint_reaches_vision_prompt():
     ]}
     assert asyncio.run(mod._rewrite_image_inputs(body))
     assert "login page look broken" in prompts[0], prompts[0]
-    assert "Do not answer the user's request yourself" in prompts[0]
+    assert "Do not complete the request yourself" in prompts[0]
     print("PASS: user text travels to the vision prompt for view_image outputs")
 
 
@@ -95,7 +95,7 @@ def test_view_image_uses_assistant_intent():
     ]}
     assert asyncio.run(mod._rewrite_image_inputs(body))
     assert "确认按钮颜色" in prompts[0], prompts[0]
-    assert "decided to view" in prompts[0]
+    assert "latest user or assistant request" in prompts[0]
     assert "修复登录页样式" not in prompts[0], "assistant intent replaces, not augments, the user text"
     print("PASS: tool-fetched images ride the assistant's stated intent")
 
@@ -173,7 +173,7 @@ def test_reasoning_is_an_intent_source():
     ]}
     assert asyncio.run(mod._rewrite_image_inputs(body))
     assert "确认按钮颜色" in prompts[0], prompts[0]
-    assert "decided to view" in prompts[0], "reasoning is assistant intent, not user text"
+    assert "latest user or assistant request" in prompts[0], "reasoning is assistant intent, not user text"
     print("PASS: reasoning counts as the assistant's stated intent")
 
 

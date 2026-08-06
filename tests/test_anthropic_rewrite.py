@@ -54,7 +54,7 @@ def test_pasted_image_is_rewritten_with_same_message_hint():
     assert content[1]["type"] == "text" and content[1]["text"].startswith("[vision proxy]"), content
     assert content[2] == {"type": "text", "text": "[vision model description] DESC"}, content
     assert "login page look broken" in prompts[0], prompts[0]
-    assert "Do not answer the user's request yourself" in prompts[0]
+    assert "Do not complete the request yourself" in prompts[0]
     print("PASS: pasted image blocks are rewritten and ride their own message's text")
 
 
@@ -75,7 +75,7 @@ def test_tool_result_image_rides_assistant_intent():
     inner = body["messages"][2]["content"][0]["content"]
     assert inner[-1] == {"type": "text", "text": "[vision model description] DESC"}, inner
     assert "确认按钮颜色" in prompts[0], prompts[0]
-    assert "decided to view" in prompts[0]
+    assert "latest user or assistant request" in prompts[0]
     assert "修复登录页样式" not in prompts[0], "assistant intent replaces, not augments, the user text"
     print("PASS: tool_result images ride the assistant's stated intent")
 
@@ -96,7 +96,7 @@ def test_thinking_is_an_intent_source():
     assert asyncio.run(mod._rewrite_image_inputs(body))
     assert "确认按钮颜色" in prompts[0], prompts[0]
     assert "翻了一遍日志" not in prompts[0], "only the closing paragraph of the thinking is the hint"
-    assert "decided to view" in prompts[0]
+    assert "latest user or assistant request" in prompts[0]
     print("PASS: thinking blocks count as assistant intent, closing paragraph only")
 
 
