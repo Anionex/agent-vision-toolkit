@@ -73,6 +73,15 @@ Each playbook explains when to use the workflow, which tools to call and in what
 
 ## Real-world Effects
 
+### UI restoration: sketch to interface
+
+<p align="center">
+  <img src="assets/ui-restore-sketch.png" alt="Hand-drawn JupyterLab interface used as a UI restoration reference" width="49%">
+  <img src="assets/ui-restore-result.png" alt="Restored JupyterLab workspace made from the hand-drawn reference" width="49%">
+</p>
+
+*Left: the hand-drawn reference. Right: the restored JupyterLab workspace made from it. See the [UI restoration playbook](skills/vision-tools/references/restore-ui.md) for the workflow.*
+
 <p align="center">
   <img src="assets/effect-3.jpg" alt="Multi-round image Q&A with the optional glance CLI" width="49%">
   <img src="assets/effect-4.jpg" alt="DeepSeek V4 playing chess by locating screen elements with glance/ground" width="49%">
@@ -247,6 +256,8 @@ This layer makes screenshots pasted into an agent work directly, while also prev
 
 All entry points share one configuration. Configure it once and use it everywhere.
 
+## How It Works
+
 ### Descriptions that keep the task in view
 
 Most vision bridges for text-only models simply ask a multimodal model to turn an image into a generic description, then hand that description to the text model and expect it to reconstruct the information it needs. That adds another semantic layer where some information is inevitably lost — the source of the common belief that stitched-together vision solutions must suffer a large performance penalty.
@@ -261,8 +272,6 @@ To address this, `agent-vision-toolkit` tries to recover **why the agent wants t
        alt="Generic image descriptions compared with task-aware vision using a focus hint - Part 2"
        width="49%">
 </p>
-
-## How It Works
 
 <details>
 <summary><b>Request flow and protocol details</b></summary>

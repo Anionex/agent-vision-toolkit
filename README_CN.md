@@ -73,6 +73,15 @@
 
 ## 实际效果
 
+### UI 还原：从手绘稿到成品界面
+
+<p align="center">
+  <img src="assets/ui-restore-sketch.png" alt="作为 UI 还原参考的手绘 JupyterLab 界面" width="49%">
+  <img src="assets/ui-restore-result.png" alt="依据手绘参考还原出的 JupyterLab 工作区界面" width="49%">
+</p>
+
+*左：作为输入的手绘参考；右：依据该手绘稿还原出的 JupyterLab 工作区界面。完整流程见 [UI 还原 playbook](skills/vision-tools/references/restore-ui.md)。*
+
 <p align="center">
   <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
   <img src="assets/effect-4.jpg" alt="DeepSeek V4 用 glance/ground 定位屏幕元素自主游玩国际象棋" width="49%">
@@ -245,6 +254,8 @@ crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 
 所有入口共享配置。一次配置好后即可多处使用。
 
+## 工作原理
+
 ### 让描述始终对着当前任务
 
 大多数纯文本模型的视觉转接方案只是用多模态模型把图片变成一段通用描述，之后再丢给纯文本模型，让他自己根据描述拼凑出想要的内容，这中间隔了一层语义；一些东西必然会丢失——也就是这个地方存在的损失，让我们认为缝合方案必然带来巨大的性能损失。
@@ -259,9 +270,6 @@ crop screenshot.png --region 1563,514,1668,621 -o send-button.png
        alt="通用图片描述与带 focus hint 的任务感知视觉的对比 - 下半部分"
        width="49%">
 </p>
-
-
-## 工作原理
 
 <details>
 <summary><b>请求流与协议细节</b></summary>
