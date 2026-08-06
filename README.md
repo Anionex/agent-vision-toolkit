@@ -5,6 +5,8 @@
 [![GitHub stars](https://img.shields.io/github/stars/Anionex/agent-vision-toolkit?style=flat-square&logo=github)](https://github.com/Anionex/agent-vision-toolkit/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Anionex/agent-vision-toolkit?style=flat-square&logo=github)](https://github.com/Anionex/agent-vision-toolkit/forks)
 [![License: MIT](https://img.shields.io/github/license/Anionex/agent-vision-toolkit?style=flat-square&color=4EAA25)](https://github.com/Anionex/agent-vision-toolkit/blob/main/LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Anionex/agent-vision-toolkit/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Anionex/agent-vision-toolkit/actions/workflows/ci.yml)
+[![Sponsor](https://img.shields.io/badge/Sponsor-Anionex-EA4AAA?style=flat-square&logo=githubsponsors)](https://github.com/sponsors/Anionex)
 
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-Standard-green?style=flat-square)](https://agentskills.io)
 [![Extensions](https://img.shields.io/badge/-Extensions-3178C6?style=flat-square)](https://github.com/Anionex/agent-vision-toolkit/tree/main/extensions)
@@ -18,12 +20,30 @@
 
 If your coding agent runs on a text-only model like DeepSeek V4, it can't look at images — screenshots, mockups, diagrams, and error dialogs are all dead ends. This repository gives it eyes in two layers:
 
-1. **The toolkit** — four CLIs, plus a skill that teaches your agent when to reach for each one. Works in any agent with a shell.
+1. **The toolkit** — five CLIs, plus a skill that teaches your agent when to reach for each one. Works in any agent with a shell.
 2. **Seamless integration** *(optional upgrade)* — a transparent local proxy and single-file native extensions, so **pasted images and built-in image tools work too**, with no tool call and no extra prompting.
 
 All code has been verified in real Codex + DeepSeek sessions, and the same pipeline has been live-verified end-to-end in Claude Code, Pi, Oh My Pi, and OpenCode.
 
 > If this project helps you, feel free to star🌟 & fork.
+
+<details>
+<summary><b>Contents</b></summary>
+
+- [Use-case Playbooks](#use-case-playbooks)
+- [Real-world Effects](#real-world-effects)
+- [Highlights](#highlights)
+- [Quick Start](#quick-start)
+- [The Tools](#the-tools)
+- [Upgrade: Seamless Integration](#upgrade-seamless-integration)
+- [How It Works](#how-it-works)
+- [Configuration](#configuration)
+- [Privacy, Data Flow, and Cost](#privacy-data-flow-and-cost)
+- [FAQ](#faq)
+- [Community and Support](#community-and-support)
+- [Support the Project](#support-the-project)
+
+</details>
 
 
 ## Use-case Playbooks
@@ -282,6 +302,13 @@ Upstream authentication is still sent by your agent and passed through by the pr
 - Python 3.11+
 - An OpenAI-compatible vision API that supports `/chat/completions` and `image_url`
 
+## Privacy, Data Flow, and Cost
+
+- Model-based operations send images to the OpenAI-compatible endpoint configured by `VISION_BASE_URL`; local tools such as `trace` and `crop` do not upload them.
+- The text-only upstream receives the rewritten request with that description, not the original image. Its existing model name and authentication headers are forwarded unchanged.
+- The proxy does not log request bodies, images, prompts, conversations, or API keys. Optional logs contain operational metadata only.
+- Descriptions are cached in memory per image and prompt, then discarded when the process restarts. Each uncached pair may create one billable request under the configured vision provider's pricing and data-retention terms.
+
 ## FAQ
 
 ### After pointing `base_url` at the local proxy, does the proxy also need the upstream model's API key?
@@ -326,6 +353,19 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 - This is an image-to-text layer; it doesn't hand vision tokens directly to the text model.
 - Description quality depends on the configured vision model.
 - The proxy's cache lives only inside its process and is cleared on restart.
+
+## Community and Support
+
+- Setup and usage help: [Support guide](SUPPORT.md) and the repository's issue forms
+- Bug reports and feature requests: [Issues](https://github.com/Anionex/agent-vision-toolkit/issues/new/choose)
+- Contributions: [Contributing guide](CONTRIBUTING.md)
+- Security reports: [Security policy](SECURITY.md)
+- Community standards: [Code of Conduct](CODE_OF_CONDUCT.md)
+- User-facing changes: [Changelog](CHANGELOG.md)
+
+## Support the Project
+
+If agent-vision-toolkit saves you time, you can support it by starring, sharing, contributing, or [sponsoring Anionex](https://github.com/sponsors/Anionex). Sponsorship helps fund vision API evaluations, cross-platform verification, and ongoing maintenance.
 
 ---
 

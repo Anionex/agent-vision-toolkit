@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Installation guide
+    url: https://github.com/Anionex/agent-vision-toolkit/blob/main/AGENT_INSTALL.md
+    about: Follow the host-specific installation and troubleshooting steps first.
+  - name: Security policy
+    url: https://github.com/Anionex/agent-vision-toolkit/security/policy
+    about: Report suspected vulnerabilities privately instead of opening a public issue.

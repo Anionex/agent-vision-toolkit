@@ -5,6 +5,8 @@
 [![GitHub stars](https://img.shields.io/github/stars/Anionex/agent-vision-toolkit?style=flat-square&logo=github)](https://github.com/Anionex/agent-vision-toolkit/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Anionex/agent-vision-toolkit?style=flat-square&logo=github)](https://github.com/Anionex/agent-vision-toolkit/forks)
 [![License: MIT](https://img.shields.io/github/license/Anionex/agent-vision-toolkit?style=flat-square&color=4EAA25)](https://github.com/Anionex/agent-vision-toolkit/blob/main/LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Anionex/agent-vision-toolkit/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Anionex/agent-vision-toolkit/actions/workflows/ci.yml)
+[![Sponsor](https://img.shields.io/badge/Sponsor-Anionex-EA4AAA?style=flat-square&logo=githubsponsors)](https://github.com/sponsors/Anionex)
 
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-Standard-green?style=flat-square)](https://agentskills.io)
 [![Extensions](https://img.shields.io/badge/-Extensions-3178C6?style=flat-square)](https://github.com/Anionex/agent-vision-toolkit/tree/main/extensions)
@@ -18,12 +20,30 @@
 
 如果你的 coding agent 接的是 DeepSeek V4 这类纯文本模型，它就没法看图——截图、设计稿、示意图、报错弹窗全是死路。本仓库分两层给它装上眼睛：
 
-1. **工具箱** —— 四个 CLI，外加一个 skill 告诉 agent 什么时候该用哪个。任何有 shell 的 agent 都能用。
+1. **工具箱** —— 五个 CLI，外加一个 skill 告诉 agent 什么时候该用哪个。任何有 shell 的 agent 都能用。
 2. **无缝接入**（可选升级）—— 透明本地代理与单文件原生 extension，让**用户粘贴的图片和 agent 内置看图工具也能工作**，不需要额外的工具调用，也不需要额外提示词。
 
 所有代码均已在真实 Codex + DeepSeek 会话中验证过，同一套管线也在 Claude Code、Pi、Oh My Pi、OpenCode 中完成了真机端到端验证。
 
 > 如果项目对你有用，欢迎 star🌟 & fork。
+
+<details>
+<summary><b>目录</b></summary>
+
+- [用例技能](#用例技能)
+- [实际效果](#实际效果)
+- [亮点](#亮点)
+- [快速开始](#快速开始)
+- [工具](#工具)
+- [升级：无缝接入](#升级无缝接入)
+- [工作原理](#工作原理)
+- [配置](#配置)
+- [隐私、数据流与费用](#隐私数据流与费用)
+- [常见问题](#常见问题)
+- [社区与支持](#社区与支持)
+- [支持项目](#支持项目)
+
+</details>
 
 
 ## 用例技能
@@ -279,6 +299,13 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 - Python 3.11+
 - 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API
 
+## 隐私、数据流与费用
+
+- 需要模型理解图片的操作会把图片发送到 `VISION_BASE_URL` 所配置的 OpenAI-compatible 接口；`trace`、`crop` 等本地工具不会上传图片。
+- 纯文本上游收到的是包含该描述的改写后请求，而不是原始图片；原有模型名和鉴权请求头会保持不变并原样透传。
+- 代理不会记录请求 body、图片、prompt、对话或 API key；可选日志只包含运行元数据。
+- 描述按图片与 prompt 缓存在内存中，进程重启后清空。每个未命中的组合可能产生一次计费请求，费用与数据保留规则以所配置视觉服务商为准。
+
 ## 常见问题
 
 ### `base_url` 指向本地代理后，代理也需要配置上游模型的 API key 吗？
@@ -323,6 +350,19 @@ Codex（携带原有 Authorization）
 - 这是图片转文字的一层，不会把视觉 token 直接交给纯文本模型。
 - 图片描述质量取决于所配置的视觉模型。
 - 代理的缓存只存在于进程内，重启后清空。
+
+## 社区与支持
+
+- 安装与使用帮助：[支持说明](SUPPORT.md) 与仓库 Issue 表单
+- Bug 与功能建议：[Issues](https://github.com/Anionex/agent-vision-toolkit/issues/new/choose)
+- 参与贡献：[贡献指南](CONTRIBUTING.md)
+- 安全问题：[安全策略](SECURITY.md)
+- 社区规范：[行为准则](CODE_OF_CONDUCT.md)
+- 用户可见变更：[更新日志](CHANGELOG.md)
+
+## 支持项目
+
+如果 agent-vision-toolkit 为你节省了时间，欢迎 Star、分享、参与贡献，或通过 [GitHub Sponsors 赞助 Anionex](https://github.com/sponsors/Anionex)。赞助主要用于视觉模型 API 实测、跨平台验证与持续维护。
 
 ---
 Made by [Anionex](https://github.com/Anionex) with codex

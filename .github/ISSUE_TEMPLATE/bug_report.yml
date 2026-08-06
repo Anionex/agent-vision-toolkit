@@ -1,0 +1,78 @@
+name: Bug report
+description: Report a reproducible problem in the toolkit, proxy, skill, or extensions.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve agent-vision-toolkit. Remove API keys, authorization headers, request bodies, images containing private data, and other secrets before submitting.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - Proxy - Codex / OpenAI Responses
+        - Proxy - Claude Code / Anthropic Messages
+        - CLI - glance
+        - CLI - ground / detect
+        - CLI - trace / crop
+        - Skill or playbook
+        - Pi / Oh My Pi extension
+        - OpenCode extension
+        - Installation or documentation
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Agent host and model
+      description: For example, Codex with a text-only model or OpenCode with a named provider.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and runtime versions
+      placeholder: macOS 15.6, Python 3.11.9, Node 24.4.0
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Include the smallest sequence that reproduces the problem.
+      placeholder: |
+        1. Configure ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or output
+      description: Do not include API keys, Authorization headers, request bodies, prompts, conversations, or private images.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues and pull requests for the same problem.
+          required: true
+        - label: I removed credentials and private data from everything included above.
+          required: true

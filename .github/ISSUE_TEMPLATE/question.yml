@@ -1,0 +1,34 @@
+name: Setup or usage question
+description: Ask for help configuring or using agent-vision-toolkit.
+title: "[Question] "
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: Check README.md, AGENT_INSTALL.md, and SUPPORT.md first. Never include API keys, Authorization headers, private images, or full request bodies.
+  - type: input
+    id: goal
+    attributes:
+      label: What are you trying to do?
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Host, operating system, and runtime versions
+      placeholder: Codex, macOS 15.6, Python 3.11.9
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?
+      description: Include sanitized commands and output.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Sanitized configuration shape
+      description: Show relevant field names and placeholder values, never real credentials.
+      render: shell

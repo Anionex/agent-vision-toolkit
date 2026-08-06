@@ -1,0 +1,50 @@
+name: Feature request
+description: Propose a focused improvement that fits the project's scope.
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Please read CONTRIBUTING.md before proposing installation frameworks, protocol changes, or new host integrations.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Use case or problem
+      description: Describe the concrete workflow that is difficult today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Explain the smallest change that would solve the use case.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options:
+        - CLI toolkit
+        - Skill or playbook
+        - Proxy protocol support
+        - Native extension
+        - Documentation
+        - Testing or evaluation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include existing tools, scripts, or project patterns that could be reused.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Scope checks
+      options:
+        - label: I searched existing issues and pull requests.
+          required: true
+        - label: This proposal does not require logging request bodies, images, prompts, conversations, or API keys.
+          required: true

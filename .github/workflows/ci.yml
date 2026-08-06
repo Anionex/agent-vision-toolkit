@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Python entry points
+        run: python -m py_compile vision_proxy.py vision_client.py ground.py detect.py bin/glance bin/trace bin/crop
+      - name: Run core tests
+        run: |
+          python tests/test_image_rewrite_shapes.py
+          python tests/test_focus_hint.py
+          python tests/test_anthropic_rewrite.py
+          python tests/smoke_test_proxy.py
+          python tests/test_vision_client.py
+
+  extensions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Test native extensions
+        run: node tests/test_extensions.mjs
