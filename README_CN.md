@@ -76,11 +76,13 @@
 
 <p align="center">
   <a href="examples/long-screenshot-ocr/telegram-chat-long.png">
-    <img src="examples/long-screenshot-ocr/telegram-chat-preview.png" alt="用于长截图 OCR 的全合成英文 Telegram 聊天预览" width="680">
+    <img src="examples/long-screenshot-ocr/telegram-chat-preview.png" alt="包含完整长图缩略轨道和五个可读检查点的英文 Telegram 聊天总览" width="680">
   </a>
 </p>
 
-这个隐私安全的测试样例完全由本地 HTML 生成，包含 Telegram 风格的状态栏、顶栏、壁纸、气泡尾巴、头像、回复、文件、投票、图片卡片、表情回应和未读分隔线。仓库中保留的参考实跑结果将长图切为 21 块，在 20 个安全边界处无需重叠，并按顺序完整还原 **180/180 条记录**；没有缺失或多余消息，发言人、时间和引用字段也全部一致。[查看完整长图、转写结果和复现步骤 →](examples/long-screenshot-ocr/)
+*左侧轨道展示完整的 31,186 px 长截图，右侧五个面板依次放大从开头到结尾的检查点。点击总览图可打开原始全分辨率图片。*
+
+这个测试样例完全由本地 HTML 生成，包含 Telegram 风格的状态栏、顶栏、壁纸、气泡尾巴、头像、回复、文件、投票、图片卡片、表情回应和未读分隔线。仓库中保留的参考实跑结果将长图切为 21 块，在 20 个安全边界处无需重叠，并按顺序完整还原 **180/180 条记录**；没有缺失或多余消息，发言人、时间和引用字段也全部一致。[查看完整长图、转写结果和复现步骤 →](examples/long-screenshot-ocr/)
 
 ### UI 还原：从手绘稿到成品界面
 

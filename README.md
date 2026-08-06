@@ -76,11 +76,13 @@ Beyond giving an agent tools, the included `vision-tools` skill provides end-to-
 
 <p align="center">
   <a href="examples/long-screenshot-ocr/telegram-chat-long.png">
-    <img src="examples/long-screenshot-ocr/telegram-chat-preview.png" alt="Preview of a fully synthetic English Telegram chat used for long-screenshot OCR" width="680">
+    <img src="examples/long-screenshot-ocr/telegram-chat-preview.png" alt="Full-length overview of the English Telegram chat with the complete screenshot and five readable checkpoints" width="680">
   </a>
 </p>
 
-The privacy-safe fixture is generated entirely from local HTML and includes Telegram-style app chrome, wallpaper, bubble tails, avatars, replies, files, a poll, a photo card, reactions, and an unread divider. In the checked-in reference run, the workflow split it into 21 chunks with 20 safe boundaries and recovered all **180/180 records** in order, with no missing/extra messages and no speaker, timestamp, or reply-field differences. [Open the full input, transcript, and reproduction steps →](examples/long-screenshot-ocr/)
+*The left rail shows the complete 31,186 px screenshot; the five panels enlarge checkpoints from start to finish. Click the overview for the original full-resolution input.*
+
+The fixture is generated entirely from local HTML and includes Telegram-style app chrome, wallpaper, bubble tails, avatars, replies, files, a poll, a photo card, reactions, and an unread divider. In the checked-in reference run, the workflow split it into 21 chunks with 20 safe boundaries and recovered all **180/180 records** in order, with no missing/extra messages and no speaker, timestamp, or reply-field differences. [Open the full input, transcript, and reproduction steps →](examples/long-screenshot-ocr/)
 
 ### UI restoration: sketch to interface
 

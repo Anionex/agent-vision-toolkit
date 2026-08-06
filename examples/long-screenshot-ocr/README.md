@@ -1,12 +1,12 @@
 # Synthetic Telegram long-screenshot OCR demo
 
-This fixture is fully synthetic. The names, messages, dates, release details,
-filenames, and identifiers were created for this repository; it contains no
-real chat export or user data.
+The overview keeps the complete **31,186 px** screenshot visible in the left
+rail and enlarges five checkpoints from start to finish. Click it to open the
+original full-resolution PNG.
 
 <p align="center">
   <a href="telegram-chat-long.png">
-    <img src="telegram-chat-preview.png" alt="Preview of the synthetic English Telegram launch chat" width="680">
+    <img src="telegram-chat-preview.png" alt="Full-length overview of the English Telegram launch chat with five readable checkpoints" width="680">
   </a>
 </p>
 
@@ -16,7 +16,8 @@ real chat export or user data.
 |---|---|
 | [`telegram-chat.html`](telegram-chat.html) | Deterministic, offline source for the fictional English conversation. |
 | [`telegram-chat-long.png`](telegram-chat-long.png) | The generated 780 x 31186 input screenshot. |
-| [`telegram-chat-preview.png`](telegram-chat-preview.png) | A compact README preview cropped from the same synthetic screenshot. |
+| [`telegram-chat-preview.html`](telegram-chat-preview.html) | Deterministic source for the full-length README overview. |
+| [`telegram-chat-preview.png`](telegram-chat-preview.png) | The complete screenshot as a vertical rail plus five readable checkpoints. |
 | [`telegram-chat-ocr.md`](telegram-chat-ocr.md) | Merged Markdown transcript produced by the long-screenshot OCR workflow. |
 
 ## Checked-in reference run
@@ -71,4 +72,16 @@ python3 skills/vision-tools/scripts/html_shot.py \
   --scale 2 \
   --wait-ms 100 \
   -o examples/long-screenshot-ocr/telegram-chat-long.png
+```
+
+To regenerate the full-length README overview:
+
+```bash
+python3 skills/vision-tools/scripts/html_shot.py \
+  examples/long-screenshot-ocr/telegram-chat-preview.html \
+  --width 390 \
+  --height 2600 \
+  --scale 2 \
+  --wait-ms 200 \
+  -o examples/long-screenshot-ocr/telegram-chat-preview.png
 ```
