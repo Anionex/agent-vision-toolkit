@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hero.png" alt="agent-vision-toolkit — Give text-only LLM agents eyes." width="100%">
+</p>
+
 <div align="center">
 
 # agent-vision-toolkit
