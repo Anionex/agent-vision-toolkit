@@ -50,8 +50,7 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 - **Pasted images and `view_image` both work**: images pasted directly (`message.content`) and images passed when the model calls `view_image` (`function_call_output.output`) are both understood.
 - **Parallel multi-image understanding**: multiple images in one request hit the vision model concurrently — N images cost roughly the latency of 1, no waiting image by image.
 - **The vision model only looks, it doesn't reason for you**: it transcribes and describes, leaving the conclusion to your coding model.
-- **Coarse to fine**: the first description is a map, not the whole answer — `glance -q` and `ground --region` are the follow-up channel when a detail wasn't covered.
-- **Exact geometry stays local**: `trace` never calls a vision API, so numbers come from pixels rather than from a model's confident estimate.
+- **A practical methodology for visual work**: the skill teaches the agent what to inspect, which tool to choose, how to proceed step by step, and how to verify the result across different visual tasks.
 - **More vision tools may be added later**
 
 
