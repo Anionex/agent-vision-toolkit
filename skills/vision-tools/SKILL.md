@@ -19,6 +19,7 @@ Pick the tool by the question you are answering:
 | "What is its exact shape, size, offset?" | `trace` |
 | "Cut this box out as its own image file" | `crop` |
 | "Extract the icon/logo foreground from a region as transparent PNG" | `scripts/extract_fg.py` |
+| "Extract icons from cropped+scaled screenshots, no region needed" | `scripts/extract_icon.py` |
 | "Turn this HTML file into a screenshot" | `scripts/html_shot.py` |
 | "Which colours dominate a region, and which palette value fits it?" | `scripts/dominant_colors.py` |
 | A relation none of them return — a gap, a distance between two located things | code over the pixels (Pillow) |
@@ -148,6 +149,26 @@ once and reuse it, instead of re-cropping in memory on every call.
 clearly, crop with `--scale 4`, then run `ground`/`trace` on the upscaled
 file — coordinates it returns are in the upscaled grid, divide by `N` to map
 back to the original image. Requires the optional `pillow`.
+
+## extract_icon — batch-extract icon foreground from scaled crops (local, no vision API)
+
+```bash
+crop shot.png --region X1,Y1,X2,Y2 --scale 4 -o d/icon1.png
+python3 scripts/extract_icon.py d/icon1.png d/icon2.png   # writes <stem>.clean.png next to each input
+python3 scripts/extract_icon.py d/icon1.png --disc-radius 60
+python3 scripts/extract_icon.py d/icon1.png --boxes "101,84,184,171"
+```
+
+Input is a `crop --scale` cut-out with the icon centered (disc + glyph).
+Everything is inferred: the disc centre is the image centre, the disc
+radius defaults to `min(w,h)/2 * 0.6`, and the disc colour is sampled from
+a ring around the centre; `extract_fg` then excludes that colour and the
+glyph is picked as the most saturated among the three largest coloured
+components (white rings, ripples, and text fall away). The output is a 1:1
+transparent PNG of the glyph only. When inference fails, override the
+radius with `--disc-radius`, or pass a `ground` box (in the upscaled grid)
+as `--boxes` to recentre and re-filter by overlap. Requires the optional
+`pillow`.
 
 ## html_shot — render an HTML file to an image (local, needs a Chrome-family browser)
 
