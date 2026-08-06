@@ -21,9 +21,22 @@ If your coding agent runs on a text-only model like DeepSeek V4, it can't look a
 1. **The toolkit** — four CLIs, plus a skill that teaches your agent when to reach for each one. Works in any agent with a shell.
 2. **Seamless integration** *(optional upgrade)* — a transparent local proxy and single-file native extensions, so **pasted images and built-in image tools work too**, with no tool call and no extra prompting.
 
-All code has been verified in real Codex + DeepSeek sessions, and the same pipeline has been live-verified end-to-end in Claude Code, Pi, Oh My Pi, and OpenCode. Use cases include but are not limited to: image Q&A, screenshot analysis, Computer Use GUI operation, and multi-step image reasoning.
+All code has been verified in real Codex + DeepSeek sessions, and the same pipeline has been live-verified end-to-end in Claude Code, Pi, Oh My Pi, and OpenCode.
 
 > If this project helps you, feel free to star🌟 & follow～ I'll keep sharing more practical tools and tips.
+
+
+## Use-case Playbooks
+
+Beyond giving an agent tools, the included `vision-tools` skill provides end-to-end playbooks it can follow: when to use each workflow, which tools to call, and how to verify the result.
+
+| Use case | What the agent learns to do |
+|---|---|
+| [Rebuild a UI from a screenshot or design](skills/vision-tools/references/restore-ui.md) | Reuse project components and assets first, then combine code-native UI, extracted visuals, rendered screenshots, and visual comparison to align a page or component. |
+| [Restore an icon, logo, illustration, or other graphic](skills/vision-tools/references/restore-graphic.md) | Extract a transparent PNG from the source image, or rebuild an editable/scalable SVG when needed, then verify shape, color, and alpha edges. |
+| [Turn a sketch, diagram, or whiteboard into structured code](skills/vision-tools/references/restore-structure.md) | Recover nodes, labels, connections, and directions as editable Mermaid, Graphviz, or another structured representation. |
+| [Operate a GUI from screenshots](skills/vision-tools/references/gui.md) | Locate a control, perform one action, capture the screen again, and verify the resulting state before continuing. |
+| **More use cases** | Other step-by-step visual-agent playbooks are being added gradually. |
 
 
 ## Real-world Effects

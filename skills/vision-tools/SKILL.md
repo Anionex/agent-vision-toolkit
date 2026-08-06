@@ -1,6 +1,14 @@
 ---
 name: vision-tools
-description: Local vision CLIs: glance (describe/ask/OCR an image), ground (locate a target, pixel box), detect (element inventory), trace (image to SVG geometry), crop (cut a pixel box to a file), and scripts/html_shot.py (HTML file to image). Use for any task involving an image — questions, text, locating elements, comparing, rebuilding as HTML/SVG, digitizing a sketch or diagram, reading values off a chart, operating a GUI from screenshots — and to re-check an image yourself when a description you were given lacks a detail.
+description: >-
+  Local vision CLIs: glance (describe/ask/OCR an image), ground (locate a
+  target, pixel box), detect (element inventory), trace (image to SVG
+  geometry), crop (cut a pixel box to a file), and scripts/html_shot.py (HTML
+  file to image). Use for any task involving an image — questions, text,
+  locating elements, comparing, rebuilding as HTML/SVG, digitizing a sketch
+  or diagram, reading values off a chart, operating a GUI from screenshots —
+  and to re-check an image yourself when a description you were given lacks a
+  detail.
 ---
 
 # vision-tools
@@ -128,7 +136,7 @@ high-contrast graphics only; text becomes curves (pair with `--ocr` when
 the text matters). Small images are upscaled automatically before tracing,
 so a 30px icon traces as readily as a screenshot — size is not a reason to
 skip the tool. Before shipping or reusing a traced SVG, read
-`references/restore-exact.md` — it holds the reuse traps and the
+`references/restore-graphic.md` — it holds the reuse traps and the
 ship-vs-hand-write call.
 
 ## crop — cut a pixel box out of an image (local, no vision API)
@@ -184,12 +192,13 @@ python3 scripts/html_shot.py page.html --width 1440 --height 900 -o page.png
 python3 scripts/html_shot.py page.html --scale 2            # 2x pixels: small text stays readable
 ```
 
-The rebuild loop: write HTML, screenshot it, `pixel_diff` it against the
-design. Rendering happens in headless Chrome/Chromium/Edge — no Python
-dependencies. Only the viewport is captured, so pass `--height` for pages
-taller than the window; `--wait-ms N` pauses for fonts, images, or
-animation before capturing. Paths are relative to this skill's own
-directory.
+The visual-alignment loop: write HTML, screenshot it at the reference
+viewport, then compare it with the design. Use `pixel_diff` to locate
+material differences, not to chase a zero-difference score. Rendering
+happens in headless Chrome/Chromium/Edge — no Python dependencies. Only the
+viewport is captured, so pass `--height` for pages taller than the window;
+`--wait-ms N` pauses for fonts, images, or animation before capturing.
+Paths are relative to this skill's own directory.
 
 ## pixel_diff — where two images differ (local, no vision API)
 
@@ -267,7 +276,9 @@ sequence, and how to tell you got it right.
 
 | The job | Read |
 |---|---|
-| Rebuild what an image shows (page → HTML, icon/diagram → SVG, sketch/diagram → Mermaid/Graphviz) — or check a build against its design image | `references/restore.md` 选模式，再读 `references/restore-quick.md`（默认）或 `references/restore-exact.md`（仅明确要求像素级时） |
+| Rebuild a page or component as HTML/CSS, or align an existing UI with its reference image | `references/restore-ui.md` |
+| Extract or rebuild an icon, logo, illustration, or other isolated graphic as transparent PNG/SVG | `references/restore-graphic.md` |
+| Turn a sketch, diagram, or whiteboard into Mermaid, Graphviz, or another structured representation | `references/restore-structure.md` |
 | Operate a GUI from screenshots — locate, act, verify each step | `references/gui.md` |
 
 ## Notes

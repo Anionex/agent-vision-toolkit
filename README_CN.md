@@ -21,9 +21,22 @@
 1. **工具箱** —— 四个 CLI，外加一个 skill 告诉 agent 什么时候该用哪个。任何有 shell 的 agent 都能用。
 2. **无缝接入**（可选升级）—— 透明本地代理与单文件原生 extension，让**用户粘贴的图片和 agent 内置看图工具也能工作**，不需要额外的工具调用，也不需要额外提示词。
 
-所有代码均已在真实 Codex + DeepSeek 会话中验证过，同一套管线也在 Claude Code、Pi、Oh My Pi、OpenCode 中完成了真机端到端验证。可用场景包括但不限于：图片问答，截图分析，Computer Use GUI 界面操作，多步图像推理。
+所有代码均已在真实 Codex + DeepSeek 会话中验证过，同一套管线也在 Claude Code、Pi、Oh My Pi、OpenCode 中完成了真机端到端验证。
 
 > 如果项目对你有用，欢迎 star🌟 & follow～，我会分享更多的实用工具和技巧
+
+
+## 用例技能
+
+除了给 agent 提供看图工具，随项目提供的 `vision-tools` skill 还内置了可直接照着执行的完整用例：什么时候使用、按什么顺序调用工具、最后如何验收，都写在对应的 playbook 里。
+
+| 用例 | Agent 会如何完成 |
+|---|---|
+| [根据截图或设计稿还原 UI](skills/vision-tools/references/restore-ui.md) | 优先复用项目已有组件和素材，再结合原生 UI 代码、截图素材、渲染截图与视觉对比，逐轮对齐页面或组件。 |
+| [还原图标、Logo、插画等图形素材](skills/vision-tools/references/restore-graphic.md) | 从原图提取透明 PNG；需要可编辑或无损缩放时重建 SVG，并验证形状、颜色和透明边缘。 |
+| [把草图、示意图或白板转成结构化代码](skills/vision-tools/references/restore-structure.md) | 识别节点、文字、连线与方向，输出可编辑的 Mermaid、Graphviz 或其他结构化表示。 |
+| [根据截图操作 GUI](skills/vision-tools/references/gui.md) | 定位控件、执行一次操作、重新截图并验证结果，再继续下一步，避免在过期截图上连续操作。 |
+| **更多用例** | 其他可让 agent 直接照着执行的视觉任务用例正在逐步加入。 |
 
 
 ## 实际效果
