@@ -1,23 +1,37 @@
 #!/usr/bin/env python3
-"""trace: deterministic image-to-SVG tracing for exact shape geometry.
+"""trace: recover clean SVG geometry from flat raster graphics.
 
-Runs fully local (no vision API, no credentials): coordinates come from the
-actual pixels, so use this instead of asking a vision model for shapes,
-sizes, or outlines. Flat, high-contrast graphics only; text becomes curves.
+The default pipeline traces the *centerline* of high-contrast strokes, then
+fits semantic SVG primitives (circle, line, polyline, polygon).  This is the
+representation an editable icon normally wants: a magnifier becomes one
+circle plus one line instead of two noisy contour paths.
+
+Use --outline for the previous vtracer silhouette mode when the filled outer
+contour, rather than the drawing trajectory, is the desired result.
 """
 
 import argparse
-from pathlib import Path
+import math
+import random
 import re
 import sys
 import tempfile
+from collections import Counter, deque
+from dataclasses import dataclass
+from itertools import pairwise
+from pathlib import Path
 
 WHITE_FILLS = {"#ffffff", "#fff", "white"}
-
-# Speckle filtering drops components under a fixed pixel area, so a 30px icon
-# binarizes to nothing at 1x while the same icon enlarged traces cleanly.
-# Enlarge anything smaller than this; full-size screenshots already clear it.
 TARGET_MIN_SIDE = 256
+GRAPH_FALLBACK_TRIGGER = 0.88
+GRAPH_FALLBACK_GAIN = 0.02
+
+
+@dataclass
+class Primitive:
+    kind: str
+    points: list | None = None
+    circle: tuple | None = None
 
 
 def strip_background(svg):
@@ -34,87 +48,1562 @@ def truncate_decimals(svg, places=2):
     return re.sub(r"-?\d+\.\d{3,}", lambda m: f"{float(m.group()):.{places}f}", svg)
 
 
-def prepare_input(path, region, scale):
-    """Crop/upscale with Pillow when asked; return the path vtracer reads and the scale used.
-
-    `scale` may be None, meaning "pick one from the size": small shapes are
-    enlarged until they survive speckle filtering. Without Pillow we cannot
-    measure the image, so that choice falls back to no upscale.
-    """
+def parse_region(region, width, height):
     try:
-        from PIL import Image
+        x1, y1, x2, y2 = (int(value) for value in region.split(","))
+    except ValueError:
+        raise ValueError("--region expects four integers: X1,Y1,X2,Y2 (pixels)")
+    box = (
+        max(0, min(x1, x2)),
+        max(0, min(y1, y2)),
+        min(width, max(x1, x2)),
+        min(height, max(y1, y2)),
+    )
+    if box[2] <= box[0] or box[3] <= box[1]:
+        raise ValueError(
+            f"--region {region} is empty after clamping to {width}x{height}"
+        )
+    return box
+
+
+def load_geometry_image(path, region, scale):
+    try:
+        import numpy as np
+        from PIL import Image, ImageOps
+    except ImportError:
+        sys.exit(
+            "trace: geometry mode requires Pillow and numpy; install the optional "
+            "dependencies pillow numpy first"
+        )
+
+    with Image.open(path) as source:
+        image = ImageOps.exif_transpose(source).convert("RGBA")
+    if region:
+        try:
+            image = image.crop(parse_region(region, image.width, image.height))
+        except ValueError as exc:
+            sys.exit(f"trace: {exc}")
+
+    logical_size = image.size
+    if scale is None:
+        shortest = max(min(image.size), 1)
+        scale = max(2 if region else 1, math.ceil(TARGET_MIN_SIDE / shortest))
+    if scale < 1:
+        sys.exit("trace: --scale must be a positive integer")
+    if scale != 1:
+        image = image.resize(
+            (image.width * scale, image.height * scale), Image.Resampling.LANCZOS
+        )
+    return image, logical_size, scale, np
+
+
+def _otsu_threshold(values, np):
+    values = np.asarray(values)
+    if values.size == 0:
+        return 0
+    clipped = np.clip(np.rint(values), 0, 255).astype(np.uint8)
+    hist = np.bincount(clipped.ravel(), minlength=256).astype(float)
+    total = hist.sum()
+    if total == 0:
+        return 0
+    cumulative = np.cumsum(hist)
+    cumulative_mean = np.cumsum(hist * np.arange(256))
+    global_mean = cumulative_mean[-1]
+    denominator = cumulative * (total - cumulative)
+    numerator = (global_mean * cumulative - cumulative_mean * total) ** 2
+    score = np.zeros(256, dtype=float)
+    valid = denominator > 0
+    score[valid] = numerator[valid] / denominator[valid]
+    return int(np.argmax(score))
+
+
+def _border_pixels(array, np):
+    return np.concatenate(
+        (array[0], array[-1], array[1:-1, 0], array[1:-1, -1]), axis=0
+    )
+
+
+def image_to_mask(image, np):
+    """Separate foreground from the border-estimated background.
+
+    This handles dark-on-light, light-on-dark, colored backgrounds, and
+    transparent icons without asking the caller to pre-invert the image.
+    """
+    rgba = np.asarray(image, dtype=np.uint8)
+    rgb = rgba[..., :3].astype(float)
+    alpha = rgba[..., 3]
+    border_alpha = _border_pixels(alpha, np)
+
+    transparent_background = (
+        np.percentile(border_alpha, 75) < 32 and np.count_nonzero(alpha) > 0
+    )
+    if transparent_background:
+        threshold = max(1, _otsu_threshold(alpha, np))
+        mask = alpha > threshold
+    else:
+        border_rgb = _border_pixels(rgb, np)
+        background = np.median(border_rgb, axis=0)
+        # RMS channel distance stays on a 0..255 scale.
+        distance = np.sqrt(np.mean((rgb - background) ** 2, axis=2))
+        threshold = max(4, _otsu_threshold(distance, np))
+        mask = distance > threshold
+
+        coverage = float(mask.mean())
+        if coverage < 0.0002 or coverage > 0.70:
+            luminance = (
+                rgb[..., 0] * 0.2126 + rgb[..., 1] * 0.7152 + rgb[..., 2] * 0.0722
+            )
+            gray_threshold = _otsu_threshold(luminance, np)
+            candidates = [luminance <= gray_threshold, luminance > gray_threshold]
+
+            def candidate_score(candidate):
+                share = float(candidate.mean())
+                border_share = float(_border_pixels(candidate, np).mean())
+                valid_penalty = 0 if 0.0002 <= share <= 0.70 else 10
+                return valid_penalty + border_share * 4 + share
+
+            mask = min(candidates, key=candidate_score)
+
+    mask &= alpha > 4
+    mask = filter_small_components(mask, np)
+    if not mask.any():
+        raise ValueError(
+            "no foreground was found; crop closer to the shape or use --outline "
+            "for a non-stroke silhouette"
+        )
+
+    pixels = rgb[mask]
+    color = tuple(round(float(value)) for value in np.median(pixels, axis=0))
+    return mask, color
+
+
+def _mask_components(mask, np):
+    height, width = mask.shape
+    visited = np.zeros(mask.shape, dtype=bool)
+    components = []
+    for y, x in np.argwhere(mask):
+        y, x = int(y), int(x)
+        if visited[y, x]:
+            continue
+        queue = deque([(y, x)])
+        visited[y, x] = True
+        component = []
+        while queue:
+            cy, cx = queue.pop()
+            component.append((cy, cx))
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    if not (dx or dy):
+                        continue
+                    ny, nx = cy + dy, cx + dx
+                    if (
+                        0 <= ny < height
+                        and 0 <= nx < width
+                        and mask[ny, nx]
+                        and not visited[ny, nx]
+                    ):
+                        visited[ny, nx] = True
+                        queue.append((ny, nx))
+        components.append(component)
+    return components
+
+
+def filter_small_components(mask, np):
+    """Remove isolated raster noise before thinning without external CV libraries."""
+    height, width = mask.shape
+    foreground = int(mask.sum())
+    if foreground == 0:
+        return mask
+    min_area = max(3, int(height * width * 0.00002))
+    if min_area <= 3 and foreground < 8:
+        return mask
+
+    kept = np.zeros(mask.shape, dtype=bool)
+    for component in _mask_components(mask, np):
+        if len(component) >= min_area:
+            ys, xs = zip(*component)
+            kept[list(ys), list(xs)] = True
+    return kept
+
+
+def _erode_mask(mask, iterations, np):
+    eroded = mask.copy()
+    for _ in range(iterations):
+        padded = np.pad(eroded, 1, constant_values=False)
+        eroded = (
+            padded[:-2, :-2]
+            & padded[:-2, 1:-1]
+            & padded[:-2, 2:]
+            & padded[1:-1, :-2]
+            & padded[1:-1, 1:-1]
+            & padded[1:-1, 2:]
+            & padded[2:, :-2]
+            & padded[2:, 1:-1]
+            & padded[2:, 2:]
+        )
+        if not eroded.any():
+            break
+    return eroded
+
+
+def _radial_foreground_radius(mask, center, np):
+    cx, cy = center
+    height, width = mask.shape
+    distances = []
+    max_radius = max(width, height)
+    for index in range(96):
+        angle = 2 * math.pi * index / 96
+        dx, dy = math.cos(angle), math.sin(angle)
+        last = 0.0
+        for step in range(1, max_radius * 2):
+            radius = step * 0.5
+            x = round(cx + radius * dx)
+            y = round(cy + radius * dy)
+            if not (0 <= x < width and 0 <= y < height and mask[y, x]):
+                break
+            last = radius
+        distances.append(last)
+    return (
+        float(np.percentile(distances, 25)),
+        float(np.median(distances)),
+        float(np.percentile(distances, 75)),
+    )
+
+
+def detect_filled_discs(mask, stroke_width, np):
+    """Find compact filled round marks that a centerline alone cannot represent."""
+    erosion = max(2, round(stroke_width * 0.60))
+    core = _erode_mask(mask, erosion, np)
+    min_area = max(16, int(stroke_width * stroke_width * 0.25))
+    discs = []
+    for component in _mask_components(core, np):
+        if len(component) < min_area:
+            continue
+        points = np.asarray(component, dtype=float)
+        ys, xs = points[:, 0], points[:, 1]
+        width = float(xs.max() - xs.min() + 1)
+        height = float(ys.max() - ys.min() + 1)
+        aspect = max(width, height) / max(min(width, height), 1.0)
+        occupancy = len(component) / max(width * height, 1.0)
+        if aspect > 1.35 or occupancy < 0.42:
+            continue
+        center = (float(xs.mean()), float(ys.mean()))
+        low, radius, high = _radial_foreground_radius(mask, center, np)
+        if (
+            radius < stroke_width * 1.05
+            or low <= 0
+            or high / low > 1.55
+        ):
+            continue
+        discs.append(Primitive("disc", circle=(center[0], center[1], radius)))
+    discs.sort(key=lambda item: (item.circle[0], item.circle[1], item.circle[2]))
+    return discs
+
+
+def zhang_suen(mask, np):
+    """Topology-preserving Zhang-Suen thinning, vectorized with NumPy."""
+    image = np.pad(mask.astype(np.uint8), 1)
+    max_iterations = max(image.shape)
+    for _ in range(max_iterations):
+        deleted = 0
+        for phase in (0, 1):
+            center = image[1:-1, 1:-1]
+            p2 = image[:-2, 1:-1]
+            p3 = image[:-2, 2:]
+            p4 = image[1:-1, 2:]
+            p5 = image[2:, 2:]
+            p6 = image[2:, 1:-1]
+            p7 = image[2:, :-2]
+            p8 = image[1:-1, :-2]
+            p9 = image[:-2, :-2]
+            neighbors = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9
+            transitions = (
+                ((p2 == 0) & (p3 == 1)).astype(np.uint8)
+                + ((p3 == 0) & (p4 == 1)).astype(np.uint8)
+                + ((p4 == 0) & (p5 == 1)).astype(np.uint8)
+                + ((p5 == 0) & (p6 == 1)).astype(np.uint8)
+                + ((p6 == 0) & (p7 == 1)).astype(np.uint8)
+                + ((p7 == 0) & (p8 == 1)).astype(np.uint8)
+                + ((p8 == 0) & (p9 == 1)).astype(np.uint8)
+                + ((p9 == 0) & (p2 == 1)).astype(np.uint8)
+            )
+            if phase == 0:
+                preserve_a = p2 * p4 * p6 == 0
+                preserve_b = p4 * p6 * p8 == 0
+            else:
+                preserve_a = p2 * p4 * p8 == 0
+                preserve_b = p2 * p6 * p8 == 0
+            marker = (
+                (center == 1)
+                & (neighbors >= 2)
+                & (neighbors <= 6)
+                & (transitions == 1)
+                & preserve_a
+                & preserve_b
+            )
+            count = int(marker.sum())
+            if count:
+                center[marker] = 0
+                deleted += count
+        if deleted == 0:
+            break
+    return image[1:-1, 1:-1].astype(bool)
+
+
+def _axis_run_lengths(mask, np):
+    lengths = np.zeros(mask.shape, dtype=np.int32)
+    for row_index, row in enumerate(mask):
+        transitions = np.diff(np.pad(row.astype(np.int8), (1, 1)))
+        starts = np.flatnonzero(transitions == 1)
+        ends = np.flatnonzero(transitions == -1)
+        for start, end in zip(starts, ends):
+            lengths[row_index, start:end] = end - start
+    return lengths
+
+
+def estimate_stroke_width(mask, skeleton, np):
+    horizontal = int((skeleton[:, 1:] & skeleton[:, :-1]).sum())
+    vertical = int((skeleton[1:, :] & skeleton[:-1, :]).sum())
+    diagonal = int((skeleton[1:, 1:] & skeleton[:-1, :-1]).sum())
+    diagonal += int((skeleton[1:, :-1] & skeleton[:-1, 1:]).sum())
+    length = horizontal + vertical + math.sqrt(2) * diagonal
+    if length <= 0:
+        return 1.0
+    area_width = float(mask.sum()) / length
+
+    # Filled dots collapse to a few skeleton pixels and can otherwise make the
+    # area/length estimate enormous.  Axis run lengths provide a conservative
+    # cap based on the thinner stroke pixels that still exist in the graphic.
+    horizontal_runs = _axis_run_lengths(mask, np)
+    vertical_runs = _axis_run_lengths(mask.T, np).T
+    local_widths = np.minimum(horizontal_runs, vertical_runs)[mask]
+    if local_widths.size:
+        run_width = float(np.percentile(local_widths, 25))
+        area_width = min(area_width, run_width)
+    return max(1.0, area_width)
+
+
+def _circle_from_three(a, b, c):
+    ax, ay = a
+    bx, by = b
+    cx, cy = c
+    determinant = 2 * (
+        ax * (by - cy) + bx * (cy - ay) + cx * (ay - by)
+    )
+    if abs(determinant) < 1e-6:
+        return None
+    a2 = ax * ax + ay * ay
+    b2 = bx * bx + by * by
+    c2 = cx * cx + cy * cy
+    ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / determinant
+    uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / determinant
+    radius = math.hypot(ax - ux, ay - uy)
+    return ux, uy, radius
+
+
+def _fit_circle(points, np):
+    if len(points) < 3:
+        return None
+    matrix = np.column_stack((2 * points[:, 0], 2 * points[:, 1], np.ones(len(points))))
+    target = points[:, 0] ** 2 + points[:, 1] ** 2
+    try:
+        cx, cy, constant = np.linalg.lstsq(matrix, target, rcond=None)[0]
+    except np.linalg.LinAlgError:
+        return None
+    radius_squared = constant + cx * cx + cy * cy
+    if radius_squared <= 0:
+        return None
+    return float(cx), float(cy), math.sqrt(float(radius_squared))
+
+
+def _circle_coverage(points, circle, np):
+    cx, cy, _radius = circle
+    angles = np.sort(np.mod(np.arctan2(points[:, 1] - cy, points[:, 0] - cx), 2 * math.pi))
+    if len(angles) < 2:
+        return 0.0
+    gaps = np.diff(np.concatenate((angles, angles[:1] + 2 * math.pi)))
+    angular_span = 1.0 - float(gaps.max()) / (2 * math.pi)
+    bins = np.unique(np.floor(angles / (2 * math.pi) * 72).astype(int))
+    return min(angular_span, len(bins) / 72.0)
+
+
+def detect_circles(skeleton, stroke_width, np):
+    ys, xs = np.nonzero(skeleton)
+    points = np.column_stack((xs.astype(float), ys.astype(float)))
+    if len(points) < 24:
+        return [], skeleton.copy()
+
+    remaining = np.ones(len(points), dtype=bool)
+    circles = []
+    rng = random.Random(0xA61E)
+    height, width = skeleton.shape
+    min_radius = max(4.0, stroke_width * 1.25)
+    max_radius = max(width, height) * 0.60
+    tolerance = max(1.25, stroke_width * 0.16)
+
+    for _ in range(8):
+        active_indices = np.flatnonzero(remaining)
+        active = points[active_indices]
+        if len(active) < 24:
+            break
+        best = None
+        trials = min(900, max(240, len(active) * 3))
+        for _trial in range(trials):
+            i, j, k = rng.sample(range(len(active)), 3)
+            circle = _circle_from_three(active[i], active[j], active[k])
+            if circle is None:
+                continue
+            cx, cy, radius = circle
+            if not min_radius <= radius <= max_radius:
+                continue
+            if (
+                cx + radius < -tolerance
+                or cy + radius < -tolerance
+                or cx - radius > width + tolerance
+                or cy - radius > height + tolerance
+            ):
+                continue
+            residual = np.abs(np.hypot(active[:, 0] - cx, active[:, 1] - cy) - radius)
+            inliers = residual <= tolerance
+            count = int(inliers.sum())
+            if count < max(24, int(2 * math.pi * radius * 0.42)):
+                continue
+            coverage = _circle_coverage(active[inliers], circle, np)
+            if coverage < 0.80:
+                continue
+            score = count * coverage - float(np.median(residual[inliers])) * 4
+            if best is None or score > best[0]:
+                best = (score, circle, inliers)
+
+        if best is None:
+            break
+
+        _score, circle, inliers = best
+        refined = _fit_circle(active[inliers], np)
+        if refined is None:
+            break
+        for _refine in range(2):
+            cx, cy, radius = refined
+            residual = np.abs(np.hypot(active[:, 0] - cx, active[:, 1] - cy) - radius)
+            inliers = residual <= tolerance
+            next_circle = _fit_circle(active[inliers], np)
+            if next_circle is None:
+                break
+            refined = next_circle
+
+        cx, cy, radius = refined
+        residual = np.abs(np.hypot(active[:, 0] - cx, active[:, 1] - cy) - radius)
+        inliers = residual <= tolerance
+        coverage = _circle_coverage(active[inliers], refined, np)
+        density = int(inliers.sum()) / max(2 * math.pi * radius, 1)
+        if coverage < 0.80 or density < 0.42:
+            break
+
+        circles.append(Primitive("circle", circle=refined))
+        removal = residual <= tolerance * 1.45
+        remaining[active_indices[removal]] = False
+
+    leftover = np.zeros_like(skeleton, dtype=bool)
+    kept_points = points[remaining].astype(int)
+    if len(kept_points):
+        leftover[kept_points[:, 1], kept_points[:, 0]] = True
+    circles.sort(key=lambda item: (item.circle[0], item.circle[1], item.circle[2]))
+    return circles, leftover
+
+
+def _projection_clusters(projections, indices, gap, np):
+    order = np.argsort(projections)
+    sorted_projection = projections[order]
+    sorted_indices = indices[order]
+    cuts = np.flatnonzero(np.diff(sorted_projection) > gap) + 1
+    starts = np.concatenate(([0], cuts))
+    ends = np.concatenate((cuts, [len(sorted_projection)]))
+    return [
+        (sorted_projection[start:end], sorted_indices[start:end])
+        for start, end in zip(starts, ends)
+        if end > start
+    ]
+
+
+def detect_lines(skeleton, stroke_width, np):
+    """Find long straight centerline runs before graph simplification.
+
+    Rounded caps and junctions bend a medial axis near its ends. RANSAC fits the
+    stable interior instead, after which intersections can restore the intended
+    corner instead of preserving the thinning hook.
+    """
+    ys, xs = np.nonzero(skeleton)
+    points = np.column_stack((xs.astype(float), ys.astype(float)))
+    if len(points) < 8:
+        return [], skeleton.copy()
+
+    remaining = np.ones(len(points), dtype=bool)
+    lines = []
+    rng = random.Random(0x11A6)
+    tolerance = max(1.15, stroke_width * 0.14)
+    gap = max(2.5, stroke_width * 0.50)
+    min_length = max(10.0, stroke_width * 1.8)
+    min_points = max(8, int(stroke_width * 0.65))
+
+    for _ in range(64):
+        active_indices = np.flatnonzero(remaining)
+        active = points[active_indices]
+        if len(active) < min_points:
+            break
+        best = None
+        trials = min(900, max(300, len(active) * 3))
+        for _trial in range(trials):
+            first_index, second_index = rng.sample(range(len(active)), 2)
+            delta = active[second_index] - active[first_index]
+            length = float(np.hypot(delta[0], delta[1]))
+            if length < min_length:
+                continue
+            direction = delta / length
+            residual = np.abs(
+                (active[:, 0] - active[first_index, 0]) * direction[1]
+                - (active[:, 1] - active[first_index, 1]) * direction[0]
+            )
+            inliers = np.flatnonzero(residual <= tolerance)
+            if len(inliers) < min_points:
+                continue
+            projection = (active[inliers] - active[first_index]) @ direction
+            for cluster_projection, cluster_indices in _projection_clusters(
+                projection, inliers, gap, np
+            ):
+                segment_length = float(cluster_projection[-1] - cluster_projection[0])
+                if len(cluster_indices) < min_points or segment_length < min_length:
+                    continue
+                score = segment_length + len(cluster_indices) * 0.30
+                if best is None or score > best[0]:
+                    best = (score, active_indices[cluster_indices])
+        if best is None:
+            break
+
+        support_indices = best[1]
+        line, _residual = _fit_line(points[support_indices], np)
+        line_array = np.asarray(line, dtype=float)
+        direction = line_array[1] - line_array[0]
+        length = float(np.hypot(direction[0], direction[1]))
+        if length < min_length:
+            break
+        direction /= length
+        origin = line_array[0]
+
+        # Re-select one contiguous run around the fitted axis, then fit once more.
+        active_indices = np.flatnonzero(remaining)
+        active = points[active_indices]
+        residual = np.abs(
+            (active[:, 0] - origin[0]) * direction[1]
+            - (active[:, 1] - origin[1]) * direction[0]
+        )
+        inliers = np.flatnonzero(residual <= tolerance)
+        projection = (active[inliers] - origin) @ direction
+        clusters = [
+            cluster
+            for cluster in _projection_clusters(projection, inliers, gap, np)
+            if len(cluster[1]) >= min_points
+            and cluster[0][-1] - cluster[0][0] >= min_length
+        ]
+        if not clusters:
+            break
+        _projection, cluster_indices = max(
+            clusters, key=lambda item: item[0][-1] - item[0][0] + len(item[1]) * 0.30
+        )
+        support_indices = active_indices[cluster_indices]
+        line, _residual = _fit_line(points[support_indices], np)
+
+        # Use a looser residual only to recover the extent hidden by cap/junction hooks.
+        line_array = np.asarray(line, dtype=float)
+        direction = line_array[1] - line_array[0]
+        length = float(np.hypot(direction[0], direction[1]))
+        direction /= max(length, 1e-9)
+        center = line_array.mean(axis=0)
+        support_projection = (points[support_indices] - center) @ direction
+        active_indices = np.flatnonzero(remaining)
+        active = points[active_indices]
+        active_projection = (active - center) @ direction
+        active_residual = np.abs(
+            (active[:, 0] - center[0]) * direction[1]
+            - (active[:, 1] - center[1]) * direction[0]
+        )
+        extent_mask = (
+            (active_residual <= max(tolerance * 2.5, stroke_width * 0.35))
+            & (active_projection >= support_projection.min() - gap)
+            & (active_projection <= support_projection.max() + gap)
+        )
+        extent = active_projection[extent_mask]
+        if len(extent):
+            line = [
+                tuple(center + extent.min() * direction),
+                tuple(center + extent.max() * direction),
+            ]
+        lines.append(Primitive("line", points=line))
+        remaining[support_indices] = False
+
+    leftover = np.zeros_like(skeleton, dtype=bool)
+    kept_points = points[remaining].astype(int)
+    if len(kept_points):
+        leftover[kept_points[:, 1], kept_points[:, 0]] = True
+    return lines, leftover
+
+
+def prune_circle_fragments(lines, circles, stroke_width):
+    """Discard short line fits that merely approximate part of a detected circle."""
+    if not circles:
+        return lines
+    kept = []
+    tolerance = max(1.5, stroke_width * 1.25)
+    for line in lines:
+        start, end = line.points
+        samples = [
+            (
+                start[0] + (end[0] - start[0]) * position / 8,
+                start[1] + (end[1] - start[1]) * position / 8,
+            )
+            for position in range(9)
+        ]
+        follows_circle = False
+        for circle in circles:
+            cx, cy, radius = circle.circle
+            close = sum(
+                abs(math.dist(point, (cx, cy)) - radius) <= tolerance
+                for point in samples
+            )
+            if close >= 7:
+                follows_circle = True
+                break
+        if not follows_circle:
+            kept.append(line)
+    return kept
+
+
+def _build_graph(skeleton, np):
+    ys, xs = np.nonzero(skeleton)
+    points = {(int(x), int(y)) for y, x in zip(ys, xs)}
+    adjacency = {point: set() for point in points}
+    orthogonal = ((1, 0), (-1, 0), (0, 1), (0, -1))
+    diagonal = ((1, 1), (1, -1), (-1, 1), (-1, -1))
+    for x, y in points:
+        for dx, dy in orthogonal:
+            neighbor = (x + dx, y + dy)
+            if neighbor in points:
+                adjacency[(x, y)].add(neighbor)
+        for dx, dy in diagonal:
+            neighbor = (x + dx, y + dy)
+            if neighbor not in points:
+                continue
+            # Avoid triangular graph edges around orthogonal corners/junction blocks.
+            if (x + dx, y) in points or (x, y + dy) in points:
+                continue
+            adjacency[(x, y)].add(neighbor)
+    return adjacency
+
+
+def trace_graph_paths(skeleton, np):
+    adjacency = _build_graph(skeleton, np)
+    if not adjacency:
+        return []
+    special = {point for point, neighbors in adjacency.items() if len(neighbors) != 2}
+
+    clusters = []
+    point_to_cluster = {}
+    pending = set(special)
+    while pending:
+        seed = min(pending)
+        pending.remove(seed)
+        queue = [seed]
+        cluster = {seed}
+        while queue:
+            point = queue.pop()
+            for neighbor in adjacency[point]:
+                if neighbor in pending and neighbor in special:
+                    pending.remove(neighbor)
+                    cluster.add(neighbor)
+                    queue.append(neighbor)
+        index = len(clusters)
+        clusters.append(cluster)
+        for point in cluster:
+            point_to_cluster[point] = index
+
+    centers = []
+    for cluster in clusters:
+        centers.append(
+            (
+                sum(point[0] for point in cluster) / len(cluster),
+                sum(point[1] for point in cluster) / len(cluster),
+            )
+        )
+
+    def edge_key(a, b):
+        return (a, b) if a <= b else (b, a)
+
+    visited = set()
+    paths = []
+    cap = len(adjacency) + 2
+
+    for cluster_index, cluster in enumerate(clusters):
+        for point in sorted(cluster):
+            for neighbor in sorted(adjacency[point]):
+                if neighbor in cluster or edge_key(point, neighbor) in visited:
+                    continue
+                path = [centers[cluster_index]]
+                previous, current = point, neighbor
+                visited.add(edge_key(previous, current))
+                for _ in range(cap):
+                    target = point_to_cluster.get(current)
+                    if target is not None:
+                        path.append(centers[target])
+                        break
+                    path.append((float(current[0]), float(current[1])))
+                    choices = [
+                        candidate
+                        for candidate in adjacency[current]
+                        if candidate != previous
+                        and edge_key(current, candidate) not in visited
+                    ]
+                    if not choices:
+                        break
+                    next_point = min(choices)
+                    visited.add(edge_key(current, next_point))
+                    previous, current = current, next_point
+                if len(path) >= 2:
+                    paths.append((path, False))
+
+    # Components containing only degree-2 pixels are closed loops.
+    for start in sorted(adjacency):
+        for first in sorted(adjacency[start]):
+            if edge_key(start, first) in visited:
+                continue
+            path = [(float(start[0]), float(start[1]))]
+            previous, current = start, first
+            visited.add(edge_key(previous, current))
+            closed = False
+            for _ in range(cap):
+                path.append((float(current[0]), float(current[1])))
+                choices = [
+                    candidate
+                    for candidate in adjacency[current]
+                    if candidate != previous
+                    and edge_key(current, candidate) not in visited
+                ]
+                if not choices:
+                    if start in adjacency[current]:
+                        closed = True
+                    break
+                next_point = min(choices)
+                visited.add(edge_key(current, next_point))
+                previous, current = current, next_point
+                if current == start:
+                    closed = True
+                    break
+            if len(path) >= 2:
+                paths.append((path, closed))
+    return paths
+
+
+def extract_closed_loop_paths(skeleton, np):
+    """Preserve isolated closed strokes before straight-line extraction.
+
+    RANSAC is useful for icons made from explicit straight runs, but it can
+    carve a smooth closed outline into unrelated chords.  A connected
+    skeleton component whose every pixel has degree two is already an
+    unambiguous loop, so keep it as one closed path and only line-fit the
+    remaining components.
+    """
+    adjacency = _build_graph(skeleton, np)
+    if not adjacency:
+        return [], skeleton.copy()
+
+    visited = set()
+    loop_points = set()
+    paths = []
+    for seed in sorted(adjacency):
+        if seed in visited:
+            continue
+        component = []
+        pending = [seed]
+        visited.add(seed)
+        while pending:
+            point = pending.pop()
+            component.append(point)
+            for neighbor in adjacency[point]:
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    pending.append(neighbor)
+
+        if len(component) < 4 or any(len(adjacency[point]) != 2 for point in component):
+            continue
+
+        start = min(component)
+        previous = start
+        current = min(adjacency[start])
+        path = [(float(start[0]), float(start[1]))]
+        closed = False
+        for _ in range(len(component) + 1):
+            if current == start:
+                closed = True
+                break
+            path.append((float(current[0]), float(current[1])))
+            choices = [neighbor for neighbor in adjacency[current] if neighbor != previous]
+            if len(choices) != 1:
+                break
+            previous, current = current, choices[0]
+        if closed and len(path) == len(component):
+            paths.append((path, True))
+            loop_points.update(component)
+
+    leftover = skeleton.copy()
+    for x, y in loop_points:
+        leftover[y, x] = False
+    paths.sort(key=lambda item: (item[0][0][0], item[0][0][1]))
+    return paths, leftover
+
+
+def _path_length(points):
+    return sum(math.dist(a, b) for a, b in pairwise(points))
+
+
+def _perpendicular_distance(point, start, end):
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dy)
+    if length < 1e-9:
+        return math.dist(point, start)
+    return abs((point[0] - start[0]) * dy - (point[1] - start[1]) * dx) / length
+
+
+def rdp(points, epsilon):
+    if len(points) < 3:
+        return points[:]
+    distance, index = max(
+        (_perpendicular_distance(point, points[0], points[-1]), index)
+        for index, point in enumerate(points[1:-1], start=1)
+    )
+    if distance <= epsilon:
+        return [points[0], points[-1]]
+    left = rdp(points[: index + 1], epsilon)
+    right = rdp(points[index:], epsilon)
+    return left[:-1] + right
+
+
+def _fit_line(points, np):
+    data = np.asarray(points, dtype=float)
+    center = data.mean(axis=0)
+    covariance = np.cov(data - center, rowvar=False, bias=True)
+    values, vectors = np.linalg.eigh(covariance)
+    direction = vectors[:, int(np.argmax(values))]
+    if direction[0] < 0 or (abs(direction[0]) < 1e-9 and direction[1] < 0):
+        direction = -direction
+    projection = (data - center) @ direction
+    endpoints = center + np.outer((projection.min(), projection.max()), direction)
+    residual = np.abs((data[:, 0] - center[0]) * direction[1] - (data[:, 1] - center[1]) * direction[0])
+    return [tuple(endpoints[0]), tuple(endpoints[1])], float(residual.max(initial=0))
+
+
+def _simplify_closed(points, epsilon):
+    if len(points) < 4:
+        return points
+    start_index = min(range(len(points)), key=lambda index: (points[index][0], points[index][1]))
+    ordered = points[start_index:] + points[:start_index]
+    split_index = max(
+        range(1, len(ordered)), key=lambda index: math.dist(ordered[0], ordered[index])
+    )
+    first = rdp(ordered[: split_index + 1], epsilon)
+    second = rdp(ordered[split_index:] + [ordered[0]], epsilon)
+    simplified = first[:-1] + second[:-1]
+    return simplified if len(simplified) >= 3 else ordered
+
+
+def paths_to_primitives(paths, stroke_width, np, epsilon_factor=0.10):
+    primitives = []
+    epsilon = max(0.65, stroke_width * epsilon_factor)
+    min_length = max(2.0, stroke_width * 0.65)
+    for points, closed in paths:
+        if len(points) < 2 or _path_length(points) < min_length:
+            continue
+        if closed:
+            simplified = _simplify_closed(points, epsilon)
+            if len(simplified) >= 3:
+                primitives.append(Primitive("polygon", points=simplified))
+            continue
+
+        line, residual = _fit_line(points, np)
+        if residual <= max(0.75, stroke_width * 0.09):
+            primitives.append(Primitive("line", points=line))
+            continue
+        simplified = rdp(points, epsilon)
+        if len(simplified) == 2:
+            primitives.append(Primitive("line", points=simplified))
+        elif len(simplified) > 2:
+            primitives.append(Primitive("polyline", points=simplified))
+    return primitives
+
+
+def _line_merge_candidate(first, second, stroke_width):
+    a, b = first.points
+    c, d = second.points
+    ux, uy = b[0] - a[0], b[1] - a[1]
+    vx, vy = d[0] - c[0], d[1] - c[1]
+    ulen, vlen = math.hypot(ux, uy), math.hypot(vx, vy)
+    if min(ulen, vlen) < 1e-6:
+        return False
+    angle_sine = abs(ux * vy - uy * vx) / (ulen * vlen)
+    if angle_sine > math.sin(math.radians(8)):
+        return False
+    tolerance = max(1.0, stroke_width * 0.30)
+    if max(_perpendicular_distance(point, a, b) for point in (c, d)) > tolerance:
+        return False
+    direction = (ux / ulen, uy / ulen)
+    first_interval = sorted((0.0, ulen))
+    second_interval = sorted(
+        (
+            (c[0] - a[0]) * direction[0] + (c[1] - a[1]) * direction[1],
+            (d[0] - a[0]) * direction[0] + (d[1] - a[1]) * direction[1],
+        )
+    )
+    gap = max(
+        0.0,
+        second_interval[0] - first_interval[1],
+        first_interval[0] - second_interval[1],
+    )
+    return gap <= max(2.0, stroke_width * 0.9)
+
+
+def merge_collinear_lines(primitives, stroke_width, np):
+    lines = [primitive for primitive in primitives if primitive.kind == "line"]
+    others = [primitive for primitive in primitives if primitive.kind != "line"]
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(lines)):
+            for j in range(i + 1, len(lines)):
+                if not _line_merge_candidate(lines[i], lines[j], stroke_width):
+                    continue
+                merged, _residual = _fit_line(lines[i].points + lines[j].points, np)
+                lines[i] = Primitive("line", points=merged)
+                lines.pop(j)
+                changed = True
+                break
+            if changed:
+                break
+    return others + lines
+
+
+def _infinite_line_intersection(first, second):
+    (x1, y1), (x2, y2) = first.points
+    (x3, y3), (x4, y4) = second.points
+    denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+    if abs(denominator) < 1e-8:
+        return None
+    determinant_a = x1 * y2 - y1 * x2
+    determinant_b = x3 * y4 - y3 * x4
+    return (
+        (determinant_a * (x3 - x4) - (x1 - x2) * determinant_b) / denominator,
+        (determinant_a * (y3 - y4) - (y1 - y2) * determinant_b) / denominator,
+    )
+
+
+def snap_line_intersections(primitives, stroke_width):
+    lines = [primitive for primitive in primitives if primitive.kind == "line"]
+    limit = max(4.0, stroke_width * 2.8)
+    for first_index, first in enumerate(lines):
+        for second in lines[first_index + 1 :]:
+            intersection = _infinite_line_intersection(first, second)
+            if intersection is None:
+                continue
+            first_endpoint = min(
+                range(2), key=lambda index: math.dist(first.points[index], intersection)
+            )
+            second_endpoint = min(
+                range(2), key=lambda index: math.dist(second.points[index], intersection)
+            )
+            first_distance = math.dist(first.points[first_endpoint], intersection)
+            second_distance = math.dist(second.points[second_endpoint], intersection)
+            first_length = math.dist(*first.points)
+            second_length = math.dist(*second.points)
+            if (
+                first_distance <= min(limit, first_length * 0.48)
+                and second_distance <= min(limit, second_length * 0.48)
+            ):
+                first.points[first_endpoint] = intersection
+                second.points[second_endpoint] = intersection
+    return primitives
+
+
+def _point_segment_distance(point, start, end):
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    squared = dx * dx + dy * dy
+    if squared < 1e-12:
+        return math.dist(point, start)
+    position = (
+        (point[0] - start[0]) * dx + (point[1] - start[1]) * dy
+    ) / squared
+    position = max(0.0, min(1.0, position))
+    nearest = (start[0] + position * dx, start[1] + position * dy)
+    return math.dist(point, nearest)
+
+
+def prune_junction_connectors(primitives, stroke_width):
+    """Remove short medial-axis hooks that only bridge two real fitted lines."""
+    lines = [primitive for primitive in primitives if primitive.kind == "line"]
+    tolerance = max(2.0, stroke_width * 0.45)
+    kept = []
+    for primitive in primitives:
+        if primitive.kind != "line" or math.dist(*primitive.points) >= stroke_width * 2.2:
+            kept.append(primitive)
+            continue
+        endpoints_supported = []
+        for endpoint in primitive.points:
+            supported = any(
+                other is not primitive
+                and _point_segment_distance(endpoint, *other.points) <= tolerance
+                for other in lines
+            )
+            endpoints_supported.append(supported)
+        if not all(endpoints_supported):
+            kept.append(primitive)
+    return kept
+
+
+def _line_circle_intersection(anchor, endpoint, circle):
+    cx, cy, radius = circle
+    dx, dy = endpoint[0] - anchor[0], endpoint[1] - anchor[1]
+    a = dx * dx + dy * dy
+    if a < 1e-9:
+        return None
+    ox, oy = anchor[0] - cx, anchor[1] - cy
+    b = 2 * (ox * dx + oy * dy)
+    c = ox * ox + oy * oy - radius * radius
+    discriminant = b * b - 4 * a * c
+    if discriminant < 0:
+        return None
+    root = math.sqrt(discriminant)
+    candidates = [(-b - root) / (2 * a), (-b + root) / (2 * a)]
+    return min(
+        ((anchor[0] + t * dx, anchor[1] + t * dy) for t in candidates),
+        key=lambda point: math.dist(point, endpoint),
+    )
+
+
+def snap_to_circles(primitives, circles, stroke_width):
+    if not circles:
+        return primitives
+    limit = max(3.0, stroke_width * 2.2)
+    for primitive in primitives:
+        if primitive.kind not in {"line", "polyline"} or len(primitive.points) < 2:
+            continue
+        for endpoint_index, neighbor_index in ((0, 1), (-1, -2)):
+            endpoint = primitive.points[endpoint_index]
+            anchor = primitive.points[neighbor_index]
+            for circle_primitive in circles:
+                candidate = _line_circle_intersection(anchor, endpoint, circle_primitive.circle)
+                if candidate is not None and math.dist(candidate, endpoint) <= limit:
+                    primitive.points[endpoint_index] = candidate
+                    break
+    return primitives
+
+
+def _endpoint_connected(primitive, endpoint_index, primitives, circles, stroke_width):
+    endpoint = primitive.points[endpoint_index]
+    tolerance = max(1.5, stroke_width * 0.28)
+    for circle in circles:
+        cx, cy, radius = circle.circle
+        if abs(math.dist(endpoint, (cx, cy)) - radius) <= tolerance:
+            return True
+    for other in primitives:
+        if other is primitive or not other.points:
+            continue
+        for point in other.points:
+            if math.dist(endpoint, point) <= tolerance:
+                return True
+    return False
+
+
+def restore_free_caps(mask, primitives, circles, stroke_width, np):
+    """Move free endpoints from the thinned cap back to the raster's true extent."""
+    ys, xs = np.nonzero(mask)
+    foreground = np.column_stack((xs.astype(float), ys.astype(float)))
+    if not len(foreground):
+        return primitives
+    for primitive in primitives:
+        if primitive.kind not in {"line", "polyline"} or len(primitive.points) < 2:
+            continue
+        for endpoint_index, neighbor_index in ((0, 1), (-1, -2)):
+            if _endpoint_connected(
+                primitive, endpoint_index, primitives, circles, stroke_width
+            ):
+                continue
+            endpoint = np.asarray(primitive.points[endpoint_index], dtype=float)
+            neighbor = np.asarray(primitive.points[neighbor_index], dtype=float)
+            direction = endpoint - neighbor
+            length = float(np.hypot(direction[0], direction[1]))
+            if length < 1e-9:
+                continue
+            direction /= length
+            relative = foreground - endpoint
+            projection = relative @ direction
+            residual = np.abs(relative[:, 0] * direction[1] - relative[:, 1] * direction[0])
+            candidates = (
+                (residual <= max(1.5, stroke_width * 0.65))
+                & (projection >= -stroke_width * 0.30)
+                & (projection <= stroke_width * 1.6)
+            )
+            if not candidates.any():
+                continue
+            boundary = float(projection[candidates].max())
+            shift = boundary - stroke_width / 2
+            shift = max(-stroke_width * 0.35, min(shift, stroke_width * 1.1))
+            primitive.points[endpoint_index] = tuple(endpoint + direction * shift)
+    return primitives
+
+
+def _draw_geometry(primitives, size, stroke_width):
+    from PIL import Image, ImageDraw
+
+    width, height = size
+    canvas = Image.new("1", (width, height), 0)
+    draw = ImageDraw.Draw(canvas)
+    line_width = max(1, round(stroke_width))
+    radius = line_width / 2
+
+    def round_cap(point):
+        x, y = point
+        draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=1)
+
+    for primitive in primitives:
+        if primitive.kind == "disc":
+            cx, cy, r = primitive.circle
+            draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=1)
+            continue
+        if primitive.kind == "circle":
+            cx, cy, r = primitive.circle
+            draw.ellipse(
+                (cx - r - radius, cy - r - radius, cx + r + radius, cy + r + radius),
+                fill=1,
+            )
+            inner = r - radius
+            if inner > 0:
+                draw.ellipse((cx - inner, cy - inner, cx + inner, cy + inner), fill=0)
+            continue
+        points = primitive.points
+        if primitive.kind == "polygon":
+            points = points + [points[0]]
+        draw.line(points, fill=1, width=line_width, joint="curve")
+        if primitive.kind in {"line", "polyline"}:
+            round_cap(points[0])
+            round_cap(points[-1])
+    return canvas
+
+
+def optimize_stroke_width(mask, primitives, initial, np):
+    if not primitives:
+        return initial, 0.0
+    height, width = mask.shape
+    best = (0.0, initial)
+    for factor in (0.72, 0.80, 0.88, 0.96, 1.04, 1.12, 1.20, 1.28):
+        candidate = max(1.0, initial * factor)
+        rendered = np.asarray(_draw_geometry(primitives, (width, height), candidate), dtype=bool)
+        intersection = int((rendered & mask).sum())
+        union = int((rendered | mask).sum())
+        score = intersection / union if union else 0.0
+        if score > best[0]:
+            best = (score, candidate)
+    return best[1], best[0]
+
+
+def _geometry_fit(mask, primitives, stroke_width, np):
+    rendered = np.asarray(
+        _draw_geometry(primitives, (mask.shape[1], mask.shape[0]), stroke_width),
+        dtype=bool,
+    )
+    intersection = int((rendered & mask).sum())
+    union = int((rendered | mask).sum())
+    return intersection / union if union else 0.0
+
+
+def prune_redundant_primitives(mask, primitives, stroke_width, np):
+    """Drop a fitted primitive when it only redraws a junction hook or duplicate run."""
+    current = _geometry_fit(mask, primitives, stroke_width, np)
+    changed = True
+    while changed and len(primitives) > 1:
+        changed = False
+        for index in range(len(primitives)):
+            candidate = primitives[:index] + primitives[index + 1 :]
+            score = _geometry_fit(mask, candidate, stroke_width, np)
+            if score > current + 0.001:
+                primitives = candidate
+                current = score
+                changed = True
+                break
+    return primitives, current
+
+
+def _format_number(value):
+    rounded = round(float(value), 2)
+    if abs(rounded - round(rounded)) < 1e-9:
+        return str(round(rounded))
+    return f"{rounded:.2f}".rstrip("0").rstrip(".")
+
+
+def geometry_to_svg(primitives, logical_size, scale, stroke_width, color):
+    width, height = logical_size
+    stroke = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
+
+    def point_text(point):
+        return f"{_format_number(point[0] / scale)},{_format_number(point[1] / scale)}"
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        (
+            '<svg xmlns="http://www.w3.org/2000/svg" '
+            f'width="{width}" height="{height}" viewBox="0 0 {width} {height}">'
+        ),
+        (
+            f'<g fill="none" stroke="{stroke}" '
+            f'stroke-width="{_format_number(stroke_width / scale)}" '
+            'stroke-linecap="round" stroke-linejoin="round">'
+        ),
+    ]
+    for primitive in primitives:
+        if primitive.kind == "disc":
+            cx, cy, radius = primitive.circle
+            lines.append(
+                f'<circle cx="{_format_number(cx / scale)}" '
+                f'cy="{_format_number(cy / scale)}" '
+                f'r="{_format_number(radius / scale)}" '
+                f'fill="{stroke}" stroke="none"/>'
+            )
+        elif primitive.kind == "circle":
+            cx, cy, radius = primitive.circle
+            lines.append(
+                f'<circle cx="{_format_number(cx / scale)}" '
+                f'cy="{_format_number(cy / scale)}" '
+                f'r="{_format_number(radius / scale)}"/>'
+            )
+        elif primitive.kind == "line":
+            first, second = primitive.points
+            lines.append(
+                f'<line x1="{_format_number(first[0] / scale)}" '
+                f'y1="{_format_number(first[1] / scale)}" '
+                f'x2="{_format_number(second[0] / scale)}" '
+                f'y2="{_format_number(second[1] / scale)}"/>'
+            )
+        elif primitive.kind == "polyline":
+            points = " ".join(point_text(point) for point in primitive.points)
+            lines.append(f'<polyline points="{points}"/>')
+        elif primitive.kind == "polygon":
+            points = " ".join(point_text(point) for point in primitive.points)
+            lines.append(f'<polygon points="{points}"/>')
+    lines.extend(("</g>", "</svg>"))
+    return "\n".join(lines)
+
+
+def _ordered_primitives(circles, primitives):
+    return circles + sorted(
+        primitives,
+        key=lambda item: (
+            item.kind,
+            item.points[0][0] if item.points else item.circle[0],
+            item.points[0][1] if item.points else item.circle[1],
+        ),
+    )
+
+
+def _line_first_primitives(skeleton, stroke_width, filled_discs, np):
+    circles, leftover = detect_circles(skeleton, stroke_width, np)
+    closed_paths, leftover = extract_closed_loop_paths(leftover, np)
+    closed_primitives = paths_to_primitives(
+        closed_paths, stroke_width, np, epsilon_factor=0.15
+    )
+    detected_lines, leftover = detect_lines(leftover, stroke_width, np)
+    later_circles, leftover = detect_circles(leftover, stroke_width, np)
+    circles.extend(later_circles)
+    circles.sort(key=lambda item: (item.circle[0], item.circle[1], item.circle[2]))
+    detected_lines = prune_circle_fragments(detected_lines, circles, stroke_width)
+    paths = trace_graph_paths(leftover, np)
+    primitives = closed_primitives + detected_lines + paths_to_primitives(
+        paths, stroke_width, np
+    )
+    primitives = merge_collinear_lines(primitives, stroke_width, np)
+    primitives = snap_line_intersections(primitives, stroke_width)
+    primitives = prune_junction_connectors(primitives, stroke_width)
+    primitives = snap_to_circles(primitives, circles, stroke_width)
+    return _ordered_primitives(circles, filled_discs + primitives), circles
+
+
+def _graph_preserving_primitives(skeleton, stroke_width, filled_discs, np):
+    """Trace ordered skeleton branches when greedy line fitting loses curves."""
+    circles, leftover = detect_circles(skeleton, stroke_width, np)
+    closed_paths, leftover = extract_closed_loop_paths(leftover, np)
+    primitives = paths_to_primitives(
+        closed_paths, stroke_width, np, epsilon_factor=0.15
+    )
+    primitives += paths_to_primitives(
+        trace_graph_paths(leftover, np), stroke_width, np, epsilon_factor=0.15
+    )
+    primitives = merge_collinear_lines(primitives, stroke_width, np)
+    primitives = snap_line_intersections(primitives, stroke_width)
+    primitives = prune_junction_connectors(primitives, stroke_width)
+    primitives = snap_to_circles(primitives, circles, stroke_width)
+    return _ordered_primitives(circles, filled_discs + primitives), circles
+
+
+def _finalize_geometry_candidate(
+    mask, primitives, circles, estimated_width, requested_width, scale, np
+):
+    if requested_width is None:
+        final_width, fit = optimize_stroke_width(
+            mask, primitives, estimated_width, np
+        )
+    else:
+        final_width = requested_width * scale
+        fit = _geometry_fit(mask, primitives, final_width, np)
+
+    primitives = restore_free_caps(
+        mask, primitives, circles, final_width, np
+    )
+    if requested_width is None:
+        final_width, fit = optimize_stroke_width(
+            mask, primitives, final_width, np
+        )
+    else:
+        fit = _geometry_fit(mask, primitives, final_width, np)
+
+    primitives, fit = prune_redundant_primitives(
+        mask, primitives, final_width, np
+    )
+    primitives = snap_line_intersections(primitives, final_width)
+    primitives = snap_to_circles(primitives, circles, final_width)
+    if requested_width is None:
+        final_width, fit = optimize_stroke_width(
+            mask, primitives, final_width, np
+        )
+    else:
+        fit = _geometry_fit(mask, primitives, final_width, np)
+    return primitives, final_width, fit
+
+
+def trace_geometry(path, region, scale, stroke_width, keep_color):
+    image, logical_size, scale, np = load_geometry_image(path, region, scale)
+    try:
+        mask, sampled_color = image_to_mask(image, np)
+    except ValueError as exc:
+        sys.exit(f"trace: {exc}")
+    skeleton = zhang_suen(mask, np)
+    if int(skeleton.sum()) < 2:
+        sys.exit(
+            "trace: the foreground has no drawable centerline. Use --outline for a "
+            "filled silhouette, or crop to a stroke-based graphic."
+        )
+
+    estimated_width = estimate_stroke_width(mask, skeleton, np)
+    filled_discs = detect_filled_discs(mask, estimated_width, np)
+    primitives, circles = _line_first_primitives(
+        skeleton, estimated_width, filled_discs, np
+    )
+    if not primitives:
+        sys.exit(
+            "trace: no stable geometry survived simplification. Try --scale with a "
+            "larger value, crop closer with --region, or use --outline."
+        )
+    primitives, final_width, fit = _finalize_geometry_candidate(
+        mask,
+        primitives,
+        circles,
+        estimated_width,
+        stroke_width,
+        scale,
+        np,
+    )
+
+    # Greedy RANSAC intentionally favors a small set of explicit straight
+    # runs.  When that representation fits poorly, compare it with an ordered
+    # skeleton-graph trace so curved bodies and branched symbols remain whole.
+    if fit < GRAPH_FALLBACK_TRIGGER:
+        graph_primitives, graph_circles = _graph_preserving_primitives(
+            skeleton, estimated_width, filled_discs, np
+        )
+        if graph_primitives:
+            graph_primitives, graph_width, graph_fit = _finalize_geometry_candidate(
+                mask,
+                graph_primitives,
+                graph_circles,
+                estimated_width,
+                stroke_width,
+                scale,
+                np,
+            )
+            if graph_fit >= fit + GRAPH_FALLBACK_GAIN:
+                primitives = graph_primitives
+                final_width = graph_width
+                fit = graph_fit
+
+    color = sampled_color if keep_color else (0, 0, 0)
+    svg = geometry_to_svg(primitives, logical_size, scale, final_width, color)
+    return svg, primitives, final_width / scale, fit, scale
+
+
+def trace_outline(path, region, scale, polygon, color):
+    try:
+        import vtracer
+    except ImportError:
+        sys.exit(
+            "trace: --outline requires vtracer; install the optional dependency "
+            "vtracer first"
+        )
+    try:
+        from PIL import Image, ImageOps
     except ImportError:
         if region or (scale or 1) != 1:
-            sys.exit("trace: --region/--scale require Pillow; install the optional dependency pillow first")
-        return str(path), 1
-    with Image.open(path) as image:
-        if region:
-            try:
-                x1, y1, x2, y2 = (int(v) for v in region.split(","))
-            except ValueError:
-                sys.exit("trace: --region expects four integers: X1,Y1,X2,Y2 (pixels)")
-            box = (max(0, min(x1, x2)), max(0, min(y1, y2)),
-                   min(image.width, max(x1, x2)), min(image.height, max(y1, y2)))
-            if box[2] <= box[0] or box[3] <= box[1]:
-                sys.exit(f"trace: --region {region} is empty after clamping to {image.width}x{image.height}")
-            image = image.crop(box)
-        if scale is None:
-            shortest = max(min(image.width, image.height), 1)
-            scale = max(2 if region else 1, -(-TARGET_MIN_SIDE // shortest))
-        if not region and scale == 1:
-            return str(path), 1
-        if scale != 1:
-            image = image.resize((image.width * scale, image.height * scale), Image.LANCZOS)
-        handle = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        image.save(handle.name)
-        return handle.name, scale
+            sys.exit(
+                "trace: --region/--scale in outline mode require Pillow; install "
+                "the optional dependency pillow first"
+            )
+        image = None
+
+    with tempfile.TemporaryDirectory(prefix="trace-") as raw:
+        work = str(path)
+        used_scale = 1
+        if "Image" in locals():
+            with Image.open(path) as source:
+                image = ImageOps.exif_transpose(source).convert("RGBA")
+            if region:
+                try:
+                    image = image.crop(parse_region(region, image.width, image.height))
+                except ValueError as exc:
+                    sys.exit(f"trace: {exc}")
+            if scale is None:
+                shortest = max(min(image.size), 1)
+                scale = max(2 if region else 1, math.ceil(TARGET_MIN_SIDE / shortest))
+            if scale < 1:
+                sys.exit("trace: --scale must be a positive integer")
+            used_scale = scale
+            if region or scale != 1:
+                if scale != 1:
+                    image = image.resize(
+                        (image.width * scale, image.height * scale), Image.Resampling.LANCZOS
+                    )
+                work = str(Path(raw) / "input.png")
+                image.save(work)
+
+        output = str(Path(raw) / "output.svg")
+        vtracer.convert_image_to_svg_py(
+            work,
+            output,
+            colormode="color" if color else "binary",
+            filter_speckle=8,
+            corner_threshold=40,
+            mode="polygon" if polygon else "spline",
+        )
+        svg = Path(output).read_text()
+    svg = truncate_decimals(strip_background(svg))
+    return svg, svg.count("<path"), used_scale
+
+
+def primitive_summary(primitives):
+    counts = Counter(primitive.kind for primitive in primitives)
+    labels = {
+        "disc": ("filled circle", "filled circles"),
+        "circle": ("circle", "circles"),
+        "line": ("line", "lines"),
+        "polyline": ("polyline", "polylines"),
+        "polygon": ("polygon", "polygons"),
+    }
+    order = ("disc", "circle", "line", "polyline", "polygon")
+    parts = [
+        f"{counts[kind]} {labels[kind][0 if counts[kind] == 1 else 1]}"
+        for kind in order
+        if counts[kind]
+    ]
+    segments = sum(
+        max(0, len(primitive.points) - (0 if primitive.kind == "polygon" else 1))
+        for primitive in primitives
+        if primitive.points
+    )
+    if segments:
+        parts.append(f"{segments} straight segments")
+    return ", ".join(parts)
 
 
 def main():
     parser = argparse.ArgumentParser(
         prog="trace",
-        description="Trace an image into SVG with exact pixel-derived geometry (local, deterministic)",
+        description=(
+            "Recover clean centerline SVG geometry from a flat raster graphic "
+            "(local, deterministic)"
+        ),
     )
     parser.add_argument("image", help="path to the image")
-    parser.add_argument("--region", metavar="X1,Y1,X2,Y2",
-                        help="crop to this pixel box first (e.g. a box from ground)")
-    parser.add_argument("--scale", type=int, metavar="N",
-                        help="upscale N times before tracing (default: enough to clear "
-                             f"{TARGET_MIN_SIDE}px on the shorter side, so small icons survive)")
-    parser.add_argument("--polygon", action="store_true",
-                        help="polygon mode for boxy diagrams/wireframes (default: spline for curved shapes)")
-    parser.add_argument("--color", action="store_true",
-                        help="keep colors (default: black-and-white, which is far more compact)")
+    parser.add_argument(
+        "--region",
+        metavar="X1,Y1,X2,Y2",
+        help="crop to this pixel box first (e.g. a box from ground)",
+    )
+    parser.add_argument(
+        "--scale",
+        type=int,
+        metavar="N",
+        help=(
+            "analyze at N times the source resolution; output coordinates stay in "
+            "the original image grid (default: auto for small images)"
+        ),
+    )
+    parser.add_argument(
+        "--stroke-width",
+        type=float,
+        metavar="PX",
+        help="force the output stroke width in original-image pixels",
+    )
+    parser.add_argument(
+        "--outline",
+        action="store_true",
+        help="trace the filled silhouette with vtracer instead of recovering centerlines",
+    )
+    parser.add_argument(
+        "--polygon",
+        action="store_true",
+        help=(
+            "compatibility flag: geometry mode is already piecewise-linear; with "
+            "--outline, select vtracer polygon mode"
+        ),
+    )
+    parser.add_argument(
+        "--color",
+        action="store_true",
+        help="sample the foreground color (geometry) or keep all colors (--outline)",
+    )
     parser.add_argument("-o", "--output", help="write the SVG here instead of stdout")
     args = parser.parse_args()
-    try:
-        import vtracer
-    except ImportError:
-        parser.exit(1, "trace: requires vtracer; install the optional dependency vtracer first\n")
+
     source = Path(args.image).expanduser()
     if not source.is_file():
         parser.exit(1, f"trace: Image not found: {source}\n")
-    work, scale = prepare_input(source, args.region, args.scale)
-    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as out:
-        vtracer.convert_image_to_svg_py(
-            work, out.name,
-            colormode="color" if args.color else "binary",
-            filter_speckle=8, corner_threshold=40,
-            mode="polygon" if args.polygon else "spline",
+    if args.stroke_width is not None and args.stroke_width <= 0:
+        parser.exit(2, "trace: --stroke-width must be positive\n")
+    if args.outline:
+        svg, paths, scale = trace_outline(
+            source, args.region, args.scale, args.polygon, args.color
         )
-        svg = Path(out.name).read_text()
-    svg = truncate_decimals(strip_background(svg))
-    paths = svg.count("<path")
-    if not paths:
-        # This is where an agent decides the tool cannot see the shape and goes
-        # back to guessing. Name the recoveries instead, cheapest first.
-        print("trace: 0 paths - nothing survived binarization. Try a larger --scale, "
-              "--region to crop closer to the shape, or pre-invert a light-on-dark image. "
-              "--color is a last resort: on an anti-aliased image it splits every gray "
-              "level into its own path.", file=sys.stderr)
+        summary = f"{paths} outline paths, traced at {scale}x"
+    else:
+        svg, primitives, stroke_width, fit, scale = trace_geometry(
+            source, args.region, args.scale, args.stroke_width, args.color
+        )
+        summary = (
+            f"{len(primitives)} clean primitive{'' if len(primitives) == 1 else 's'}: "
+            f"{primitive_summary(primitives)}; "
+            f"stroke {_format_number(stroke_width)}px; pixel fit {fit:.1%}; analyzed at {scale}x"
+        )
+        if fit < 0.62:
+            print(
+                "trace: warning: the centerline geometry has a low pixel fit. The "
+                "input may be a filled/organic silhouette; compare the result and use "
+                "--outline when its outer contour is the intended geometry.",
+                file=sys.stderr,
+            )
+
     if args.output:
         Path(args.output).expanduser().write_text(svg)
-        print(f"wrote {args.output} ({len(svg)} bytes, {paths} paths, traced at {scale}x)")
+        print(f"wrote {args.output} ({len(svg)} bytes, {summary})")
     else:
         print(svg)
 
