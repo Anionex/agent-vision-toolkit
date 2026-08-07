@@ -14,7 +14,7 @@
 [![Extensions](https://img.shields.io/badge/-Extensions-3178C6?style=flat-square)](https://github.com/Anionex/agent-vision-toolkit/tree/main/extensions)
 [![Shell](https://img.shields.io/badge/-Shell-4EAA25?style=flat-square&logo=gnubash&logoColor=white)](https://github.com/Anionex/agent-vision-toolkit/tree/main/bin)
 
-**What it thinks is what it sees — give any text-only coding agent eyes: image Q&A, long-screenshot OCR, frontend UI restoration, and GUI automation, as a vision toolkit plus a skill, with optional drop-in integration for Codex, Claude Code, Pi, Oh My Pi, and OpenCode.**
+**What it thinks is what it sees — give any text-only coding agent eyes: image Q&A, long-screenshot OCR, frontend UI restoration, and GUI automation, as a vision toolkit plus a skill, with optional drop-in integration for Codex, Claude Code, Pi, Oh My Pi, and OpenCode, plus a native Skill + CLI adapter for Reasonix.**
 
 🎯 An agent's vision capability doesn't have to live in the model — it can live in the harness.
 
@@ -28,7 +28,7 @@ This repository provides two kinds of components:
 1. **Vision tool CLIs** — multiple CLIs, plus a skill that teaches the agent when to use each one. Any agent that can invoke a shell can use them.
 2. **Seamless integration** *(optional upgrade)* — a transparent local proxy and single-file native plugins, so **images we paste and the agent's built-in image tools both work seamlessly**, with no extra tool installation or additional prompting.
 
-All code has been verified in real Codex + DeepSeek sessions, and the same pipeline has been live-verified end-to-end in Claude Code, Pi, Oh My Pi, and OpenCode.
+All code has been verified in real Codex + DeepSeek sessions, and the same pipeline has been live-verified end-to-end in Claude Code, Pi, Oh My Pi, and OpenCode. The native Reasonix Skill + CLI adapter has also been verified against Reasonix 1.21.0.
 
 > If this project helps you or gives you some inspiration, feel free to star🌟 & fork.
 
@@ -154,6 +154,12 @@ npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --c
 
 Or copy `skills/vision-tools/` into your agent's skills directory (e.g. `~/.codex/skills/`) and restart the agent.
 
+For **Reasonix**, keep the CLI checkout from step 2 on `PATH` and install the compact native adapter instead of the generic skill copy:
+
+```bash
+reasonix plugin install https://github.com/Anionex/agent-vision-toolkit/tree/main/integrations/reasonix --yes
+```
+
 </details>
 
 ## The Tools
@@ -266,9 +272,12 @@ This layer makes screenshots pasted into an agent work directly, while also prev
 | **Claude Code** | the same proxy — point `ANTHROPIC_BASE_URL` at it | ✅ verified |
 | **Pi / Oh My Pi** | one-file native extension ([`extensions/pi/`](extensions/pi/)) | ✅ verified |
 | **OpenCode** | one-file native plugin ([`extensions/opencode/`](extensions/opencode/)) | ✅ verified |
+| **Reasonix** | native Skill + existing CLIs ([`integrations/reasonix/`](integrations/reasonix/)); no MCP/runtime | ✅ verified (1.21.0) |
 | Any agent with a shell | the toolkit above — no integration needed | ✅ |
 
 All entry points share one configuration. Configure it once and use it everywhere.
+
+Reasonix intentionally uses Skill + CLI rather than MCP or a runtime sidecar: its text-only models receive a readable local path for pasted images, and the Skill routes that path through the existing toolkit checkout.
 
 ## How It Works
 
