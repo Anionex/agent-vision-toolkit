@@ -14,7 +14,7 @@
 [![Extensions](https://img.shields.io/badge/-Extensions-3178C6?style=flat-square)](https://github.com/Anionex/agent-vision-toolkit/tree/main/extensions)
 [![Shell](https://img.shields.io/badge/-Shell-4EAA25?style=flat-square&logo=gnubash&logoColor=white)](https://github.com/Anionex/agent-vision-toolkit/tree/main/bin)
 
-**所想即所见——给任意纯文本 coding agent 装上眼睛：图片问答、长图OCR、前端UI还原、GUI自动化，一套视觉工具箱加一个 skill，并可选无缝接入 Codex、Claude Code、Pi、Oh My Pi、OpenCode。**
+**所想即所见——给任意纯文本 coding agent 装上眼睛：图片问答、长图OCR、前端UI还原、GUI自动化，一套视觉工具箱加一个 skill，并可选无缝接入 Codex、Claude Code、Pi、Oh My Pi、OpenCode，另提供 Reasonix 原生 Skill + CLI 适配。**
 
 🎯 agent视觉能力不一定长在模型上，也可以长在harness上。
 
@@ -28,7 +28,7 @@
 1. **视觉工具CLIs**：多个 CLI，外加一个 skill 告诉 agent 什么时候该用哪个。任何能调用 shell 的 agent 都能使用。
 2. **无缝接入**（可选升级）：透明本地代理与单文件原生插件，让**我们粘贴的图片和 agent 内置的看图工具也能完美工作**，不需要额外的工具安装，也不需要额外提示词。
 
-所有代码均已在真实 Codex + DeepSeek 会话中验证过，同一套管线也在 Claude Code、Pi、Oh My Pi、OpenCode 中完成了真机端到端验证。
+所有代码均已在真实 Codex + DeepSeek 会话中验证过，同一套管线也在 Claude Code、Pi、Oh My Pi、OpenCode 中完成了真机端到端验证；Reasonix 原生 Skill + CLI 适配也已在 Reasonix 1.21.0 上验证通过。
 
 > 如果项目对你有用或为你带来了一些启发，欢迎 star🌟 & fork。
 
@@ -154,6 +154,12 @@ npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --c
 
 也可以把 `skills/vision-tools/` 复制到你的 agent 的 skills 目录（如 `~/.codex/skills/`），重启生效。
 
+如果使用 **Reasonix**，保留第 2 步的 CLI checkout 并确保其 `bin/` 在 `PATH` 上，然后安装精简的原生适配包，无需再复制通用 skill：
+
+```bash
+reasonix plugin install https://github.com/Anionex/agent-vision-toolkit/tree/main/integrations/reasonix --yes
+```
+
 </details>
 
 ## 工具
@@ -264,9 +270,12 @@ crop screenshot.png --region 1563,514,1668,621 -o send-button.png
 | **Claude Code** | 同一个代理——把 `ANTHROPIC_BASE_URL` 指向它 | ✅ 已验证 |
 | **Pi / Oh My Pi** | 单文件原生 extension（[`extensions/pi/`](extensions/pi/)） | ✅ 已验证 |
 | **OpenCode** | 单文件原生 plugin（[`extensions/opencode/`](extensions/opencode/)） | ✅ 已验证 |
+| **Reasonix** | 原生 Skill + 现有 CLI（[`integrations/reasonix/`](integrations/reasonix/)），不使用 MCP/runtime | ✅ 已验证（1.21.0） |
 | 任何有 shell 的 agent | 上面的工具箱——无需接入 | ✅ |
 
 所有入口共享配置。一次配置好后即可多处使用。
+
+Reasonix 刻意采用 Skill + CLI，而不是 MCP 或 runtime sidecar：纯文本模型会拿到粘贴图片的可读本地路径，再由 Skill 把该路径交给现有工具箱 checkout 处理。
 
 ## 工作原理
 
