@@ -16,6 +16,8 @@
 
 **What it thinks is what it sees — give any text-only coding agent eyes: image Q&A, long-screenshot OCR, frontend UI restoration, and GUI automation, as a vision toolkit plus a skill, with optional drop-in integration for Codex, Claude Code, Pi, Oh My Pi, and OpenCode.**
 
+🎯 An agent's vision capability doesn't have to live in the model — it can live in the harness.
+
 🌐 [**中文**](README_CN.md) ｜ **English**
 
 </div>
@@ -53,7 +55,7 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 - **More than image descriptions — it captures what the LLM actually cares about**: when viewing an image, it passes along the user's or model's latest intent, producing the details needed for the current turn instead of a broad, unfocused description.
 - **Both pasted images and built-in image tools work**: the agent can understand images pasted directly as well as images opened through its built-in tools.
 - **A battle-tested methodology for visual tasks**: the included skill teaches the agent what to inspect, which tool to choose, what sequence to follow, and how to verify the final result.
- - **One-sentence install**: ask your agent to install it — it follows the verified flow end to end, toolkit, skill, and seamless integration included.
+- **One-sentence install**: ask your agent to install it — it follows the verified flow end to end, toolkit, skill, and seamless integration included.
 
 
 ## Use-case Playbooks
@@ -73,7 +75,7 @@ When to use them, the order in which to call tools, and how to verify the result
 
 ## Real-world Effects
 
-### Infographic restoration: screenshot to HTML
+### Infographic restoration: screenshot to HTML in one sentence
 
 <p align="center">
   <img src="assets/infographic-restore-reference.png" alt="Original infographic showing how the model is trained" width="49%">
@@ -84,7 +86,7 @@ When to use them, the order in which to call tools, and how to verify the result
 
 *Left: the original infographic screenshot. Right: an editable reconstruction built with HTML/CSS. [View the HTML source →](examples/infographic-restoration/how-is-the-model-trained.html)*
 
-### UI restoration: sketch to interface
+### UI restoration: sketch to interface in one sentence
 
 <p align="center">
   <img src="assets/ui-restore-sketch.png" alt="Hand-drawn JupyterLab interface used as a UI restoration reference" width="49%">
@@ -142,7 +144,7 @@ git clone https://github.com/Anionex/agent-vision-toolkit.git
 export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # add to your shell profile to persist
 ```
 
-`glance` needs nothing beyond Python 3.11+; `ground`/`detect`/`crop` and the long-screenshot OCR playbook need `pillow`, while `trace` needs `vtracer` — install those into an isolated venv only if you want those tools.
+`glance` needs nothing beyond Python 3.11+; `ground`/`detect`/`crop` and the long-screenshot OCR playbook need `pillow`; `trace` needs `pillow` + `numpy` (and `vtracer` only for its explicit `--outline` fallback). Install optional dependencies into an isolated venv only for the tools you use.
 
 **3. Install the skill** so your agent knows the tools exist and how to combine them:
 
@@ -227,13 +229,14 @@ A full-screen pass is a fast first draft; for completeness on dense screens, inv
 </details>
 
 <details>
-<summary><b><code>trace</code> — "what is its exact shape and outline?"</b></summary>
+<summary><b><code>trace</code> — "what is its clean geometric trajectory?"</b></summary>
 
-`trace` vectorizes an image (or a cropped region) into SVG **locally and deterministically** — coordinates come from the actual pixels, not from a vision model's estimates. Use it for exact shape geometry: reproducing icons/logos as SVG, reading a diagram's layout, or measuring elements. Requires the optional `vtracer` (and `pillow` for `--region`).
+`trace` recovers the centerline of a flat, high-contrast graphic **locally and deterministically**, then fits editable SVG primitives such as `<circle>`, `<line>`, `<polyline>`, and `<polygon>`. It also preserves compact solid round marks as filled circles and keeps closed curved loops intact. A magnifier becomes one circle plus one line; a lightning stroke becomes its actual straight segments instead of noisy paths around both sides of the raster ink. Internal upscaling improves small icons while the SVG remains in the source image's coordinate grid. The LLM does not participate in this fitting: an agent such as DeepSeek only orchestrates the surrounding locate, crop, render, and verification steps. Use `--outline` only when you explicitly need the filled outer silhouette (that fallback requires `vtracer`).
 
 ```bash
-trace diagram.png --polygon
+trace icon.png -o icon.svg
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
+trace filled-artwork.png --outline -o silhouette.svg
 ```
 
 </details>

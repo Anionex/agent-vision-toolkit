@@ -16,6 +16,8 @@
 
 **所想即所见——给任意纯文本 coding agent 装上眼睛：图片问答、长图OCR、前端UI还原、GUI自动化，一套视觉工具箱加一个 skill，并可选无缝接入 Codex、Claude Code、Pi、Oh My Pi、OpenCode。**
 
+🎯 agent视觉能力不一定长在模型上，也可以长在harness上。
+
 🌐 **中文** ｜ [**English**](README.md)
 
 </div>
@@ -53,7 +55,7 @@
 - **不只是看图描述，是获取llm真正关注的内容**：看图时传递用户/模型的最新意图，得到这一轮真正要用到的细节，而不是一段没有重点的宽泛描述。
 - **直接粘贴图片和内置看图都支持**：直接粘贴图片，和模型调用内置工具两种方式，都能看图。
 - **一套经过实战验证的视觉任务方法论**：项目提供的skill，会告诉 agent 面对不同视觉任务时应该看什么、选择哪个工具、按什么步骤推进，以及最后如何验证结果。
- - **一句话安装**：直接让 agent 沿着已验证流程一键安装，视觉工具箱、skill 和无缝接入一次到位。
+- **一句话安装**：直接让 agent 沿着已验证流程一键安装，视觉工具箱、skill 和无缝接入一次到位。
 
 
 ## 用例技能
@@ -73,7 +75,7 @@
 
 ## 实际效果
 
-### 信息图还原：从截图到 HTML
+### 信息图还原：一句话从截图到 HTML
 
 <p align="center">
   <img src="assets/infographic-restore-reference.png" alt="模型训练流程信息图原始截图" width="49%">
@@ -84,7 +86,7 @@
 
 *左：原始信息图截图；右：使用 HTML/CSS 复刻的可编辑结果。[查看 HTML 源文件 →](examples/infographic-restoration/how-is-the-model-trained.html)*
 
-### UI 还原：从手绘稿到成品界面
+### UI 还原：一句话从手绘稿到成品界面
 
 <p align="center">
   <img src="assets/ui-restore-sketch.png" alt="作为 UI 还原参考的手绘 JupyterLab 界面" width="49%">
@@ -142,7 +144,7 @@ git clone https://github.com/Anionex/agent-vision-toolkit.git
 export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # 写进 shell 配置以持久生效
 ```
 
-`glance` 只需要 Python 3.11+；`ground`/`detect`/`crop` 和长截图 OCR 用例需要 `pillow`，`trace` 需要 `vtracer`——只在你要用这些工具时，把它们装进一个隔离的 venv。
+`glance` 只需要 Python 3.11+；`ground`/`detect`/`crop` 和长截图 OCR 用例需要 `pillow`；`trace` 需要 `pillow` + `numpy`（只有显式使用 `--outline` 轮廓回退时才需要 `vtracer`）。只为实际使用的工具在隔离 venv 中安装可选依赖。
 
 **3. 安装 skill**，让 agent 知道这些工具的存在以及如何组合使用：
 
@@ -228,11 +230,12 @@ detect page.png --region 238,600,953,671
 <details>
 <summary><b><code>trace</code> —— “这个的精确形状轨迹是什么？”</b></summary>
 
-`trace` 在**本地确定性地**把图片（或裁剪区域）矢量化为 SVG——坐标来自真实像素，不是视觉模型的估计。用于精确形状几何：图标/logo 还原为 SVG、读取示意图布局、测量元素尺寸。需要可选依赖 `vtracer`（`--region` 另需 `pillow`）。
+`trace` 在**本地确定性地**恢复扁平高对比图形的中心轨迹，再拟合成可编辑的 SVG 图元，如 `<circle>`、`<line>`、`<polyline>`、`<polygon>`；紧凑的实心圆点会保留成填充圆，闭合曲线也不会再被直线拟合切碎。放大镜会还原成一个圆加一条线，闪电笔画会还原成真实线段，而不是沿墨迹两侧生成杂乱 path。小图标会在内部放大分析，但输出 SVG 仍使用原图坐标。LLM 不参与这一步几何拟合；DeepSeek 之类的 agent 只负责外围的定位、裁剪、渲染和验收。只有明确需要填充物体的外轮廓时才使用 `--outline`（该回退需要 `vtracer`）。
 
 ```bash
-trace diagram.png --polygon
+trace icon.png -o icon.svg
 trace screenshot.png --region 1563,514,1668,621 -o icon.svg
+trace filled-artwork.png --outline -o silhouette.svg
 ```
 
 </details>
