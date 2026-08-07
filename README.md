@@ -53,6 +53,7 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 - **More than image descriptions — it captures what the LLM actually cares about**: when viewing an image, it passes along the user's or model's latest intent, producing the details needed for the current turn instead of a broad, unfocused description.
 - **Both pasted images and built-in image tools work**: the agent can understand images pasted directly as well as images opened through its built-in tools.
 - **A battle-tested methodology for visual tasks**: the included skill teaches the agent what to inspect, which tool to choose, what sequence to follow, and how to verify the final result.
+ - **One-sentence install**: ask your agent to install it — it follows the verified flow end to end, toolkit, skill, and seamless integration included.
 
 
 ## Use-case Playbooks
