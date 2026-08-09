@@ -1,0 +1,11 @@
+{
+  "apiVersion": "reasonix.io/plugin/v1",
+  "name": "agent-vision-toolkit",
+  "version": "0.1.0",
+  "description": "Reasonix skill adapter for the agent-vision-toolkit CLIs",
+  "contributes": {
+    "skills": [
+      "skills"
+    ]
+  }
+}
