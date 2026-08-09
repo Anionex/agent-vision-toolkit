@@ -252,6 +252,26 @@ def write_stub(path: Path, body: str) -> None:
         )
 
 
+def test_windows_command_for_path(mod):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bare_script = Path(temp_dir) / "glance"
+        bare_script.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+        command_wrapper = Path(temp_dir) / "glance.cmd"
+        command_wrapper.write_text("@echo off\r\n", encoding="ascii")
+
+        real_os = mod.os
+
+        class WindowsOS:
+            name = "nt"
+
+        mod.os = WindowsOS
+        try:
+            assert mod.command_for_path(bare_script) == [sys.executable, str(bare_script)]
+            assert mod.command_for_path(command_wrapper) == [str(command_wrapper)]
+        finally:
+            mod.os = real_os
+
+
 def test_cli_split_ocr_merge_and_resume():
     with tempfile.TemporaryDirectory() as temp_dir_raw:
         temp_dir = Path(temp_dir_raw)
@@ -468,6 +488,7 @@ def main():
     test_chat_json_render_and_message_merge(mod)
     test_chat_overlap_uses_richer_boundary_messages(mod)
     test_resume_fingerprint_tracks_mode_and_prompt(mod)
+    test_windows_command_for_path(mod)
     test_cli_split_ocr_merge_and_resume()
     test_cli_chat_mode_uses_structured_messages()
     test_cli_chat_mode_retries_invalid_json_once()
