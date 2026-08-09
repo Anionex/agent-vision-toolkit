@@ -7,7 +7,72 @@ the same workflow entered at Verify. For an isolated icon, logo, or
 illustration, read `restore-graphic.md`; for Mermaid, Graphviz, or another
 structured diagram, read `restore-structure.md`.
 
-## Core strategy: code-native UI plus screenshot-backed visuals
+## Choose the restore mode
+
+- Use **fast restore mode** when the user asks for a quick, rough,
+  approximate, prototype, or first-pass reconstruction, or explicitly values
+  speed over fidelity. Its target is a recognizable screenshot in about three
+  minutes when the project already runs.
+- Use the **standard restore workflow** below when the user asks for close,
+  precise, pixel-level, or production-ready alignment, or does not opt into a
+  faster approximation.
+
+## Fast restore mode: first screenshot in about three minutes
+
+Fast mode preserves the page's hierarchy, major regions, visible text, and
+primary state. It deliberately approximates fine spacing, exact colors,
+typography, shadows, decorative details, and icon geometry.
+
+### Hard limits
+
+1. Inspect the existing frontend stack, component library, icon set, source
+   assets, and design tokens before writing code, but stop searching as soon as
+   a usable local primitive is found.
+2. Run one full-image `detect` pass. Treat its boxes as layout estimates and do
+   not start a region-by-region inventory.
+3. After that `detect` pass, make at most **six combined image-inspection calls
+   total** through `view_image` (or the host's equivalent built-in viewer) and
+   `glance`. This is a hard cap, not a target: normally use zero to two. Count
+   every call whether it is serial or parallel; do not parallelize calls to
+   evade the budget.
+4. Do not use `trace`, foreground extraction, repeated color sampling, or
+   iterative `pixel_diff` work in fast mode. Those are fidelity tools and will
+   consume the delivery window.
+
+### Build the approximation
+
+1. Implement the largest layout regions first, then visible text, primary
+   controls, and the most important state. Ignore details that are only visible
+   when zoomed in.
+2. Reuse the project's existing components and CSS tokens. If its frontend or
+   icon library contains a reasonably similar component or icon, use it
+   directly instead of recreating the reference. Prefer an approximate library
+   icon over cropping, tracing, or hand-drawing a new one.
+3. Use nearby existing palette tokens or visually similar CSS values. Exact
+   sampled hex values, gradients, subtle borders, and shadow opacity are out of
+   scope unless one of them defines the whole composition.
+4. Keep text and controls native, selectable, and interactive. Fast mode relaxes
+   visual fidelity, not basic UI behavior.
+
+### Render once, fix once, deliver
+
+1. Render the target viewport with `scripts/html_shot.py` or the project's
+   existing browser setup.
+2. Inspect the screenshot once. If there is an obvious structural failure such
+   as a missing major region, broken wrapping, or a wildly wrong scale, make
+   one focused correction and render once more.
+3. Deliver the screenshot. Stop instead of spending the remaining time on
+   small color, icon, font, shadow, radius, or spacing differences.
+
+A practical time box is roughly 30 seconds for project inspection plus
+`detect`, 90 seconds for implementation, and the remaining minute for startup,
+rendering, one correction, and screenshot delivery. Dependency installation or
+a project that does not already run may extend that target; do not compensate
+by silently switching back to a long precision loop.
+
+## Standard restore workflow
+
+### Core strategy: code-native UI plus screenshot-backed visuals
 
 Do not choose one reconstruction mode for the whole page. Classify each
 element separately. Most finished pages should combine both kinds:
