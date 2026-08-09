@@ -8,6 +8,8 @@ import subprocess
 import sys
 import tempfile
 
+import pytest
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(REPO, "skills", "vision-tools", "scripts", "dominant_colors.py")
 
@@ -19,6 +21,16 @@ def load_module():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+@pytest.fixture
+def mod():
+    return load_module()
+
+
+@pytest.fixture
+def temp_dir(tmp_path):
+    return str(tmp_path)
 
 
 def test_extract_top_colours(mod):
