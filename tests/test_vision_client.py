@@ -140,16 +140,17 @@ def main():
                 "VISION_MODEL=fixture-model\n"
             )
             isolated_env = dict(environment, HOME=raw)
+            glance = Path(__file__).resolve().parent.parent / "bin/glance"
+            glance_cmd = [sys.executable, str(glance)] if os.name == "nt" else [str(glance)]
             result = subprocess.run(
-                [str(Path(__file__).resolve().parent.parent / "bin/glance"), str(image), "-q", "图里有什么？"],
+                [*glance_cmd, str(image), "-q", "图里有什么？"],
                 env=isolated_env, cwd=raw, text=True, capture_output=True, check=True,
             )
             assert result.stdout.strip() == "fixture answer"
 
             Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
             result = subprocess.run(
-                [str(Path(__file__).resolve().parent.parent / "bin/glance"), str(image), str(image),
-                 "-q", "differences?"],
+                [*glance_cmd, str(image), str(image), "-q", "differences?"],
                 env=isolated_env, cwd=raw, text=True, capture_output=True, check=True,
             )
             assert result.stdout.strip() == "fixture answer"
