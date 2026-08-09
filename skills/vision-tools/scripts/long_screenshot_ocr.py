@@ -434,7 +434,20 @@ def prune_stale_chunk_files(chunks_dir: Path, chunks: Sequence[Chunk]) -> None:
 
 
 def command_for_path(path: Path) -> list[str]:
-    if path.suffix.lower() == ".py" or (os.name != "nt" and not os.access(path, os.X_OK)):
+    if path.suffix.lower() == ".py":
+        return [sys.executable, str(path)]
+    if os.name == "nt":
+        # Windows cannot exec a shebang script directly; a bare script on PATH
+        # (or the repo's own bin/glance) must be run through the interpreter.
+        try:
+            with open(path, "rb") as handle:
+                first = handle.readline().decode("utf-8", errors="replace")
+        except OSError:
+            first = ""
+        if first.lstrip().startswith("#!") and "python" in first.lower():
+            return [sys.executable, str(path)]
+        return [str(path)]
+    if not os.access(path, os.X_OK):
         return [sys.executable, str(path)]
     return [str(path)]
 

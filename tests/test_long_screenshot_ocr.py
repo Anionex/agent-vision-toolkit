@@ -242,6 +242,14 @@ def test_resume_fingerprint_tracks_mode_and_prompt(mod):
 def write_stub(path: Path, body: str) -> None:
     path.write_text("#!/usr/bin/env python3\n" + body, encoding="utf-8")
     path.chmod(0o755)
+    if os.name == "nt":
+        # Windows cannot exec a shebang script and shutil.which only matches
+        # PATHEXT suffixes, so also install a .cmd wrapper that runs the stub.
+        cmd_file = path.with_suffix(".cmd")
+        cmd_file.write_text(
+            f'@echo off\r\n"{sys.executable}" "{path.resolve()}" %*\r\n',
+            encoding="ascii",
+        )
 
 
 def test_cli_split_ocr_merge_and_resume():
