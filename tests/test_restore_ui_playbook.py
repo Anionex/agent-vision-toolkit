@@ -23,10 +23,11 @@ def test_fast_mode_contract() -> None:
     required_phrases = (
         "about three minutes",
         "one full-image `detect` pass",
-        "six combined image-inspection calls",
+        "six sequential image-inspection rounds",
         "`view_image`",
         "`glance`",
-        "Count every call whether it is serial or parallel",
+        "up to three independent calls concurrently",
+        "hard ceiling is 18 calls across six rounds",
         "icon library contains a reasonably similar",
         "visually similar CSS values",
         "Deliver the screenshot",

@@ -30,11 +30,12 @@ typography, shadows, decorative details, and icon geometry.
    a usable local primitive is found.
 2. Run one full-image `detect` pass. Treat its boxes as layout estimates and do
    not start a region-by-region inventory.
-3. After that `detect` pass, make at most **six combined image-inspection calls
-   total** through `view_image` (or the host's equivalent built-in viewer) and
-   `glance`. This is a hard cap, not a target: normally use zero to two. Count
-   every call whether it is serial or parallel; do not parallelize calls to
-   evade the budget.
+3. After that `detect` pass, use at most **six sequential image-inspection
+   rounds** through `view_image` (or the host's equivalent built-in viewer) and
+   `glance`. Each round may launch up to three independent calls concurrently,
+   so the hard ceiling is 18 calls across six rounds. Batch unrelated regions
+   or questions into the same round instead of waiting for each result before
+   starting the next call. Normally one or two rounds are enough.
 4. Do not use `trace`, foreground extraction, repeated color sampling, or
    iterative `pixel_diff` work in fast mode. Those are fidelity tools and will
    consume the delivery window.
