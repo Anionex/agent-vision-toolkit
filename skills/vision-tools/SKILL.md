@@ -293,7 +293,7 @@ sequence, and how to tell you got it right.
 | The job | Read |
 |---|---|
 | OCR a long screenshot, scrolling page, or chat history without losing text at chunk boundaries | `references/long-screenshot-ocr.md` |
-| Rebuild a page or component as HTML/CSS, or align an existing UI with its reference image | `references/restore-ui.md` |
+| Rebuild a page or component as HTML/CSS, including a roughly three-minute fast approximation mode, or align an existing UI with its reference image | `references/restore-ui.md` |
 | Extract or rebuild an icon, logo, illustration, or other isolated graphic as transparent PNG/SVG | `references/restore-graphic.md` |
 | Turn a sketch, diagram, or whiteboard into Mermaid, Graphviz, or another structured representation | `references/restore-structure.md` |
 | Operate a GUI from screenshots — locate, act, verify each step | `references/gui.md` |

@@ -95,6 +95,15 @@
 
 *左：作为输入的手绘参考；右：依据该手绘稿还原出的 JupyterLab 工作区界面。完整流程见 [UI 还原 playbook](skills/vision-tools/references/restore-ui.md)。由 Codex 搭配 `deepseek-v4-flash` 实际执行。*
 
+### 快速 UI 还原：先交付近似复原
+
+<p align="center">
+  <img src="assets/ui-fast-restore-reference.png" alt="用于快速 UI 还原的 YouMind 首页原图" width="49%">
+  <img src="assets/ui-fast-restore-result.png" alt="使用快速 UI 还原模式近似复原的 YouMind 首页" width="49%">
+</p>
+
+*左：原始页面；右：快速复原结果。该模式优先保留主要布局、内容和视觉层级，允许颜色和前端图标库中的图标近似；目标是在约三分钟内给出第一张截图。*
+
 <p align="center">
   <img src="assets/effect-3.jpg" alt="安装 glance 后的多轮图片问答" width="49%">
   <img src="assets/effect-4.jpg" alt="DeepSeek V4 用 glance/ground 定位屏幕元素自主游玩国际象棋" width="49%">
