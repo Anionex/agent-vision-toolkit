@@ -9,8 +9,6 @@ import subprocess
 import sys
 import tempfile
 
-import pytest
-
 try:
     from PIL import Image, ImageDraw
 except ImportError:
@@ -28,11 +26,6 @@ def load_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
-
-
-@pytest.fixture
-def mod():
-    return load_module()
 
 
 def make_chunk(mod, temp_dir, index, *, top_overlap=0, bottom_overlap=0):
