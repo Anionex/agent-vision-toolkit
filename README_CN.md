@@ -330,6 +330,18 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 
 </details>
 
+<details>
+<summary><b>上游出口</b></summary>
+
+代理默认**直连**（TCP + TLS）你的模型上游，不再读取 Windows 系统代理，因此本地代理（如 Clash）宕机不会拖垮整条链路。显式代理为可选项：
+
+- `--upstream-proxy http://127.0.0.1:7890`（或环境变量 `VISION_UPSTREAM_PROXY`）：通过该代理的 CONNECT 隧道访问上游。
+- `--proxy-first`（或环境变量 `VISION_PROXY_FIRST=1`）：先试显式代理再走直连；默认顺序为先直连。
+
+建连成功（TCP/TLS 握手完成）的路由记入内存并复用；只有连接建立阶段失败（拒绝 / DNS / TLS / 建连超时 5 秒）才切换路由，上游返回的 HTTP 状态错误原样透传。所有路由都失败时返回 502，逐条列出路由与失败原因。
+
+</details>
+
 ## 前置条件
 
 - 已接入(纯文本)模型（如 DeepSeek V4）并可正常使用的 coding agent

@@ -333,6 +333,18 @@ The toolkit and proxy use only these environment variables; just three are requi
 
 </details>
 
+<details>
+<summary><b>Upstream egress</b></summary>
+
+The proxy reaches your model host directly (TCP + TLS) by default and never reads the Windows system proxy, so a local proxy such as Clash going down cannot take the whole chain with it. An explicit proxy is optional:
+
+- `--upstream-proxy http://127.0.0.1:7890` (or env `VISION_UPSTREAM_PROXY`) routes upstream through that proxy via a CONNECT tunnel.
+- `--proxy-first` (or env `VISION_PROXY_FIRST=1`) tries the explicit proxy before direct; the default order is direct first.
+
+The route whose connection (TCP/TLS handshake) succeeds is kept in memory and reused; only connection-establishment failures (refused / DNS / TLS / 5s connect timeout) switch routes, and HTTP status errors from the model pass through unchanged. If every route fails, the proxy returns 502 listing each route and reason.
+
+</details>
+
 ## Prerequisites
 
 - A coding agent already working with a model, including a text-only model such as DeepSeek V4

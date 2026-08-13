@@ -29,6 +29,7 @@ jobs:
           python tests/test_focus_hint.py
           python tests/test_anthropic_rewrite.py
           python tests/smoke_test_proxy.py
+          python tests/smoke_test_egress_failover.py
           python tests/test_vision_client.py
           python tests/test_restore_ui_playbook.py
 
