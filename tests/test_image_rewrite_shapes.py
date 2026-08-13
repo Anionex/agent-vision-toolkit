@@ -60,6 +60,23 @@ def test_shapes():
     print("PASS: shapes A (content) and B (output) rewritten; text-only untouched")
 
 
+def test_openai_chat_images_are_rewritten():
+    mod = _load_proxy()
+    body = {"model": "deepseek-v4-flash", "messages": [{
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "请读出图片里的标题"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}},
+        ],
+    }]}
+    assert asyncio.run(mod._rewrite_image_inputs(body))
+    content = body["messages"][0]["content"]
+    texts = [block["text"] for block in content if block.get("type") == "text"]
+    assert any(text.startswith("[vision proxy]") for text in texts), content
+    assert any("TEST-DESC" in text for text in texts), content
+    print("PASS: OpenAI Chat Completions image_url rewritten")
+
+
 def test_parallel():
     mod = _load_proxy()
     real_desc = mod._image_desc_from_url
@@ -150,6 +167,7 @@ def test_channel_note_lands_once_on_the_first_image():
 
 if __name__ == "__main__":
     test_shapes()
+    test_openai_chat_images_are_rewritten()
     test_parallel()
     test_failure_is_not_forwarded()
     test_failure_reason_is_included()

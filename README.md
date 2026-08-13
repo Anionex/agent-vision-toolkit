@@ -323,13 +323,15 @@ The toolkit and proxy use only these environment variables; just three are requi
 | `VISION_BASE_URL` | Yes | OpenAI-compatible API base URL |
 | `VISION_MODEL` | Yes | Multimodal model name |
 | `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
+| `VISION_API_PROTOCOL` | No | Vision API protocol: `chat_completions` (default) or `responses` |
+| `VISION_REASONING_EFFORT` | No | Reasoning effort for the `responses` protocol (`none`/`low`/`medium`/`high`/`xhigh`/`max`); sent only when `VISION_API_PROTOCOL=responses` |
 
 </details>
 
 ## Prerequisites
 
 - A coding agent already working with a model, including a text-only model such as DeepSeek V4
-- An OpenAI-compatible vision API that supports `/chat/completions` and `image_url`
+- An OpenAI-compatible vision API that supports `/chat/completions` and `image_url` (or `/responses` with `input_image`, via `VISION_API_PROTOCOL=responses`)
 - No other configuration is required
 
 ## FAQ

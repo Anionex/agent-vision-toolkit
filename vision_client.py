@@ -93,6 +93,20 @@ def _message_text(message: object) -> str:
     return ""
 
 
+def _responses_text(response: object) -> str:
+    if not isinstance(response, dict) or not isinstance(response.get("output"), list):
+        return ""
+    return "\n".join(
+        part["text"]
+        for item in response["output"]
+        if isinstance(item, dict) and item.get("type") == "message"
+        and isinstance(item.get("content"), list)
+        for part in item["content"]
+        if isinstance(part, dict) and part.get("type") == "output_text"
+        and isinstance(part.get("text"), str)
+    ).strip()
+
+
 def describe_image(image_url: str | list[str], prompt: str | None = None, max_tokens: int = 4096,
                    apply_lang: bool = True) -> str:
     """Describe one data/http image URL (str) or several (list) in a single call."""
@@ -110,18 +124,45 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
         instruction = LANG_INSTRUCTIONS.get(os.environ.get("LANG", "").strip().lower())
         if instruction:
             text = f"{instruction}\n\n{text}"
-    payload = {
-        "model": _required("VISION_MODEL"),
-        "messages": [{"role": "user", "content": [{"type": "text", "text": text}] + [
+    model = _required("VISION_MODEL")
+    protocol = os.environ.get("VISION_API_PROTOCOL", "chat_completions").strip().lower()
+    if protocol == "responses":
+        payload = {
+            "model": model,
+            "input": [{"role": "user", "content": [
+                {"type": "input_image", "image_url": url} for url in urls
+            ] + [{"type": "input_text", "text": text}]}],
+        }
+        if max_tokens is not None:
+            payload["max_output_tokens"] = max_tokens
+        reasoning_effort = os.environ.get("VISION_REASONING_EFFORT", "").strip()
+        if reasoning_effort:
+            payload["reasoning"] = {"effort": reasoning_effort}
+        endpoint = "/responses"
+        extract_text = _responses_text
+    elif protocol == "chat_completions":
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": url}} for url in urls
-        ]}],
-    }
-    if max_tokens is not None:
-        payload["max_tokens"] = max_tokens
+            ] + [{"type": "text", "text": text}]}],
+        }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        endpoint = "/chat/completions"
+        extract_text = lambda data: _message_text(data["choices"][0]["message"]["content"])
+    else:
+        raise VisionError(
+            "Unsupported VISION_API_PROTOCOL; use chat_completions or responses"
+        )
     request = urllib.request.Request(
-        base_url + "/chat/completions",
+        base_url + endpoint,
         data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json", "Authorization": "Bearer " + api_key},
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + api_key,
+            "User-Agent": "agent-vision-toolkit/0.1",
+        },
     )
     retries = 2
     timeout = 180
@@ -130,7 +171,7 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 data = json.load(response)
             try:
-                text = _message_text(data["choices"][0]["message"]["content"])
+                text = extract_text(data)
             except (KeyError, IndexError, TypeError) as exc:
                 raise VisionError("Vision API returned an incompatible response structure") from exc
             if not text:

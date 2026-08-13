@@ -320,13 +320,15 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 | `VISION_BASE_URL` | 是 | OpenAI-compatible API 地址 |
 | `VISION_MODEL` | 是 | 多模态模型名 |
 | `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
+| `VISION_API_PROTOCOL` | 否 | 视觉 API 协议：`chat_completions`（默认）或 `responses` |
+| `VISION_REASONING_EFFORT` | 否 | `responses` 协议下的推理强度（`none`/`low`/`medium`/`high`/`xhigh`/`max`）；仅 `VISION_API_PROTOCOL=responses` 时发送 |
 
 </details>
 
 ## 前置条件
 
 - 已接入(纯文本)模型（如 DeepSeek V4）并可正常使用的 coding agent
-- 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API
+- 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API（也可通过 `VISION_API_PROTOCOL=responses` 使用 `/responses` + `input_image`）
 - 没有其他需要的配置
 
 ## 常见问题
