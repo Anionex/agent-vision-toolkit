@@ -349,6 +349,15 @@ So don't modify Codex's existing auth config, and don't store the upstream API k
 
 </details>
 
+<details>
+<summary><b>Will adding another multimodal model significantly increase costs?</b></summary>
+
+No. Each time the primary model needs to inspect an image, the vision tool sends only the necessary intent and the image to the multimodal model's context. A truncation mechanism is also in place, so there are no overly long or accumulating contexts, keeping costs low.
+
+To reduce costs further, you can use a locally deployed small multimodal side model to provide vision capabilities. Recommended options include Gemma 4 and the Qwen 3.5/3.6 series.
+
+</details>
+
 ## Limitations
 
 - This is an image-to-text layer; it doesn't hand vision tokens directly to the text model.
