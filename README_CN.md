@@ -32,9 +32,16 @@
 
 > 如果项目对你有用或为你带来了一些启发，欢迎 star🌟 & fork。
 
+## 最新动态
+
+**2026-08-13——现已支持 DeepSeek Harness 原生接入。** 新增链接子包 [`dsh-vision-toolkit`](dsh-vision-toolkit)，可将本工具箱作为原生 Profile Bundle 接入 DSH Web 与 Headless Profile。它提供 10 个结构化视觉工具，覆盖带意图的图片问答、目标定位、元素检测、图形描摹、裁图、像素差异对比、长截图 OCR、前景提取、主色分析和 HTML 截图，并补齐 DSH Credentials、托管隔离运行时、可预览 Artifacts、Web Settings 与 Agent 级渐进工具暴露。
+
+该子包以 Git submodule 形式链接在本仓库中，并在 [`Anionex/dsh-vision-toolkit`](https://github.com/Anionex/dsh-vision-toolkit) 独立维护。克隆本仓库时可使用 `--recurse-submodules`，已有 checkout 可运行 `git submodule update --init --recursive`。
+
 <details>
 <summary><b>目录</b></summary>
 
+- [最新动态](#最新动态)
 - [亮点](#亮点)
 - [用例技能](#用例技能)
 - [实际效果](#实际效果)

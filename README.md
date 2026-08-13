@@ -32,9 +32,16 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 
 > If this project helps you or gives you some inspiration, feel free to star🌟 & fork.
 
+## Latest Update
+
+**2026-08-13 — Native DeepSeek Harness support is now available.** The new [`dsh-vision-toolkit`](dsh-vision-toolkit) linked package brings this toolkit into DSH Web and Headless profiles as a native Profile Bundle. It provides 10 structured visual tools for intent-aware image Q&A, grounding, detection, tracing, cropping, pixel diff, long-screenshot OCR, foreground extraction, dominant-color analysis, and HTML screenshots, while adding DSH Credentials, a managed isolated runtime, previewable Artifacts, Web Settings, and Agent-scoped progressive tool exposure.
+
+The package is tracked here as a Git submodule and maintained independently at [`Anionex/dsh-vision-toolkit`](https://github.com/Anionex/dsh-vision-toolkit). Clone this repository with `--recurse-submodules`, or run `git submodule update --init --recursive` in an existing checkout.
+
 <details>
 <summary><b>Contents</b></summary>
 
+- [Latest Update](#latest-update)
 - [Highlights](#highlights)
 - [Use-case Playbooks](#use-case-playbooks)
 - [Real-world Effects](#real-world-effects)
