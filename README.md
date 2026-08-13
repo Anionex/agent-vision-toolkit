@@ -341,7 +341,7 @@ The proxy reaches your model host directly (TCP + TLS) by default and never read
 - `--upstream-proxy http://127.0.0.1:7890` (or env `VISION_UPSTREAM_PROXY`) routes upstream through that proxy via a CONNECT tunnel.
 - `--proxy-first` (or env `VISION_PROXY_FIRST=1`) tries the explicit proxy before direct; the default order is direct first.
 
-The route whose connection (TCP/TLS handshake) succeeds is kept in memory and reused; only connection-establishment failures (refused / DNS / TLS / 5s connect timeout) switch routes, and HTTP status errors from the model pass through unchanged. If every route fails, the proxy returns 502 listing each route and reason.
+The route whose connection (TCP/TLS handshake) succeeds is kept in memory and reused; only connection-establishment failures (refused / DNS / TLS / a 5s socket timeout) switch routes, and HTTP status errors from the model pass through unchanged. If every route fails, the proxy returns 502 listing each route and reason. An HTTP proxy URL without an explicit port uses the standard port 80; proxy authentication is not supported.
 
 </details>
 

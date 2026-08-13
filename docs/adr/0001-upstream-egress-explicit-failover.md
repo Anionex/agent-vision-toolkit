@@ -4,7 +4,7 @@ Status: accepted
 
 The vision proxy's upstream requests used `urllib`'s default opener, which on Windows silently follows the system proxy; when the user's Clash (127.0.0.1:7890) was down, every upstream request was refused and the whole 19100 chain returned 502. We replaced the implicit opener with an explicit egress layer: requests go direct (TCP+TLS) by default, or through an optional `--upstream-proxy` CONNECT tunnel (`VISION_UPSTREAM_PROXY` env fallback, `--proxy-first` to reorder), and the system proxy is never consulted.
 
-Routing is sticky in memory: the route whose connection (TCP/TLS, bounded at 5s) succeeds is reused for subsequent requests, and switching happens only when that route fails to establish a connection — HTTP-layer errors pass through unchanged, there is no periodic re-probing, and when every route fails the client gets a 502 listing each route and reason. Connection timeouts are short (5s per candidate) so failover is fast, while streaming after connection keeps the long 600s read timeout.
+Routing is sticky in memory: the route whose connection (TCP/TLS, with a 5s socket timeout) succeeds is reused for subsequent requests, and switching happens only when that route fails to establish a connection — HTTP-layer errors pass through unchanged, there is no periodic re-probing, and when every route fails the client gets a 502 listing each route and reason. The short socket timeout keeps failover fast, while streaming after connection keeps the long 600s read timeout. Proxy URLs without a port use HTTP's standard port 80, and proxy authentication is deliberately unsupported.
 
 Considered Options:
 

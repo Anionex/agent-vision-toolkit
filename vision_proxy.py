@@ -14,6 +14,7 @@ import re
 import signal
 import socket
 import ssl
+import time
 import urllib.parse
 
 from vision_client import VisionError, describe_image, load_env_file, validate_vision_config
@@ -30,6 +31,12 @@ EGRESS_READ_TIMEOUT = 600.0
 
 def _header_value(headers, name):
     return next((value for key, value in headers if key.lower() == name.lower()), None)
+
+
+def _authority(host, port):
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"{host}:{port}"
 
 
 _DESC_CACHE = {}
@@ -796,19 +803,27 @@ class _EgressRoute:
     def __init__(self, kind, proxy_url=None):
         self.kind = kind
         self.proxy_url = proxy_url
-        self.label = "direct" if kind == "direct" else f"proxy {proxy_url}"
+        self.label = "direct"
         self.proxy_host = None
         self.proxy_port = None
         if proxy_url:
-            parsed = urllib.parse.urlsplit(proxy_url)
-            if parsed.scheme != "http" or not parsed.hostname:
-                raise ValueError(
-                    f"unsupported upstream proxy {proxy_url!r}: use http://host:port")
+            try:
+                parsed = urllib.parse.urlsplit(proxy_url)
+            except ValueError as exc:
+                raise ValueError("invalid upstream proxy URL: use http://host:port") from exc
             if parsed.username or parsed.password:
-                raise ValueError(
-                    f"upstream proxy authentication is not supported: {proxy_url!r}")
-            self.proxy_host = parsed.hostname
-            self.proxy_port = parsed.port or 7890
+                raise ValueError("upstream proxy authentication is not supported")
+            try:
+                hostname = parsed.hostname
+                port = parsed.port
+            except ValueError as exc:
+                raise ValueError("invalid upstream proxy URL: use http://host:port") from exc
+            if (parsed.scheme != "http" or not hostname or
+                    parsed.path not in ("", "/") or parsed.query or parsed.fragment):
+                raise ValueError("unsupported upstream proxy URL: use http://host:port")
+            self.proxy_host = hostname
+            self.proxy_port = port or 80
+            self.label = f"proxy http://{_authority(self.proxy_host, self.proxy_port)}"
 
     def __repr__(self):
         return f"<EgressRoute {self.label}>"
@@ -966,41 +981,49 @@ class Proxy:
             raise
 
     def _connect_route(self, route):
+        deadline = time.monotonic() + EGRESS_CONNECT_TIMEOUT
         if route.kind == "direct":
-            return self._connect_direct()
-        return self._connect_via_proxy(route)
+            return self._connect_direct(deadline)
+        return self._connect_via_proxy(route, deadline)
 
-    def _connect_direct(self):
-        sock = self._tcp_connect((self._upstream_host, self._upstream_port))
+    def _connect_direct(self, deadline):
+        sock = self._tcp_connect((self._upstream_host, self._upstream_port), deadline)
         try:
-            return self._maybe_tls(sock)
+            return self._maybe_tls(sock, deadline)
         except Exception:
             sock.close()
             raise
 
-    def _connect_via_proxy(self, route):
-        sock = self._tcp_connect((route.proxy_host, route.proxy_port))
+    def _connect_via_proxy(self, route, deadline):
+        sock = self._tcp_connect((route.proxy_host, route.proxy_port), deadline)
         try:
-            sock.settimeout(EGRESS_CONNECT_TIMEOUT)
-            self._send_connect(sock, self._upstream_host, self._upstream_port)
-            return self._maybe_tls(sock)
+            self._send_connect(sock, self._upstream_host, self._upstream_port, deadline)
+            return self._maybe_tls(sock, deadline)
         except Exception:
             sock.close()
             raise
 
-    def _tcp_connect(self, address):
+    def _tcp_connect(self, address, deadline):
         try:
-            return socket.create_connection(address, timeout=EGRESS_CONNECT_TIMEOUT)
+            return socket.create_connection(address, timeout=self._remaining(deadline))
         except TimeoutError as exc:
             raise EgressError(f"timed out after {EGRESS_CONNECT_TIMEOUT:g}s") from exc
         except OSError as exc:
             raise EgressError(str(exc)) from exc
 
-    def _maybe_tls(self, sock):
+    @staticmethod
+    def _remaining(deadline):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise EgressError(f"timed out after {EGRESS_CONNECT_TIMEOUT:g}s")
+        return remaining
+
+    def _maybe_tls(self, sock, deadline):
         if not self._upstream_tls:
             sock.settimeout(EGRESS_READ_TIMEOUT)
             return sock
         try:
+            sock.settimeout(self._remaining(deadline))
             tls = self._tls_context.wrap_socket(sock, server_hostname=self._upstream_host)
         except TimeoutError as exc:
             raise EgressError(f"timed out after {EGRESS_CONNECT_TIMEOUT:g}s") from exc
@@ -1010,12 +1033,15 @@ class Proxy:
         return tls
 
     @staticmethod
-    def _send_connect(sock, host, port):
+    def _send_connect(sock, host, port, deadline):
         """CONNECT tunnel handshake through an explicit HTTP proxy."""
+        authority = _authority(host, port)
         try:
-            sock.sendall(f"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n".encode())
+            sock.settimeout(Proxy._remaining(deadline))
+            sock.sendall(f"CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\n\r\n".encode())
             data = b""
             while b"\r\n\r\n" not in data and len(data) < 64 * 1024:
+                sock.settimeout(Proxy._remaining(deadline))
                 chunk = sock.recv(4096)
                 if not chunk:
                     break
@@ -1029,7 +1055,7 @@ class Proxy:
             status = int(head.split(b" ", 2)[1])
         except (IndexError, ValueError):
             raise EgressError("proxy CONNECT returned an invalid response") from None
-        if status != 200:
+        if not 200 <= status < 300:
             raise EgressError(f"proxy CONNECT failed with HTTP {status}")
 
     async def _send_response(self, writer, response):

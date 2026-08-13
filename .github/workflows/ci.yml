@@ -15,12 +15,16 @@ concurrency:
 
 jobs:
   python-core:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
       - name: Compile Python entry points
         run: python -m py_compile vision_proxy.py vision_client.py ground.py detect.py bin/glance bin/trace bin/crop
       - name: Run core tests
@@ -32,6 +36,18 @@ jobs:
           python tests/smoke_test_egress_failover.py
           python tests/test_vision_client.py
           python tests/test_restore_ui_playbook.py
+
+  python-egress-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Compile proxy entry points
+        run: python -m py_compile vision_proxy.py vision_client.py tests/smoke_test_egress_failover.py
+      - name: Run Windows egress smoke test
+        run: python tests/smoke_test_egress_failover.py
 
   extensions:
     runs-on: ubuntu-latest
