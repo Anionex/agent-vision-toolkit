@@ -27,7 +27,7 @@
 
 - 已接入纯文本模型并能正常对话的宿主（Codex 或 Claude Code）
 - Python 3.11+
-- 一个支持 `/chat/completions` 和 `image_url` 的 OpenAI-compatible 视觉 API；Python 客户端/代理也可配置 `/responses` + `input_image`
+- 一个支持 OpenAI Chat Completions、OpenAI Responses 或 Anthropic Messages 的视觉 API；通过 `VISION_API_PROTOCOL` 选择协议
 
 ## 1. 定位并备份现有配置
 
@@ -60,11 +60,13 @@ VISION_MODEL=...
 LANG=zh  # 可选：视觉模型输出语言（zh/en），不填保持默认中文
 # VISION_API_PROTOCOL=chat_completions  # 可选：chat_completions / responses / anthropic
 # VISION_REASONING_EFFORT=medium        # 可选：responses 协议下的推理强度
-# VISION_ANTHROPIC_THINKING=omit        # 可选：Anthropic thinking 为 omit / disabled / adaptive
+# VISION_ANTHROPIC_THINKING=omit        # 可选：omit 兼容性最好；仅在模型明确支持时使用 disabled / adaptive
 # VISION_USER_AGENT=custom-vision-client/1.0  # 可选：覆盖默认的浏览器兼容 User-Agent
 ```
 
 不要在 env 中写入上游模型的 key（如 `DEEPSEEK_API_KEY`）。上游鉴权仍由宿主发送。
+
+`VISION_ANTHROPIC_THINKING=omit` 不发送 thinking 字段，并保留模型默认行为。`disabled` 与 `adaptive` 具有模型兼容性限制；如果提供方返回 HTTP 400，先恢复 `omit`。当前不提供手动 `enabled` + `budget_tokens`。
 
 - macOS / Linux：执行 `chmod 600 <ENV_FILE>`。
 - Windows：把 env 保留在当前用户的 `%LOCALAPPDATA%` 下，不复制到公共目录。

@@ -92,13 +92,19 @@ def main():
         windows_env.parent.mkdir()
         windows_env.write_text("WINDOWS_ENV_PROBE=loaded\n")
         previous_local_appdata = os.environ.get("LOCALAPPDATA")
+        previous_explicit = os.environ.get("VISION_ENV_FILE")
         os.environ["LOCALAPPDATA"] = raw
+        os.environ.pop("VISION_ENV_FILE", None)
         os.environ.pop("WINDOWS_ENV_PROBE", None)
         try:
             vision_client.load_default_env()
             assert os.environ.get("WINDOWS_ENV_PROBE") == "loaded"
         finally:
             os.environ.pop("WINDOWS_ENV_PROBE", None)
+            if previous_explicit is None:
+                os.environ.pop("VISION_ENV_FILE", None)
+            else:
+                os.environ["VISION_ENV_FILE"] = previous_explicit
             if previous_local_appdata is None:
                 os.environ.pop("LOCALAPPDATA", None)
             else:
@@ -111,11 +117,15 @@ def main():
                        VISION_MODEL="fixture-model")
     environment.pop("VISION_API_PROTOCOL", None)
     environment.pop("VISION_REASONING_EFFORT", None)
+    environment.pop("VISION_ANTHROPIC_THINKING", None)
     environment.pop("VISION_USER_AGENT", None)
+    environment.pop("VISION_ENV_FILE", None)
     saved = dict(os.environ)
     os.environ.pop("VISION_API_PROTOCOL", None)
     os.environ.pop("VISION_REASONING_EFFORT", None)
+    os.environ.pop("VISION_ANTHROPIC_THINKING", None)
     os.environ.pop("VISION_USER_AGENT", None)
+    os.environ.pop("VISION_ENV_FILE", None)
     os.environ.update(environment)
     try:
         Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
@@ -303,6 +313,19 @@ def main():
         assert delays == [3.0]
         assert Handler.calls == 2
 
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], [json.dumps({
+            "content": [{"type": "text", "text": "adaptive answer"}],
+        }).encode()]
+        os.environ["VISION_API_PROTOCOL"] = "anthropic"
+        os.environ["VISION_ANTHROPIC_THINKING"] = "adaptive"
+        try:
+            assert vision_client.describe_image("data:image/png;base64,AAAA") == "adaptive answer"
+        finally:
+            os.environ.pop("VISION_API_PROTOCOL", None)
+            os.environ.pop("VISION_ANTHROPIC_THINKING", None)
+        assert json.loads(Handler.last_body)["thinking"] == {"type": "adaptive"}
+        assert Handler.calls == 1
+
         Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = 0, [], [], []
         os.environ["VISION_API_PROTOCOL"] = "anthropic"
         os.environ["VISION_ANTHROPIC_THINKING"] = "unsupported"
@@ -335,16 +358,16 @@ def main():
         with tempfile.TemporaryDirectory() as raw:
             image = Path(raw) / "fixture.png"
             image.write_bytes(b"\x89PNG\r\n\x1a\nfixture")
-            # glance loads <repo>/.env and <cwd>/.env last, and they override the
-            # process environment — run from a temp cwd whose .env carries the
-            # fixture config so a developer's real .env cannot leak in.
-            (Path(raw) / ".env").write_text(
+            # Pin the subprocess to one explicit fixture file so caller and
+            # checkout env files cannot redirect requests away from the server.
+            fixture_env = Path(raw) / "vision.env"
+            fixture_env.write_text(
                 "VISION_API_KEY=test-key\n"
                 f"VISION_BASE_URL=http://127.0.0.1:{server.server_port}/v1\n"
                 "VISION_MODEL=fixture-model\n"
                 "VISION_API_PROTOCOL=chat_completions\n"
             )
-            isolated_env = dict(environment, HOME=raw)
+            isolated_env = dict(environment, HOME=raw, VISION_ENV_FILE=str(fixture_env))
             glance = Path(__file__).resolve().parent.parent / "bin/glance"
             glance_cmd = [sys.executable, str(glance)] if os.name == "nt" else [str(glance)]
             result = subprocess.run(

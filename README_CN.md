@@ -137,7 +137,7 @@
 
 > 完整阅读 https://github.com/Anionex/agent-vision-toolkit/blob/main/AGENT_INSTALL.md，根据我们当前使用的 agent 应用，安装适用的视觉代理或原生 extension/plugin。如果视觉 API 尚未配置，请按当前系统找到配置文件，并引导我填写 `VISION_API_KEY`、`VISION_BASE_URL` 和 `VISION_MODEL`。
 
-唯一要准备的是 OpenAI-compatible 多模态模型的 API base URL、API key 和模型名称；agent 会引导你把它们写入对应的配置文件。
+只需准备一个支持 OpenAI Chat Completions、OpenAI Responses 或 Anthropic Messages 的多模态 API，以及它的 base URL、API key 和模型名称；agent 会引导你把它们写入对应的配置文件。
 
 > 对于可选接入层，安装完成并重启后，直接粘贴图片或让模型调用内置看图工具即可。Pi、Oh My Pi、OpenCode 走的是单文件[原生 extension](extensions/) 而不是代理，可见各 agent 的文档。
 
@@ -330,7 +330,7 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 | `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
 | `VISION_API_PROTOCOL` | 否 | Python 客户端/代理的视觉 API 协议：`chat_completions`（默认）、`responses` 或 `anthropic`；Anthropic 模式使用 `x-api-key` 与 `anthropic-version` |
 | `VISION_REASONING_EFFORT` | 否 | Python 客户端/代理使用 `responses` 时可选的服务商支持推理强度 |
-| `VISION_ANTHROPIC_THINKING` | 否 | Anthropic thinking 模式：`omit`（默认）、`disabled` 或 `adaptive` |
+| `VISION_ANTHROPIC_THINKING` | 否 | Anthropic thinking 模式。`omit`（默认）不发送 thinking 字段，兼容性最好；仅当所选模型明确支持时使用 `disabled` 或 `adaptive`，提供方返回 HTTP 400 时应先恢复 `omit`。当前不提供手动 `enabled` + `budget_tokens`。 |
 | `VISION_USER_AGENT` | 否 | Python 客户端/代理的出站 User-Agent；默认使用浏览器兼容值，也可按服务商要求覆盖 |
 
 </details>

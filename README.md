@@ -137,7 +137,7 @@ When to use them, the order in which to call tools, and how to verify the result
 
 > Read https://github.com/Anionex/agent-vision-toolkit/blob/main/AGENT_INSTALL.md in full, then install the appropriate vision proxy or native extension/plugin for the agent application we are currently using. If the vision API is not configured, locate the configuration file for the current operating system and guide me through setting `VISION_API_KEY`, `VISION_BASE_URL`, and `VISION_MODEL`.
 
-All you need to prepare is an OpenAI-compatible multimodal API base URL, API key, and model name. The agent will guide you through writing them to the appropriate configuration file.
+All you need to prepare is a multimodal API supporting OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages, plus its base URL, API key, and model name. The agent will guide you through writing them to the appropriate configuration file.
 
 > After installing the optional integration and restarting the agent, paste an image directly or let the model call its built-in image tool. Pi, Oh My Pi, and OpenCode use single-file [native extensions](extensions/) rather than the proxy; see each agent's documentation.
 
@@ -333,7 +333,7 @@ The standalone CLIs and Python proxy use these environment variables; just three
 | `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
 | `VISION_API_PROTOCOL` | No | Python client/proxy protocol: `chat_completions` (default), `responses`, or `anthropic`; Anthropic mode uses `x-api-key` and `anthropic-version` |
 | `VISION_REASONING_EFFORT` | No | Optional provider-supported reasoning effort for the Python client/proxy when using `responses` |
-| `VISION_ANTHROPIC_THINKING` | No | Anthropic thinking mode: `omit` (default), `disabled`, or `adaptive` |
+| `VISION_ANTHROPIC_THINKING` | No | Anthropic thinking mode. `omit` (default) sends no thinking field and has the broadest compatibility. Use `disabled` or `adaptive` only when the selected model documents that mode; restore `omit` first if the provider returns HTTP 400. Manual `enabled` plus `budget_tokens` is not exposed. |
 | `VISION_USER_AGENT` | No | Outbound User-Agent for the Python client/proxy; defaults to a browser-compatible value and can be overridden for provider requirements |
 
 </details>
