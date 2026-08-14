@@ -53,7 +53,10 @@ def load_env_file(path: str | os.PathLike[str] | None) -> None:
 
 def load_default_env() -> None:
     explicit = os.environ.get("VISION_ENV_FILE")
-    candidates = [Path(explicit).expanduser()] if explicit else []
+    if explicit:
+        load_env_file(Path(explicit).expanduser())
+        return
+    candidates = []
     local_appdata = os.environ.get("LOCALAPPDATA")
     if local_appdata:
         candidates.append(Path(local_appdata) / "agent-vision-toolkit" / "env")

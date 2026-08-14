@@ -52,6 +52,42 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        explicit_env = root / "explicit.env"
+        explicit_env.write_text("ENV_PRIORITY_PROBE=explicit\n")
+        windows_env = root / "local-app-data" / "agent-vision-toolkit" / "env"
+        windows_env.parent.mkdir(parents=True)
+        windows_env.write_text("ENV_PRIORITY_PROBE=local-app-data\n")
+        cwd = root / "cwd"
+        cwd.mkdir()
+        (cwd / ".env").write_text("ENV_PRIORITY_PROBE=cwd\n")
+        previous_cwd = Path.cwd()
+        previous_home = os.environ.get("HOME")
+        previous_local_appdata = os.environ.get("LOCALAPPDATA")
+        previous_explicit = os.environ.get("VISION_ENV_FILE")
+        previous_probe = os.environ.get("ENV_PRIORITY_PROBE")
+        os.environ["HOME"] = raw
+        os.environ["LOCALAPPDATA"] = str(root / "local-app-data")
+        os.environ["VISION_ENV_FILE"] = str(explicit_env)
+        os.environ.pop("ENV_PRIORITY_PROBE", None)
+        os.chdir(cwd)
+        try:
+            vision_client.load_default_env()
+            assert os.environ.get("ENV_PRIORITY_PROBE") == "explicit"
+        finally:
+            os.chdir(previous_cwd)
+            for name, value in (
+                ("HOME", previous_home),
+                ("LOCALAPPDATA", previous_local_appdata),
+                ("VISION_ENV_FILE", previous_explicit),
+                ("ENV_PRIORITY_PROBE", previous_probe),
+            ):
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
+    with tempfile.TemporaryDirectory() as raw:
         windows_env = Path(raw) / "agent-vision-toolkit" / "env"
         windows_env.parent.mkdir()
         windows_env.write_text("WINDOWS_ENV_PROBE=loaded\n")
