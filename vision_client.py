@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Shared OpenAI-compatible vision client used by the proxy and glance CLI."""
+"""Shared multi-provider vision client used by the proxy and glance CLI."""
 
 from __future__ import annotations
 
 import base64
+from email.utils import parsedate_to_datetime
 import http.client
 import json
 import mimetypes
@@ -142,6 +143,20 @@ def _redact(text: str, *secrets: str) -> str:
     return text
 
 
+def _retry_delay(error: urllib.error.HTTPError, attempt: int) -> float:
+    value = error.headers.get("Retry-After")
+    if value:
+        try:
+            return max(0.0, min(float(value), 60.0))
+        except ValueError:
+            try:
+                retry_at = parsedate_to_datetime(value)
+                return max(0.0, min(retry_at.timestamp() - time.time(), 60.0))
+            except (TypeError, ValueError, OverflowError):
+                pass
+    return min(2 ** attempt, 4)
+
+
 def describe_image(image_url: str | list[str], prompt: str | None = None, max_tokens: int = 4096,
                    apply_lang: bool = True) -> str:
     """Describe one data/http image URL (str) or several (list) in a single call."""
@@ -195,8 +210,14 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
             "messages": [{"role": "user", "content": [
                 {"type": "image", "source": _anthropic_image_source(url)} for url in urls
             ] + [{"type": "text", "text": text}]}],
-            "thinking": {"type": "disabled"},
         }
+        thinking = os.environ.get("VISION_ANTHROPIC_THINKING", "").strip().lower() or "omit"
+        if thinking != "omit":
+            if thinking not in {"disabled", "adaptive"}:
+                raise VisionError(
+                    "Unsupported VISION_ANTHROPIC_THINKING; use omit, disabled, or adaptive"
+                )
+            payload["thinking"] = {"type": thinking}
         endpoint = "/messages"
         extract_text = _anthropic_text
     else:
@@ -231,9 +252,9 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
         except urllib.error.HTTPError as exc:
             body = _redact(exc.read().decode(errors="replace")[:400], api_key)
             body = body.replace("\r", " ").replace("\n", " ")
-            if exc.code in {429, 500, 502, 503, 504} and attempt < retries:
+            if exc.code in {429, 500, 502, 503, 504, 529} and attempt < retries:
                 print(f"vision: HTTP {exc.code}, retrying ({attempt + 1}/{retries})", file=sys.stderr)
-                time.sleep(min(2 ** attempt, 4))
+                time.sleep(_retry_delay(exc, attempt))
                 continue
             raise VisionError(f"Vision API HTTP {exc.code}: {body}") from exc
         except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as exc:

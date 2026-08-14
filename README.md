@@ -152,7 +152,7 @@ VISION_BASE_URL=https://openrouter.ai/api/v1
 VISION_MODEL=google/gemini-3.6-flash
 ```
 
-Any OpenAI-compatible endpoint that supports `/chat/completions` with `image_url` works (e.g. Aliyun DashScope: `https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`). The Python client/proxy can also use `/responses` with `input_image` by setting `VISION_API_PROTOCOL=responses`. Add `LANG=en` for English descriptions (default is Chinese).
+Any OpenAI-compatible endpoint that supports `/chat/completions` with `image_url` works (e.g. Aliyun DashScope: `https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`). The Python client/proxy can also use `/responses` with `input_image` by setting `VISION_API_PROTOCOL=responses`, or Anthropic Messages by setting `VISION_API_PROTOCOL=anthropic` and a base URL ending in `/v1` (not `/messages`). Add `LANG=en` for English descriptions (default is Chinese).
 
 **2. Put the CLIs on your PATH:**
 
@@ -328,11 +328,12 @@ The standalone CLIs and Python proxy use these environment variables; just three
 | Variable | Required | Description |
 |---|---:|---|
 | `VISION_API_KEY` | Yes | API key of the multimodal model |
-| `VISION_BASE_URL` | Yes | OpenAI-compatible API base URL |
+| `VISION_BASE_URL` | Yes | Provider API base URL; include `/v1` but not the protocol endpoint such as `/messages` |
 | `VISION_MODEL` | Yes | Multimodal model name |
 | `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
-| `VISION_API_PROTOCOL` | No | Python client/proxy protocol: `chat_completions` (default) or `responses` |
+| `VISION_API_PROTOCOL` | No | Python client/proxy protocol: `chat_completions` (default), `responses`, or `anthropic`; Anthropic mode uses `x-api-key` and `anthropic-version` |
 | `VISION_REASONING_EFFORT` | No | Optional provider-supported reasoning effort for the Python client/proxy when using `responses` |
+| `VISION_ANTHROPIC_THINKING` | No | Anthropic thinking mode: `omit` (default), `disabled`, or `adaptive` |
 | `VISION_USER_AGENT` | No | Outbound User-Agent for the Python client/proxy; defaults to a browser-compatible value and can be overridden for provider requirements |
 
 </details>
@@ -352,7 +353,7 @@ The route whose connection (TCP/TLS handshake) succeeds is kept in memory and re
 ## Prerequisites
 
 - A coding agent already working with a model, including a text-only model such as DeepSeek V4
-- An OpenAI-compatible vision API that supports `/chat/completions` and `image_url`; the Python client/proxy can also use `/responses` with `input_image` via `VISION_API_PROTOCOL=responses`
+- A vision API supporting OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages; select the latter two with `VISION_API_PROTOCOL=responses` or `VISION_API_PROTOCOL=anthropic`
 - No other configuration is required
 
 ## FAQ

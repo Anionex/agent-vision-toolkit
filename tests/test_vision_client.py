@@ -19,6 +19,7 @@ import vision_client
 class Handler(BaseHTTPRequestHandler):
     statuses = []
     bodies = []
+    response_headers = []
     calls = 0
     last_body = b""
     last_headers = {}
@@ -38,6 +39,9 @@ class Handler(BaseHTTPRequestHandler):
         else:
             body = b'{"error":{"message":"fixture error"}}'
         self.send_response(status)
+        if Handler.response_headers:
+            for name, value in Handler.response_headers.pop(0).items():
+                self.send_header(name, value)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -78,9 +82,18 @@ def main():
     os.environ.pop("VISION_USER_AGENT", None)
     os.environ.update(environment)
     try:
-        Handler.calls, Handler.statuses, Handler.bodies = 0, [429, 200], []
-        assert vision_client.describe_image("data:image/png;base64,AAAA") == "fixture answer"
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0, [429, 200], [], [{"Retry-After": "17"}, {}]
+        )
+        original_sleep = vision_client.time.sleep
+        delays = []
+        vision_client.time.sleep = delays.append
+        try:
+            assert vision_client.describe_image("data:image/png;base64,AAAA") == "fixture answer"
+        finally:
+            vision_client.time.sleep = original_sleep
         assert Handler.calls == 2
+        assert delays == [17.0]
         assert Handler.last_headers.get("User-Agent") == vision_client.DEFAULT_USER_AGENT
         assert not Handler.last_headers["User-Agent"].startswith("Python-urllib/")
 
@@ -175,13 +188,13 @@ def main():
         assert len(image_parts) == 2, "a list of URLs must become one request with all images"
         assert Handler.calls == 1
 
-        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], [json.dumps({
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = 0, [200], [json.dumps({
             "object": "response",
             "output": [{
                 "type": "message",
                 "content": [{"type": "output_text", "text": "responses fixture answer"}],
             }],
-        }).encode()]
+        }).encode()], []
         os.environ["VISION_API_PROTOCOL"] = "responses"
         os.environ["VISION_REASONING_EFFORT"] = "medium"
         try:
@@ -225,7 +238,7 @@ def main():
         assert not any(k.lower() == "authorization" for k in Handler.last_headers)
         payload = json.loads(Handler.last_body)
         assert payload["max_tokens"] == 123
-        assert payload["thinking"] == {"type": "disabled"}
+        assert "thinking" not in payload
         content = payload["messages"][0]["content"]
         assert [part["type"] for part in content] == ["image", "image", "text"]
         assert content[0]["source"] == {
@@ -233,6 +246,41 @@ def main():
         }
         assert content[1]["source"] == {"type": "url", "url": "https://example.com/remote.webp"}
         assert Handler.calls == 1
+
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0, [529, 200], [b'{"error":{"type":"overloaded_error"}}', json.dumps({
+                "content": [{"type": "text", "text": "recovered"}],
+            }).encode()], [{"Retry-After": "3"}, {}]
+        )
+        delays = []
+        original_sleep = vision_client.time.sleep
+        vision_client.time.sleep = delays.append
+        os.environ["VISION_API_PROTOCOL"] = "anthropic"
+        os.environ["VISION_ANTHROPIC_THINKING"] = "disabled"
+        try:
+            assert vision_client.describe_image("data:image/png;base64,AAAA") == "recovered"
+        finally:
+            os.environ.pop("VISION_API_PROTOCOL", None)
+            os.environ.pop("VISION_ANTHROPIC_THINKING", None)
+            vision_client.time.sleep = original_sleep
+        assert json.loads(Handler.last_body)["thinking"] == {"type": "disabled"}
+        assert delays == [3.0]
+        assert Handler.calls == 2
+
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = 0, [], [], []
+        os.environ["VISION_API_PROTOCOL"] = "anthropic"
+        os.environ["VISION_ANTHROPIC_THINKING"] = "unsupported"
+        try:
+            try:
+                vision_client.describe_image("data:image/png;base64,AAAA")
+            except vision_client.VisionError as exc:
+                assert "Unsupported VISION_ANTHROPIC_THINKING" in str(exc)
+            else:
+                raise AssertionError("an unsupported thinking mode must fail before making a request")
+        finally:
+            os.environ.pop("VISION_API_PROTOCOL", None)
+            os.environ.pop("VISION_ANTHROPIC_THINKING", None)
+        assert Handler.calls == 0
 
         Handler.calls, Handler.statuses, Handler.bodies = 0, [], []
         os.environ["VISION_API_PROTOCOL"] = "unsupported"

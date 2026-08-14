@@ -58,8 +58,9 @@ VISION_API_KEY=...
 VISION_BASE_URL=...
 VISION_MODEL=...
 LANG=zh  # 可选：视觉模型输出语言（zh/en），不填保持默认中文
-# VISION_API_PROTOCOL=chat_completions  # 可选：Python 客户端/代理可改用 responses 协议
+# VISION_API_PROTOCOL=chat_completions  # 可选：chat_completions / responses / anthropic
 # VISION_REASONING_EFFORT=medium        # 可选：responses 协议下的推理强度
+# VISION_ANTHROPIC_THINKING=omit        # 可选：Anthropic thinking 为 omit / disabled / adaptive
 # VISION_USER_AGENT=custom-vision-client/1.0  # 可选：覆盖默认的浏览器兼容 User-Agent
 ```
 

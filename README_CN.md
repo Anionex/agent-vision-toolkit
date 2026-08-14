@@ -152,7 +152,7 @@ VISION_BASE_URL=https://openrouter.ai/api/v1
 VISION_MODEL=google/gemini-3.6-flash
 ```
 
-任何支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 端点都可以（如阿里云百炼：`https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`）。Python 客户端/代理也可设置 `VISION_API_PROTOCOL=responses` 使用 `/responses` + `input_image`。需要英文描述时加 `LANG=en`（默认中文）。
+任何支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 端点都可以（如阿里云百炼：`https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`）。Python 客户端/代理也可设置 `VISION_API_PROTOCOL=responses` 使用 `/responses` + `input_image`，或设置 `VISION_API_PROTOCOL=anthropic` 使用 Anthropic Messages；此时 Base URL 应以 `/v1` 结尾，不要包含 `/messages`。需要英文描述时加 `LANG=en`（默认中文）。
 
 **2. 把 CLI 放进 PATH：**
 
@@ -325,11 +325,12 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 | 变量 | 必需 | 说明 |
 |---|---:|---|
 | `VISION_API_KEY` | 是 | 多模态模型的 API key |
-| `VISION_BASE_URL` | 是 | OpenAI-compatible API 地址 |
+| `VISION_BASE_URL` | 是 | 服务商 API Base URL；可包含 `/v1`，但不要包含 `/messages` 等协议端点 |
 | `VISION_MODEL` | 是 | 多模态模型名 |
 | `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
-| `VISION_API_PROTOCOL` | 否 | Python 客户端/代理的视觉 API 协议：`chat_completions`（默认）或 `responses` |
+| `VISION_API_PROTOCOL` | 否 | Python 客户端/代理的视觉 API 协议：`chat_completions`（默认）、`responses` 或 `anthropic`；Anthropic 模式使用 `x-api-key` 与 `anthropic-version` |
 | `VISION_REASONING_EFFORT` | 否 | Python 客户端/代理使用 `responses` 时可选的服务商支持推理强度 |
+| `VISION_ANTHROPIC_THINKING` | 否 | Anthropic thinking 模式：`omit`（默认）、`disabled` 或 `adaptive` |
 | `VISION_USER_AGENT` | 否 | Python 客户端/代理的出站 User-Agent；默认使用浏览器兼容值，也可按服务商要求覆盖 |
 
 </details>
@@ -349,7 +350,7 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 ## 前置条件
 
 - 已接入(纯文本)模型（如 DeepSeek V4）并可正常使用的 coding agent
-- 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API；Python 客户端/代理也可通过 `VISION_API_PROTOCOL=responses` 使用 `/responses` + `input_image`
+- 一个支持 OpenAI Chat Completions、OpenAI Responses 或 Anthropic Messages 的视觉 API；后两者分别使用 `VISION_API_PROTOCOL=responses` 与 `VISION_API_PROTOCOL=anthropic`
 - 没有其他需要的配置
 
 ## 常见问题
