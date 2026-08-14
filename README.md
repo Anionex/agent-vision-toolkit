@@ -330,6 +330,7 @@ The toolkit and proxy use only these environment variables; just three are requi
 | `VISION_BASE_URL` | Yes | OpenAI-compatible API base URL |
 | `VISION_MODEL` | Yes | Multimodal model name |
 | `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
+| `VISION_USER_AGENT` | No | Outbound User-Agent for the Python client/proxy; defaults to a browser-compatible value and can be overridden for provider requirements |
 
 </details>
 

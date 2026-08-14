@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import urllib.error
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -20,9 +21,11 @@ class Handler(BaseHTTPRequestHandler):
     bodies = []
     calls = 0
     last_body = b""
+    last_headers = {}
 
     def do_POST(self):
         Handler.calls += 1
+        Handler.last_headers = dict(self.headers)
         length = int(self.headers.get("Content-Length", 0))
         Handler.last_body = self.rfile.read(length)
         status = Handler.statuses.pop(0)
@@ -64,12 +67,25 @@ def main():
     environment = dict(os.environ, VISION_API_KEY="test-key",
                        VISION_BASE_URL=f"http://127.0.0.1:{server.server_port}/v1",
                        VISION_MODEL="fixture-model")
+    environment.pop("VISION_USER_AGENT", None)
     saved = dict(os.environ)
+    os.environ.pop("VISION_USER_AGENT", None)
     os.environ.update(environment)
     try:
         Handler.calls, Handler.statuses, Handler.bodies = 0, [429, 200], []
         assert vision_client.describe_image("data:image/png;base64,AAAA") == "fixture answer"
         assert Handler.calls == 2
+        assert Handler.last_headers.get("User-Agent") == vision_client.DEFAULT_USER_AGENT
+        assert not Handler.last_headers["User-Agent"].startswith("Python-urllib/")
+
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
+        os.environ["VISION_USER_AGENT"] = "custom-vision-client/2.0"
+        try:
+            assert vision_client.describe_image("data:image/png;base64,AAAA") == "fixture answer"
+        finally:
+            os.environ.pop("VISION_USER_AGENT", None)
+        assert Handler.last_headers.get("User-Agent") == "custom-vision-client/2.0"
+        assert Handler.calls == 1
 
         Handler.calls, Handler.statuses, Handler.bodies = 0, [401], []
         try:
@@ -81,7 +97,7 @@ def main():
         assert Handler.calls == 1, "401 must not be retried"
 
         Handler.calls, Handler.statuses, Handler.bodies = (
-            0, [400], [b'{"error":"test-key must not leak"}']
+            0, [403], [b'{"error":"Cloudflare 1010 rejected test-key"}']
         )
         try:
             vision_client.describe_image("data:image/png;base64,AAAA")
@@ -90,7 +106,27 @@ def main():
             assert "<redacted>" in str(exc)
         else:
             raise AssertionError("HTTP errors must fail cleanly")
-        assert Handler.calls == 1, "400 must not be retried"
+        assert Handler.calls == 1, "403 must not be retried"
+
+        original_urlopen = vision_client.urllib.request.urlopen
+        original_sleep = vision_client.time.sleep
+
+        def fail_with_secret(*_args, **_kwargs):
+            raise urllib.error.URLError("connection failed for test-key")
+
+        vision_client.urllib.request.urlopen = fail_with_secret
+        vision_client.time.sleep = lambda _seconds: None
+        try:
+            try:
+                vision_client.describe_image("data:image/png;base64,AAAA")
+            except vision_client.VisionError as exc:
+                assert "test-key" not in str(exc)
+                assert "<redacted>" in str(exc)
+            else:
+                raise AssertionError("network errors must fail with redacted details")
+        finally:
+            vision_client.urllib.request.urlopen = original_urlopen
+            vision_client.time.sleep = original_sleep
 
         Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         os.environ["LANG"] = "en"

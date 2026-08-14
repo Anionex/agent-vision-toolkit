@@ -2,6 +2,12 @@
 
 All notable user-facing changes to agent-vision-toolkit are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- Send a browser-compatible, configurable User-Agent from the shared Python vision client so Cloudflare-backed OpenAI-compatible endpoints do not reject the default `Python-urllib` signature.
+
 ## [0.1.0] - 2026-08-07
 
 ### Added
