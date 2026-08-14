@@ -402,3 +402,11 @@ To reduce costs further, you can use a locally deployed small multimodal side mo
 If agent-vision-toolkit saves you time, you are welcome to star it, share it, contribute, or [sponsor the project](FUNDING.md).
 
 I'm [anionex](https://anionex.me/), an AI-native developer who once ranked No. 4 on GitHub's global developer trending list, with more than 16k stars across my projects. If you would like to follow my future work, [follow me on X](https://x.com/anion_ex) or [GitHub](https://github.com/Anionex).
+
+<a href="https://www.star-history.com/?repos=Anionex%2Fagent-vision-toolkit&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Anionex/agent-vision-toolkit&type=date&theme=dark&legend=top-left&sealed_token=gCPJbPhF9qWnhHaryfGRnXebnoHYk7jJWj37Lq7wSzXbFbPbyhfY9Y63nYAFRmiEPfGHAWEpRlWMCTdMW6vbTJMa7Wq7uTl5fDmkxTy4Mqdjz1QujbUwqw" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Anionex/agent-vision-toolkit&type=date&legend=top-left&sealed_token=gCPJbPhF9qWnhHaryfGRnXebnoHYk7jJWj37Lq7wSzXbFbPbyhfY9Y63nYAFRmiEPfGHAWEpRlWMCTdMW6vbTJMa7Wq7uTl5fDmkxTy4Mqdjz1QujbUwqw" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Anionex/agent-vision-toolkit&type=date&legend=top-left&sealed_token=gCPJbPhF9qWnhHaryfGRnXebnoHYk7jJWj37Lq7wSzXbFbPbyhfY9Y63nYAFRmiEPfGHAWEpRlWMCTdMW6vbTJMa7Wq7uTl5fDmkxTy4Mqdjz1QujbUwqw" />
+ </picture>
+</a>
