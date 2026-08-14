@@ -36,6 +36,7 @@ jobs:
           python tests/smoke_test_egress_failover.py
           python tests/test_vision_client.py
           python tests/test_restore_ui_playbook.py
+          python tests/test_trace.py
 
   python-egress-windows:
     runs-on: windows-latest
@@ -47,7 +48,9 @@ jobs:
       - name: Compile proxy entry points
         run: python -m py_compile vision_proxy.py vision_client.py tests/smoke_test_egress_failover.py
       - name: Run Windows egress smoke test
-        run: python tests/smoke_test_egress_failover.py
+        run: |
+          python tests/smoke_test_egress_failover.py
+          python tests/test_trace.py
 
   extensions:
     runs-on: ubuntu-latest
