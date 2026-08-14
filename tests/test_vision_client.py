@@ -69,6 +69,7 @@ def main():
                        VISION_MODEL="fixture-model")
     environment.pop("VISION_USER_AGENT", None)
     saved = dict(os.environ)
+    os.environ.pop("VISION_USER_AGENT", None)
     os.environ.update(environment)
     try:
         Handler.calls, Handler.statuses, Handler.bodies = 0, [429, 200], []
