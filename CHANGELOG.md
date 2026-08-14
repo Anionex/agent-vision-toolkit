@@ -2,18 +2,26 @@
 
 All notable user-facing changes to agent-vision-toolkit are documented in this file.
 
-## [Unreleased]
+## [0.2.0] - 2026-08-14
 
 ### Added
 
 - Let the shared Python vision client call either Chat Completions or Responses APIs, including optional reasoning effort and explicit `store: false` data handling.
 - Add native Anthropic Messages requests with protocol-specific authentication, image sources, optional thinking control, and text-block response extraction.
 - Rewrite OpenAI Chat Completions `image_url` blocks through the existing vision-description pipeline with a host-neutral channel note.
+- Add a fast UI restoration workflow for quick, rough first drafts while preserving page hierarchy, visible text, and native controls.
+- Add the project landing-page source and link the DeepSeek Harness vision bundle for users who want that integration.
+
+### Changed
+
+- Make upstream egress explicit and resilient: connect directly by default, optionally use a configured HTTP CONNECT proxy, and fail over only when connection establishment fails instead of following ambient system proxy settings.
+- Make protocol-specific environment configuration authoritative and keep the existing host authentication and model compatibility behavior intact.
 
 ### Fixed
 
 - Send a browser-compatible, configurable User-Agent from the shared Python vision client so Cloudflare-backed OpenAI-compatible endpoints do not reject the default `Python-urllib` signature.
 - Honor `Retry-After` and retry Anthropic 529 overload responses.
+- Run the `glance` launcher through its interpreter on Windows and preserve `trace` SVG byte output across Windows line-ending behavior.
 
 ## [0.1.0] - 2026-08-07
 
