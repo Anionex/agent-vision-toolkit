@@ -202,6 +202,38 @@ def main():
         assert payload["reasoning"] == {"effort": "medium"}
         assert Handler.calls == 1
 
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], [json.dumps({
+            "content": [
+                {"type": "thinking", "thinking": "internal reasoning"},
+                {"type": "text", "text": "anthropic fixture answer"},
+                {"type": "text", "text": "second text block"},
+            ],
+            "usage": {"input_tokens": 42, "output_tokens": 7},
+        }).encode()]
+        os.environ["VISION_API_PROTOCOL"] = "anthropic"
+        try:
+            assert vision_client.describe_image(
+                ["data:image/png;base64,AAAA", "https://example.com/remote.webp"],
+                prompt="read both images",
+                max_tokens=123,
+            ) == "anthropic fixture answer\nsecond text block"
+        finally:
+            os.environ.pop("VISION_API_PROTOCOL", None)
+        assert Handler.last_path == "/v1/messages"
+        assert next(v for k, v in Handler.last_headers.items() if k.lower() == "x-api-key") == "test-key"
+        assert next(v for k, v in Handler.last_headers.items() if k.lower() == "anthropic-version") == "2023-06-01"
+        assert not any(k.lower() == "authorization" for k in Handler.last_headers)
+        payload = json.loads(Handler.last_body)
+        assert payload["max_tokens"] == 123
+        assert payload["thinking"] == {"type": "disabled"}
+        content = payload["messages"][0]["content"]
+        assert [part["type"] for part in content] == ["image", "image", "text"]
+        assert content[0]["source"] == {
+            "type": "base64", "media_type": "image/png", "data": "AAAA"
+        }
+        assert content[1]["source"] == {"type": "url", "url": "https://example.com/remote.webp"}
+        assert Handler.calls == 1
+
         Handler.calls, Handler.statuses, Handler.bodies = 0, [], []
         os.environ["VISION_API_PROTOCOL"] = "unsupported"
         try:

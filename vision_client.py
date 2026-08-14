@@ -112,6 +112,29 @@ def _responses_text(response: object) -> str:
     ).strip()
 
 
+def _anthropic_image_source(url: str) -> dict[str, str]:
+    if not url.startswith("data:"):
+        return {"type": "url", "url": url}
+    header, separator, data = url.partition(",")
+    if separator == "" or ";base64" not in header:
+        raise VisionError("Anthropic image data URLs must use base64 encoding")
+    media_type = header[5:].split(";", 1)[0]
+    if not media_type:
+        raise VisionError("Anthropic image data URLs must include a media type")
+    return {"type": "base64", "media_type": media_type, "data": data}
+
+
+def _anthropic_text(response: object) -> str:
+    if not isinstance(response, dict) or not isinstance(response.get("content"), list):
+        return ""
+    return "\n".join(
+        block["text"]
+        for block in response["content"]
+        if isinstance(block, dict) and block.get("type") == "text"
+        and isinstance(block.get("text"), str)
+    ).strip()
+
+
 def _redact(text: str, *secrets: str) -> str:
     for secret in secrets:
         if secret:
@@ -165,19 +188,33 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
             payload["max_tokens"] = max_tokens
         endpoint = "/chat/completions"
         extract_text = lambda data: _message_text(data["choices"][0]["message"]["content"])
+    elif protocol == "anthropic":
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens if max_tokens is not None else 4096,
+            "messages": [{"role": "user", "content": [
+                {"type": "image", "source": _anthropic_image_source(url)} for url in urls
+            ] + [{"type": "text", "text": text}]}],
+            "thinking": {"type": "disabled"},
+        }
+        endpoint = "/messages"
+        extract_text = _anthropic_text
     else:
         raise VisionError(
-            "Unsupported VISION_API_PROTOCOL; use chat_completions or responses"
+            "Unsupported VISION_API_PROTOCOL; use chat_completions, responses, or anthropic"
         )
-    request = urllib.request.Request(
-        base_url + endpoint,
-        data=json.dumps(payload).encode(),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + api_key,
-            "User-Agent": user_agent,
-        },
-    )
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": user_agent,
+    }
+    if protocol == "anthropic":
+        headers.update({
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        })
+    else:
+        headers["Authorization"] = "Bearer " + api_key
+    request = urllib.request.Request(base_url + endpoint, data=json.dumps(payload).encode(), headers=headers)
     retries = 2
     timeout = 180
     for attempt in range(retries + 1):
