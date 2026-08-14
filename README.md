@@ -32,9 +32,16 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 
 > If this project helps you or gives you some inspiration, feel free to star🌟 & fork.
 
+## Latest Update
+
+**2026-08-13 — Native DeepSeek Harness support is now available.** The new [`dsh-vision-toolkit`](dsh-vision-toolkit) linked package brings this toolkit into DSH Web and Headless profiles as a native Profile Bundle. It provides 10 structured visual tools for intent-aware image Q&A, grounding, detection, tracing, cropping, pixel diff, long-screenshot OCR, foreground extraction, dominant-color analysis, and HTML screenshots, while adding DSH Credentials, a managed isolated runtime, previewable Artifacts, Web Settings, and Agent-scoped progressive tool exposure.
+
+The package is tracked here as a Git submodule and maintained independently at [`Anionex/dsh-vision-toolkit`](https://github.com/Anionex/dsh-vision-toolkit). Clone this repository with `--recurse-submodules`, or run `git submodule update --init --recursive` in an existing checkout.
+
 <details>
 <summary><b>Contents</b></summary>
 
+- [Latest Update](#latest-update)
 - [Highlights](#highlights)
 - [Use-case Playbooks](#use-case-playbooks)
 - [Real-world Effects](#real-world-effects)
@@ -144,7 +151,7 @@ VISION_BASE_URL=https://openrouter.ai/api/v1
 VISION_MODEL=google/gemini-3.6-flash
 ```
 
-Any OpenAI-compatible endpoint that supports `/chat/completions` with `image_url` works (e.g. Aliyun DashScope: `https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`). Add `LANG=en` for English descriptions (default is Chinese).
+Any OpenAI-compatible endpoint that supports `/chat/completions` with `image_url` works (e.g. Aliyun DashScope: `https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`). The Python client/proxy can also use `/responses` with `input_image` by setting `VISION_API_PROTOCOL=responses`. Add `LANG=en` for English descriptions (default is Chinese).
 
 **2. Put the CLIs on your PATH:**
 
@@ -315,7 +322,7 @@ Codex -> 127.0.0.1:19100 -> your existing text-only upstream
 <details>
 <summary><b>Environment variables</b></summary>
 
-The toolkit and proxy use only these environment variables; just three are required:
+The standalone CLIs and Python proxy use these environment variables; just three are required. The native Pi and OpenCode extensions use their own settings and currently call `/chat/completions` only.
 
 | Variable | Required | Description |
 |---|---:|---|
@@ -323,15 +330,28 @@ The toolkit and proxy use only these environment variables; just three are requi
 | `VISION_BASE_URL` | Yes | OpenAI-compatible API base URL |
 | `VISION_MODEL` | Yes | Multimodal model name |
 | `LANG` | No | Vision model output language: `zh` (Chinese) or `en` (English); default `zh` |
-| `VISION_API_PROTOCOL` | No | Vision API protocol: `chat_completions` (default) or `responses` |
-| `VISION_REASONING_EFFORT` | No | Reasoning effort for the `responses` protocol (`none`/`low`/`medium`/`high`/`xhigh`/`max`); sent only when `VISION_API_PROTOCOL=responses` |
+| `VISION_API_PROTOCOL` | No | Python client/proxy protocol: `chat_completions` (default) or `responses` |
+| `VISION_REASONING_EFFORT` | No | Optional provider-supported reasoning effort for the Python client/proxy when using `responses` |
+| `VISION_USER_AGENT` | No | Outbound User-Agent for the Python client/proxy; defaults to a browser-compatible value and can be overridden for provider requirements |
+
+</details>
+
+<details>
+<summary><b>Upstream egress</b></summary>
+
+The proxy reaches your model host directly (TCP + TLS) by default and never reads the Windows system proxy, so a local proxy such as Clash going down cannot take the whole chain with it. An explicit proxy is optional:
+
+- `--upstream-proxy http://127.0.0.1:7890` (or env `VISION_UPSTREAM_PROXY`) routes upstream through that proxy via a CONNECT tunnel.
+- `--proxy-first` (or env `VISION_PROXY_FIRST=1`) tries the explicit proxy before direct; the default order is direct first.
+
+The route whose connection (TCP/TLS handshake) succeeds is kept in memory and reused; only connection-establishment failures (refused / DNS / TLS / a 5s socket timeout) switch routes, and HTTP status errors from the model pass through unchanged. If every route fails, the proxy returns 502 listing each route and reason. An HTTP proxy URL without an explicit port uses the standard port 80; proxy authentication is not supported.
 
 </details>
 
 ## Prerequisites
 
 - A coding agent already working with a model, including a text-only model such as DeepSeek V4
-- An OpenAI-compatible vision API that supports `/chat/completions` and `image_url` (or `/responses` with `input_image`, via `VISION_API_PROTOCOL=responses`)
+- An OpenAI-compatible vision API that supports `/chat/completions` and `image_url`; the Python client/proxy can also use `/responses` with `input_image` via `VISION_API_PROTOCOL=responses`
 - No other configuration is required
 
 ## FAQ
@@ -348,6 +368,15 @@ Codex (carrying the original Authorization)
 ```
 
 So don't modify Codex's existing auth config, and don't store the upstream API key again in the proxy env. The proxy env only needs `VISION_API_KEY`, `VISION_BASE_URL`, and `VISION_MODEL`.
+
+</details>
+
+<details>
+<summary><b>Will adding another multimodal model significantly increase costs?</b></summary>
+
+No. Each time the primary model needs to inspect an image, the vision tool sends only the necessary intent and the image to the multimodal model's context. A truncation mechanism is also in place, so there are no overly long or accumulating contexts, keeping costs low.
+
+To reduce costs further, you can use a locally deployed small multimodal side model to provide vision capabilities. Recommended options include Gemma 4 and the Qwen 3.5/3.6 series.
 
 </details>
 

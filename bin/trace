@@ -34,6 +34,12 @@ def truncate_decimals(svg, places=2):
     return re.sub(r"-?\d+\.\d{3,}", lambda m: f"{float(m.group()):.{places}f}", svg)
 
 
+def write_svg(path, svg):
+    """Write the exact UTF-8 payload whose byte count is reported to callers."""
+    payload = svg.encode("utf-8")
+    return Path(path).expanduser().write_bytes(payload)
+
+
 def prepare_input(path, region, scale):
     """Crop/upscale with Pillow when asked; return the path vtracer reads and the scale used.
 
@@ -113,8 +119,8 @@ def main():
               "--color is a last resort: on an anti-aliased image it splits every gray "
               "level into its own path.", file=sys.stderr)
     if args.output:
-        Path(args.output).expanduser().write_text(svg)
-        print(f"wrote {args.output} ({len(svg)} bytes, {paths} paths, traced at {scale}x)")
+        bytes_written = write_svg(args.output, svg)
+        print(f"wrote {args.output} ({bytes_written} bytes, {paths} paths, traced at {scale}x)")
     else:
         print(svg)
 

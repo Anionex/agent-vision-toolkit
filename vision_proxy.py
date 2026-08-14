@@ -6,22 +6,37 @@ from __future__ import annotations
 import argparse
 import asyncio
 from http import HTTPStatus
+import http.client
 import hashlib
 import json
 import os
 import re
 import signal
-import urllib.error
-import urllib.request
+import socket
+import ssl
+import time
+import urllib.parse
 
 from vision_client import VisionError, describe_image, load_env_file, validate_vision_config
 
 HOP_HEADERS = {"connection", "content-length", "host", "proxy-connection", "te", "trailer", "transfer-encoding", "upgrade"}
 CODEX_HEADERS = {"originator", "session-id", "thread-id", "user-agent"}
 
+# Upstream egress: connection establishment is bounded and fast (5s per
+# candidate) so a dead route can fail over quickly; once a connection exists,
+# streaming keeps the long read timeout the proxy always had (600s).
+EGRESS_CONNECT_TIMEOUT = 5.0
+EGRESS_READ_TIMEOUT = 600.0
+
 
 def _header_value(headers, name):
     return next((value for key, value in headers if key.lower() == name.lower()), None)
+
+
+def _authority(host, port):
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"{host}:{port}"
 
 
 _DESC_CACHE = {}
@@ -88,6 +103,14 @@ _ANTHROPIC_CHANNEL_NOTE = (
     "stated reason for looking. Whenever a description misses what you need, say "
     "what you are looking for and read the image file again: the next description "
     "is written to answer that."
+)
+
+_OPENAI_CHAT_CHANNEL_NOTE = (
+    "[vision proxy] Images reach you as text here: a vision model reads each image "
+    "and writes a description — you never receive visual tokens. Each description "
+    "is written to answer the text sent with that image. Whenever a description "
+    "misses what you need, state the missing detail and submit the image again with "
+    "that specific question so the next description can focus on it."
 )
 
 
@@ -374,7 +397,7 @@ def _detect_format(parsed):
 _FORMATS = {
     "responses": (_collect_responses_jobs, lambda text: {"type": "input_text", "text": text}, _CHANNEL_NOTE),
     "anthropic": (_collect_anthropic_jobs, lambda text: {"type": "text", "text": text}, _ANTHROPIC_CHANNEL_NOTE),
-    "openai_chat": (_collect_openai_chat_jobs, lambda text: {"type": "text", "text": text}, _CHANNEL_NOTE),
+    "openai_chat": (_collect_openai_chat_jobs, lambda text: {"type": "text", "text": text}, _OPENAI_CHAT_CHANNEL_NOTE),
 }
 
 
@@ -809,13 +832,76 @@ def _rewrite_sse_body(body):
     return bytes(out)
 
 
+class EgressError(Exception):
+    """One egress route failed to establish a connection (triggers failover)."""
+
+
+class EgressFailure(RuntimeError):
+    """Every egress route failed; the message carries per-route reasons."""
+
+
+class _EgressRoute:
+    """One upstream egress candidate: direct, or via an explicit CONNECT proxy."""
+
+    def __init__(self, kind, proxy_url=None):
+        self.kind = kind
+        self.proxy_url = proxy_url
+        self.label = "direct"
+        self.proxy_host = None
+        self.proxy_port = None
+        if proxy_url:
+            try:
+                parsed = urllib.parse.urlsplit(proxy_url)
+            except ValueError as exc:
+                raise ValueError("invalid upstream proxy URL: use http://host:port") from exc
+            if parsed.username or parsed.password:
+                raise ValueError("upstream proxy authentication is not supported")
+            try:
+                hostname = parsed.hostname
+                port = parsed.port
+            except ValueError as exc:
+                raise ValueError("invalid upstream proxy URL: use http://host:port") from exc
+            if (parsed.scheme != "http" or not hostname or
+                    parsed.path not in ("", "/") or parsed.query or parsed.fragment):
+                raise ValueError("unsupported upstream proxy URL: use http://host:port")
+            self.proxy_host = hostname
+            self.proxy_port = port or 80
+            self.label = f"proxy http://{_authority(self.proxy_host, self.proxy_port)}"
+
+    def __repr__(self):
+        return f"<EgressRoute {self.label}>"
+
+
 class Proxy:
+    """Local relay from the coding agent to the upstream model host.
+
+    Upstream egress is explicit: direct TCP+TLS by default, or through an
+    optional --upstream-proxy CONNECT tunnel. The Windows system proxy is never
+    consulted, so a dead local proxy (Clash) cannot take the whole chain down.
+    """
+
     def __init__(self, port, upstream, log_path, codex_header_compat=False,
-                 inject_reasoning_summary=False):
+                 inject_reasoning_summary=False, upstream_proxy=None,
+                 proxy_first=False):
         self.port = port
         self.upstream = upstream.rstrip("/")
         self.codex_header_compat = codex_header_compat
         self.inject_reasoning_summary = inject_reasoning_summary
+        self.proxy_first = proxy_first
+        self._sticky_route = None  # in-memory only; resets on process restart
+        parsed = urllib.parse.urlsplit(self.upstream)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            raise ValueError(f"invalid upstream URL: {self.upstream!r}")
+        self._upstream_host = parsed.hostname
+        self._upstream_port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        self._upstream_path = parsed.path.rstrip("/")
+        self._upstream_tls = parsed.scheme == "https"
+        self._tls_context = ssl.create_default_context()
+        self._routes = [_EgressRoute("direct")]
+        if upstream_proxy:
+            self._routes.append(_EgressRoute("proxy", upstream_proxy))
+        if proxy_first and len(self._routes) > 1:
+            self._routes.reverse()
         os.environ["VISION_LOG_FILE"] = log_path
 
     def _upstream_headers(self, incoming):
@@ -874,6 +960,10 @@ class Proxy:
             await self._send_response(writer, response)
         except VisionError as exc:
             await self._send_error(writer, 502, str(exc))
+        except EgressFailure as exc:
+            _log(f"[vision-proxy] all egress routes failed: {exc}")
+            if not response_started:
+                await self._send_error(writer, 502, str(exc))
         except (ConnectionResetError, BrokenPipeError):
             pass
         except Exception as exc:
@@ -890,20 +980,126 @@ class Proxy:
                 pass
 
     async def _open_upstream(self, method, path, body, headers):
-        request = urllib.request.Request(self.upstream + path, data=body or None, method=method)
-        for key, value in headers:
-            request.add_header(key, value)
-
-        def open_request():
+        """Open the upstream over the sticky route; fail over only on
+        connection-establishment failure. HTTP status errors pass through."""
+        failures = []
+        for route in self._egress_candidates():
             try:
-                return urllib.request.urlopen(request, timeout=600)
-            except urllib.error.HTTPError as exc:
-                return exc
+                response = await asyncio.to_thread(
+                    self._open_route, method, path, body, headers, route)
+                _log(f"[vision-proxy] egress route OK: {route.label}")
+                return response
+            except EgressError as exc:
+                failures.append(f"{route.label} -> {exc}")
+                _log(f"[vision-proxy] egress route failed: {route.label} -> {exc}")
+        raise EgressFailure("All egress routes failed: " + "; ".join(failures))
 
+    def _egress_candidates(self):
+        """Ordered routes for one request: sticky route first, then the rest."""
+        routes = list(self._routes)
+        sticky = self._sticky_route
+        if sticky is not None:
+            ordered = [route for route in routes if route.label == sticky.label]
+            if ordered:
+                routes = ordered + [route for route in routes if route.label != sticky.label]
+        return routes
+
+    def _open_route(self, method, path, body, headers, route):
+        """Establish one route, commit it as sticky, then run the HTTP exchange.
+
+        Runs in a worker thread. The http.client response object exposes
+        status/headers/read/read1/close, exactly what _send_response needs.
+        """
+        sock = self._connect_route(route)
+        self._sticky_route = route  # TCP/TLS handshake succeeded
+        conn = http.client.HTTPConnection(
+            self._upstream_host, self._upstream_port, timeout=EGRESS_READ_TIMEOUT)
+        conn.sock = sock
         try:
-            return await asyncio.to_thread(open_request)
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"Upstream network error: {exc.reason}") from exc
+            conn.request(method, self._upstream_path + path,
+                         body=body or None, headers=dict(headers))
+            return conn.getresponse()
+        except Exception:
+            conn.close()
+            raise
+
+    def _connect_route(self, route):
+        deadline = time.monotonic() + EGRESS_CONNECT_TIMEOUT
+        if route.kind == "direct":
+            return self._connect_direct(deadline)
+        return self._connect_via_proxy(route, deadline)
+
+    def _connect_direct(self, deadline):
+        sock = self._tcp_connect((self._upstream_host, self._upstream_port), deadline)
+        try:
+            return self._maybe_tls(sock, deadline)
+        except Exception:
+            sock.close()
+            raise
+
+    def _connect_via_proxy(self, route, deadline):
+        sock = self._tcp_connect((route.proxy_host, route.proxy_port), deadline)
+        try:
+            self._send_connect(sock, self._upstream_host, self._upstream_port, deadline)
+            return self._maybe_tls(sock, deadline)
+        except Exception:
+            sock.close()
+            raise
+
+    def _tcp_connect(self, address, deadline):
+        try:
+            return socket.create_connection(address, timeout=self._remaining(deadline))
+        except TimeoutError as exc:
+            raise EgressError(f"timed out after {EGRESS_CONNECT_TIMEOUT:g}s") from exc
+        except OSError as exc:
+            raise EgressError(str(exc)) from exc
+
+    @staticmethod
+    def _remaining(deadline):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise EgressError(f"timed out after {EGRESS_CONNECT_TIMEOUT:g}s")
+        return remaining
+
+    def _maybe_tls(self, sock, deadline):
+        if not self._upstream_tls:
+            sock.settimeout(EGRESS_READ_TIMEOUT)
+            return sock
+        try:
+            sock.settimeout(self._remaining(deadline))
+            tls = self._tls_context.wrap_socket(sock, server_hostname=self._upstream_host)
+        except TimeoutError as exc:
+            raise EgressError(f"timed out after {EGRESS_CONNECT_TIMEOUT:g}s") from exc
+        except OSError as exc:
+            raise EgressError(str(exc)) from exc
+        tls.settimeout(EGRESS_READ_TIMEOUT)
+        return tls
+
+    @staticmethod
+    def _send_connect(sock, host, port, deadline):
+        """CONNECT tunnel handshake through an explicit HTTP proxy."""
+        authority = _authority(host, port)
+        try:
+            sock.settimeout(Proxy._remaining(deadline))
+            sock.sendall(f"CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\n\r\n".encode())
+            data = b""
+            while b"\r\n\r\n" not in data and len(data) < 64 * 1024:
+                sock.settimeout(Proxy._remaining(deadline))
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+                data += chunk
+        except TimeoutError as exc:
+            raise EgressError(f"timed out after {EGRESS_CONNECT_TIMEOUT:g}s") from exc
+        except OSError as exc:
+            raise EgressError(str(exc)) from exc
+        head = data.split(b"\r\n", 1)[0] if data else b""
+        try:
+            status = int(head.split(b" ", 2)[1])
+        except (IndexError, ValueError):
+            raise EgressError("proxy CONNECT returned an invalid response") from None
+        if not 200 <= status < 300:
+            raise EgressError(f"proxy CONNECT failed with HTTP {status}")
 
     async def _send_response(self, writer, response):
         status = getattr(response, "status", None) or getattr(response, "code", 502)
@@ -1010,7 +1206,8 @@ class Proxy:
 
     async def serve(self):
         server = await asyncio.start_server(self.handle, "127.0.0.1", self.port)
-        _log(f"[vision-proxy] listening on 127.0.0.1:{self.port} -> {self.upstream}")
+        egress = " -> ".join(route.label for route in self._routes)
+        _log(f"[vision-proxy] listening on 127.0.0.1:{self.port} -> {self.upstream} (egress: {egress})")
         async with server:
             await server.serve_forever()
 
@@ -1024,15 +1221,30 @@ async def main():
     parser.add_argument("--codex-header-compat", action="store_true")
     parser.add_argument("--inject-reasoning-summary", action="store_true")
     parser.add_argument("--skip-vision-config-check", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--upstream-proxy", default=None,
+                        help="explicit HTTP proxy for upstream egress, e.g. "
+                             "http://127.0.0.1:7890 (env VISION_UPSTREAM_PROXY "
+                             "is the fallback; the system proxy is never used)")
+    parser.add_argument("--proxy-first", action="store_true",
+                        help="try the explicit proxy before direct (env "
+                             "VISION_PROXY_FIRST=1 is the fallback)")
     args = parser.parse_args()
     load_env_file(args.env_file)
+    upstream_proxy = args.upstream_proxy or os.environ.get("VISION_UPSTREAM_PROXY") or None
+    proxy_first = args.proxy_first or os.environ.get("VISION_PROXY_FIRST", "").lower() in ("1", "true", "yes", "on")
+    if upstream_proxy:
+        try:
+            _EgressRoute("proxy", upstream_proxy)
+        except ValueError as exc:
+            parser.error(str(exc))
     if not args.skip_vision_config_check:
         try:
             validate_vision_config()
         except VisionError as exc:
             parser.error(str(exc))
     proxy = Proxy(args.port, args.upstream, args.log, args.codex_header_compat,
-                  args.inject_reasoning_summary)
+                  args.inject_reasoning_summary, upstream_proxy=upstream_proxy,
+                  proxy_first=proxy_first)
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):

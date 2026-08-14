@@ -15,7 +15,8 @@ description: >-
 
 Five local CLIs that give a text-only agent eyes. They read one shared
 vision config (`VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL` /
-`LANG`) — no extra credentials.
+`LANG`), plus the optional Python-client settings `VISION_API_PROTOCOL`,
+`VISION_REASONING_EFFORT`, and `VISION_USER_AGENT` — no extra credentials.
 
 Pick the tool by the question you are answering:
 

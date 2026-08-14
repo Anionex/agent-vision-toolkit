@@ -15,6 +15,11 @@ import urllib.error
 import urllib.request
 
 DEFAULT_PROMPT = "Please describe the contents of this image in detail."
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/126.0.0.0 Safari/537.36"
+)
 
 LANG_INSTRUCTIONS = {
     "zh": "请使用简体中文回答。",
@@ -107,6 +112,13 @@ def _responses_text(response: object) -> str:
     ).strip()
 
 
+def _redact(text: str, *secrets: str) -> str:
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, "<redacted>")
+    return text
+
+
 def describe_image(image_url: str | list[str], prompt: str | None = None, max_tokens: int = 4096,
                    apply_lang: bool = True) -> str:
     """Describe one data/http image URL (str) or several (list) in a single call."""
@@ -119,16 +131,18 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
             raise VisionError("Only data URLs or http(s) image URLs are supported")
     base_url = _required("VISION_BASE_URL").rstrip("/")
     api_key = _required("VISION_API_KEY")
+    user_agent = os.environ.get("VISION_USER_AGENT", "").strip() or DEFAULT_USER_AGENT
     text = prompt or DEFAULT_PROMPT
     if apply_lang:
         instruction = LANG_INSTRUCTIONS.get(os.environ.get("LANG", "").strip().lower())
         if instruction:
             text = f"{instruction}\n\n{text}"
     model = _required("VISION_MODEL")
-    protocol = os.environ.get("VISION_API_PROTOCOL", "chat_completions").strip().lower()
+    protocol = os.environ.get("VISION_API_PROTOCOL", "").strip().lower() or "chat_completions"
     if protocol == "responses":
         payload = {
             "model": model,
+            "store": False,
             "input": [{"role": "user", "content": [
                 {"type": "input_image", "image_url": url} for url in urls
             ] + [{"type": "input_text", "text": text}]}],
@@ -161,7 +175,7 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
         headers={
             "Content-Type": "application/json",
             "Authorization": "Bearer " + api_key,
-            "User-Agent": "agent-vision-toolkit/0.1",
+            "User-Agent": user_agent,
         },
     )
     retries = 2
@@ -178,7 +192,7 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
                 raise VisionError("Vision API returned an empty description")
             return text
         except urllib.error.HTTPError as exc:
-            body = exc.read().decode(errors="replace")[:400].replace(api_key, "<redacted>")
+            body = _redact(exc.read().decode(errors="replace")[:400], api_key)
             body = body.replace("\r", " ").replace("\n", " ")
             if exc.code in {429, 500, 502, 503, 504} and attempt < retries:
                 print(f"vision: HTTP {exc.code}, retrying ({attempt + 1}/{retries})", file=sys.stderr)
@@ -190,7 +204,7 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
                 print(f"vision: {type(exc).__name__}, retrying ({attempt + 1}/{retries})", file=sys.stderr)
                 time.sleep(min(2 ** attempt, 4))
                 continue
-            reason = getattr(exc, "reason", str(exc))
+            reason = _redact(str(getattr(exc, "reason", str(exc))), api_key)
             raise VisionError(f"Vision API network error: {reason}") from exc
         except json.JSONDecodeError as exc:
             raise VisionError("Vision API returned invalid JSON") from exc

@@ -37,6 +37,18 @@ def main():
     assert "7.891011" not in truncated and "7.89" in truncated
     print("PASS: background stripping and decimal truncation")
 
+    with tempfile.TemporaryDirectory() as raw:
+        out = os.path.join(raw, "multiline.svg")
+        multiline = "<svg>\n<title>几何</title>\n<path/>\n</svg>\n"
+        reported = mod.write_svg(out, multiline)
+        payload = multiline.encode("utf-8")
+        with open(out, "rb") as handle:
+            written = handle.read()
+        assert written == payload, "SVG output must preserve LF bytes on every platform"
+        assert reported == len(written), "reported bytes must equal the file size on disk"
+        assert reported > len(multiline), "the byte contract must not use Unicode character count"
+        print("PASS: multiline SVG output preserves exact UTF-8 bytes")
+
     try:
         import vtracer  # noqa: F401
         from PIL import Image

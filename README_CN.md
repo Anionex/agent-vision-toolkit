@@ -32,9 +32,16 @@
 
 > 如果项目对你有用或为你带来了一些启发，欢迎 star🌟 & fork。
 
+## 最新动态
+
+**2026-08-13——现已支持 DeepSeek Harness 原生接入。** 新增链接子包 [`dsh-vision-toolkit`](dsh-vision-toolkit)，可将本工具箱作为原生 Profile Bundle 接入 DSH Web 与 Headless Profile。它提供 10 个结构化视觉工具，覆盖带意图的图片问答、目标定位、元素检测、图形描摹、裁图、像素差异对比、长截图 OCR、前景提取、主色分析和 HTML 截图，并补齐 DSH Credentials、托管隔离运行时、可预览 Artifacts、Web Settings 与 Agent 级渐进工具暴露。
+
+该子包以 Git submodule 形式链接在本仓库中，并在 [`Anionex/dsh-vision-toolkit`](https://github.com/Anionex/dsh-vision-toolkit) 独立维护。克隆本仓库时可使用 `--recurse-submodules`，已有 checkout 可运行 `git submodule update --init --recursive`。
+
 <details>
 <summary><b>目录</b></summary>
 
+- [最新动态](#最新动态)
 - [亮点](#亮点)
 - [用例技能](#用例技能)
 - [实际效果](#实际效果)
@@ -144,7 +151,7 @@ VISION_BASE_URL=https://openrouter.ai/api/v1
 VISION_MODEL=google/gemini-3.6-flash
 ```
 
-任何支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 端点都可以（如阿里云百炼：`https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`）。需要英文描述时加 `LANG=en`（默认中文）。
+任何支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 端点都可以（如阿里云百炼：`https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`）。Python 客户端/代理也可设置 `VISION_API_PROTOCOL=responses` 使用 `/responses` + `input_image`。需要英文描述时加 `LANG=en`（默认中文）。
 
 **2. 把 CLI 放进 PATH：**
 
@@ -312,7 +319,7 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 <details>
 <summary><b>环境变量</b></summary>
 
-工具箱与代理都只需要这些环境变量，必填的只有3个：
+独立 CLI 和 Python 代理使用这些环境变量，必填的只有 3 个。Pi 与 OpenCode 原生扩展使用各自设置，目前仅调用 `/chat/completions`。
 
 | 变量 | 必需 | 说明 |
 |---|---:|---|
@@ -320,15 +327,28 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 | `VISION_BASE_URL` | 是 | OpenAI-compatible API 地址 |
 | `VISION_MODEL` | 是 | 多模态模型名 |
 | `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
-| `VISION_API_PROTOCOL` | 否 | 视觉 API 协议：`chat_completions`（默认）或 `responses` |
-| `VISION_REASONING_EFFORT` | 否 | `responses` 协议下的推理强度（`none`/`low`/`medium`/`high`/`xhigh`/`max`）；仅 `VISION_API_PROTOCOL=responses` 时发送 |
+| `VISION_API_PROTOCOL` | 否 | Python 客户端/代理的视觉 API 协议：`chat_completions`（默认）或 `responses` |
+| `VISION_REASONING_EFFORT` | 否 | Python 客户端/代理使用 `responses` 时可选的服务商支持推理强度 |
+| `VISION_USER_AGENT` | 否 | Python 客户端/代理的出站 User-Agent；默认使用浏览器兼容值，也可按服务商要求覆盖 |
+
+</details>
+
+<details>
+<summary><b>上游出口</b></summary>
+
+代理默认**直连**（TCP + TLS）你的模型上游，不再读取 Windows 系统代理，因此本地代理（如 Clash）宕机不会拖垮整条链路。显式代理为可选项：
+
+- `--upstream-proxy http://127.0.0.1:7890`（或环境变量 `VISION_UPSTREAM_PROXY`）：通过该代理的 CONNECT 隧道访问上游。
+- `--proxy-first`（或环境变量 `VISION_PROXY_FIRST=1`）：先试显式代理再走直连；默认顺序为先直连。
+
+建连成功（TCP/TLS 握手完成）的路由记入内存并复用；只有连接建立阶段失败（拒绝 / DNS / TLS / 5 秒 socket 超时）才切换路由，上游返回的 HTTP 状态错误原样透传。所有路由都失败时返回 502，逐条列出路由与失败原因。HTTP 代理 URL 未写端口时使用标准端口 80；暂不支持代理鉴权。
 
 </details>
 
 ## 前置条件
 
 - 已接入(纯文本)模型（如 DeepSeek V4）并可正常使用的 coding agent
-- 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API（也可通过 `VISION_API_PROTOCOL=responses` 使用 `/responses` + `input_image`）
+- 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API；Python 客户端/代理也可通过 `VISION_API_PROTOCOL=responses` 使用 `/responses` + `input_image`
 - 没有其他需要的配置
 
 ## 常见问题
@@ -345,6 +365,13 @@ Codex（携带原有 Authorization）
 ```
 
 因此不要修改 Codex 原有的认证配置，也不要在代理 env 中重复保存上游的 API key。代理 env 只需配置 `VISION_API_KEY`、`VISION_BASE_URL` 和 `VISION_MODEL`。
+
+</details>
+
+<details>
+<summary><b>要再加入一个多模态模型，费用会增加很多吗</b></summary>
+不会。主模型每次看图，调用看图工具的时候，只会将所需的意图和图片传递到多模态模型的上下文中，并配置了截断机制，因此不存在超长上下文或上下文积累的问题，成本较低。
+如果想进一步压缩成本，可以使用本地部署的侧端多模态小模型来接入视觉能力。推荐的包括gemma4和qwen3.5/qwen3.6系列。
 
 </details>
 

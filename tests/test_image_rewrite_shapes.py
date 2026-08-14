@@ -72,7 +72,9 @@ def test_openai_chat_images_are_rewritten():
     assert asyncio.run(mod._rewrite_image_inputs(body))
     content = body["messages"][0]["content"]
     texts = [block["text"] for block in content if block.get("type") == "text"]
-    assert any(text.startswith("[vision proxy]") for text in texts), content
+    note = next(text for text in texts if text.startswith("[vision proxy]"))
+    assert "view_image" not in note, note
+    assert "submit the image again" in note, note
     assert any("TEST-DESC" in text for text in texts), content
     print("PASS: OpenAI Chat Completions image_url rewritten")
 

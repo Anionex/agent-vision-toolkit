@@ -2,6 +2,17 @@
 
 All notable user-facing changes to agent-vision-toolkit are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Let the shared Python vision client call either Chat Completions or Responses APIs, including optional reasoning effort and explicit `store: false` data handling.
+- Rewrite OpenAI Chat Completions `image_url` blocks through the existing vision-description pipeline with a host-neutral channel note.
+
+### Fixed
+
+- Send a browser-compatible, configurable User-Agent from the shared Python vision client so Cloudflare-backed OpenAI-compatible endpoints do not reject the default `Python-urllib` signature.
+
 ## [0.1.0] - 2026-08-07
 
 ### Added

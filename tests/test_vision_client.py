@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import urllib.error
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -67,14 +68,30 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     environment = dict(os.environ, VISION_API_KEY="test-key",
                        VISION_BASE_URL=f"http://127.0.0.1:{server.server_port}/v1",
-                       VISION_MODEL="fixture-model",
-                       VISION_API_PROTOCOL="chat_completions")
+                       VISION_MODEL="fixture-model")
+    environment.pop("VISION_API_PROTOCOL", None)
+    environment.pop("VISION_REASONING_EFFORT", None)
+    environment.pop("VISION_USER_AGENT", None)
     saved = dict(os.environ)
+    os.environ.pop("VISION_API_PROTOCOL", None)
+    os.environ.pop("VISION_REASONING_EFFORT", None)
+    os.environ.pop("VISION_USER_AGENT", None)
     os.environ.update(environment)
     try:
         Handler.calls, Handler.statuses, Handler.bodies = 0, [429, 200], []
         assert vision_client.describe_image("data:image/png;base64,AAAA") == "fixture answer"
         assert Handler.calls == 2
+        assert Handler.last_headers.get("User-Agent") == vision_client.DEFAULT_USER_AGENT
+        assert not Handler.last_headers["User-Agent"].startswith("Python-urllib/")
+
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
+        os.environ["VISION_USER_AGENT"] = "custom-vision-client/2.0"
+        try:
+            assert vision_client.describe_image("data:image/png;base64,AAAA") == "fixture answer"
+        finally:
+            os.environ.pop("VISION_USER_AGENT", None)
+        assert Handler.last_headers.get("User-Agent") == "custom-vision-client/2.0"
+        assert Handler.calls == 1
 
         Handler.calls, Handler.statuses, Handler.bodies = 0, [401], []
         try:
@@ -86,7 +103,7 @@ def main():
         assert Handler.calls == 1, "401 must not be retried"
 
         Handler.calls, Handler.statuses, Handler.bodies = (
-            0, [400], [b'{"error":"test-key must not leak"}']
+            0, [403], [b'{"error":"Cloudflare 1010 rejected test-key"}']
         )
         try:
             vision_client.describe_image("data:image/png;base64,AAAA")
@@ -95,7 +112,27 @@ def main():
             assert "<redacted>" in str(exc)
         else:
             raise AssertionError("HTTP errors must fail cleanly")
-        assert Handler.calls == 1, "400 must not be retried"
+        assert Handler.calls == 1, "403 must not be retried"
+
+        original_urlopen = vision_client.urllib.request.urlopen
+        original_sleep = vision_client.time.sleep
+
+        def fail_with_secret(*_args, **_kwargs):
+            raise urllib.error.URLError("connection failed for test-key")
+
+        vision_client.urllib.request.urlopen = fail_with_secret
+        vision_client.time.sleep = lambda _seconds: None
+        try:
+            try:
+                vision_client.describe_image("data:image/png;base64,AAAA")
+            except vision_client.VisionError as exc:
+                assert "test-key" not in str(exc)
+                assert "<redacted>" in str(exc)
+            else:
+                raise AssertionError("network errors must fail with redacted details")
+        finally:
+            vision_client.urllib.request.urlopen = original_urlopen
+            vision_client.time.sleep = original_sleep
 
         Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         os.environ["LANG"] = "en"
@@ -133,8 +170,7 @@ def main():
         content = json.loads(Handler.last_body)["messages"][0]["content"]
         assert content[0].get("type") == "image_url", \
             "vision payloads must put image parts before text for OpenCode Go MiMo compatibility"
-        assert Handler.last_headers.get("User-Agent") == "agent-vision-toolkit/0.1", \
-            "vision requests need a non-default user agent for OpenCode Go image compatibility"
+        assert Handler.last_headers.get("User-Agent") == vision_client.DEFAULT_USER_AGENT
         image_parts = [part for part in content if part.get("type") == "image_url"]
         assert len(image_parts) == 2, "a list of URLs must become one request with all images"
         assert Handler.calls == 1
@@ -161,9 +197,23 @@ def main():
         payload = json.loads(Handler.last_body)
         content = payload["input"][0]["content"]
         assert [part["type"] for part in content] == ["input_image", "input_image", "input_text"]
+        assert payload["store"] is False
         assert payload["max_output_tokens"] == 123
         assert payload["reasoning"] == {"effort": "medium"}
         assert Handler.calls == 1
+
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [], []
+        os.environ["VISION_API_PROTOCOL"] = "unsupported"
+        try:
+            try:
+                vision_client.describe_image("data:image/png;base64,AAAA")
+            except vision_client.VisionError as exc:
+                assert "Unsupported VISION_API_PROTOCOL" in str(exc)
+            else:
+                raise AssertionError("an unsupported protocol must fail before making a request")
+        finally:
+            os.environ.pop("VISION_API_PROTOCOL", None)
+        assert Handler.calls == 0
 
         Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         with tempfile.TemporaryDirectory() as raw:

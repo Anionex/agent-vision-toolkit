@@ -27,7 +27,7 @@
 
 - 已接入纯文本模型并能正常对话的宿主（Codex 或 Claude Code）
 - Python 3.11+
-- 一个支持 `/chat/completions` 和 `image_url` 的 OpenAI-compatible 视觉 API
+- 一个支持 `/chat/completions` 和 `image_url` 的 OpenAI-compatible 视觉 API；Python 客户端/代理也可配置 `/responses` + `input_image`
 
 ## 1. 定位并备份现有配置
 
@@ -58,8 +58,9 @@ VISION_API_KEY=...
 VISION_BASE_URL=...
 VISION_MODEL=...
 LANG=zh  # 可选：视觉模型输出语言（zh/en），不填保持默认中文
-# VISION_API_PROTOCOL=chat_completions  # 可选：responses 协议（如 OpenCode Go 的 gpt-5.6-luna 需用 responses）
+# VISION_API_PROTOCOL=chat_completions  # 可选：Python 客户端/代理可改用 responses 协议
 # VISION_REASONING_EFFORT=medium        # 可选：responses 协议下的推理强度
+# VISION_USER_AGENT=custom-vision-client/1.0  # 可选：覆盖默认的浏览器兼容 User-Agent
 ```
 
 不要在 env 中写入上游模型的 key（如 `DEEPSEEK_API_KEY`）。上游鉴权仍由宿主发送。
@@ -241,6 +242,21 @@ wrapper 必须使用当前系统的绝对 Python 和脚本路径，并放入用�
 - `--codex-header-compat`：调整部分 Codex 身份请求头。
 - `--inject-reasoning-summary`：注入兼容的 reasoning summary；该模式可能缓冲对应响应。
 
+## 上游出口（Egress）
+
+代理默认**直连**（TCP + TLS）`--upstream` 指定的上游，不再读取 Windows 系统代理——本地代理（如 Clash）宕机不会拖垮整条链路。需要显式走代理时：
+
+- `--upstream-proxy http://127.0.0.1:7890`（或环境变量 `VISION_UPSTREAM_PROXY`）：通过该代理的 CONNECT 隧道访问上游。
+- `--proxy-first`（或环境变量 `VISION_PROXY_FIRST=1`）：先试显式代理，再走直连；默认先直连。
+
+行为约定：
+
+- 建连成功（TCP/TLS 握手完成）的路由记入内存，后续请求优先复用；进程重启后重置。
+- 只有连接建立阶段失败（拒绝 / DNS / TLS / 5 秒 socket 超时）才切换路由；上游返回的 HTTP 4xx/5xx 原样透传、不切换。
+- 所有路由都失败时返回 502，错误消息逐条列出路由与失败原因（如 `All egress routes failed: direct -> ...; proxy http://127.0.0.1:7890 -> ...`）。
+- HTTP 代理 URL 未写端口时使用标准端口 80；暂不支持代理鉴权。
+- socket 建连超时 5 秒/候选，连接建立后读取超时保持 600 秒，流式响应开始后不中途切换。
+
 ## 故障排查
 
 | 现象 | 检查 |
@@ -250,3 +266,4 @@ wrapper 必须使用当前系统的绝对 Python 和脚本路径，并放入用�
 | 端口未监听 | 检查 Python、脚本、env、上游地址、后台启动项和端口占用 |
 | 改配置后未生效 | 完全退出并重启宿主 |
 | 上游返回鉴权错误 | 确认宿主仍发送原有鉴权头，且代理没有删除或替换该请求头 |
+| 整条链路 502，提示 `All egress routes failed` | 直连与显式代理都建连失败；检查上游地址、网络连通性与 `--upstream-proxy` 配置 |

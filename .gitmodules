@@ -1,0 +1,3 @@
+[submodule "dsh-vision-toolkit"]
+	path = dsh-vision-toolkit
+	url = https://github.com/Anionex/dsh-vision-toolkit.git
