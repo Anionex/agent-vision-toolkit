@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Shared OpenAI-compatible vision client used by the proxy and glance CLI."""
+"""Shared multi-provider vision client used by the proxy and glance CLI."""
 
 from __future__ import annotations
 
 import base64
+from email.utils import parsedate_to_datetime
 import http.client
 import json
 import mimetypes
@@ -52,7 +53,10 @@ def load_env_file(path: str | os.PathLike[str] | None) -> None:
 
 def load_default_env() -> None:
     explicit = os.environ.get("VISION_ENV_FILE")
-    candidates = [Path(explicit).expanduser()] if explicit else []
+    if explicit:
+        load_env_file(Path(explicit).expanduser())
+        return
+    candidates = []
     local_appdata = os.environ.get("LOCALAPPDATA")
     if local_appdata:
         candidates.append(Path(local_appdata) / "agent-vision-toolkit" / "env")
@@ -112,11 +116,48 @@ def _responses_text(response: object) -> str:
     ).strip()
 
 
+def _anthropic_image_source(url: str) -> dict[str, str]:
+    if not url.startswith("data:"):
+        return {"type": "url", "url": url}
+    header, separator, data = url.partition(",")
+    if separator == "" or ";base64" not in header:
+        raise VisionError("Anthropic image data URLs must use base64 encoding")
+    media_type = header[5:].split(";", 1)[0]
+    if not media_type:
+        raise VisionError("Anthropic image data URLs must include a media type")
+    return {"type": "base64", "media_type": media_type, "data": data}
+
+
+def _anthropic_text(response: object) -> str:
+    if not isinstance(response, dict) or not isinstance(response.get("content"), list):
+        return ""
+    return "\n".join(
+        block["text"]
+        for block in response["content"]
+        if isinstance(block, dict) and block.get("type") == "text"
+        and isinstance(block.get("text"), str)
+    ).strip()
+
+
 def _redact(text: str, *secrets: str) -> str:
     for secret in secrets:
         if secret:
             text = text.replace(secret, "<redacted>")
     return text
+
+
+def _retry_delay(error: urllib.error.HTTPError, attempt: int) -> float:
+    value = error.headers.get("Retry-After")
+    if value:
+        try:
+            return max(0.0, min(float(value), 60.0))
+        except ValueError:
+            try:
+                retry_at = parsedate_to_datetime(value)
+                return max(0.0, min(retry_at.timestamp() - time.time(), 60.0))
+            except (TypeError, ValueError, OverflowError):
+                pass
+    return min(2 ** attempt, 4)
 
 
 def describe_image(image_url: str | list[str], prompt: str | None = None, max_tokens: int = 4096,
@@ -165,19 +206,39 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
             payload["max_tokens"] = max_tokens
         endpoint = "/chat/completions"
         extract_text = lambda data: _message_text(data["choices"][0]["message"]["content"])
+    elif protocol == "anthropic":
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens if max_tokens is not None else 4096,
+            "messages": [{"role": "user", "content": [
+                {"type": "image", "source": _anthropic_image_source(url)} for url in urls
+            ] + [{"type": "text", "text": text}]}],
+        }
+        thinking = os.environ.get("VISION_ANTHROPIC_THINKING", "").strip().lower() or "omit"
+        if thinking != "omit":
+            if thinking not in {"disabled", "adaptive"}:
+                raise VisionError(
+                    "Unsupported VISION_ANTHROPIC_THINKING; use omit, disabled, or adaptive"
+                )
+            payload["thinking"] = {"type": thinking}
+        endpoint = "/messages"
+        extract_text = _anthropic_text
     else:
         raise VisionError(
-            "Unsupported VISION_API_PROTOCOL; use chat_completions or responses"
+            "Unsupported VISION_API_PROTOCOL; use chat_completions, responses, or anthropic"
         )
-    request = urllib.request.Request(
-        base_url + endpoint,
-        data=json.dumps(payload).encode(),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + api_key,
-            "User-Agent": user_agent,
-        },
-    )
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": user_agent,
+    }
+    if protocol == "anthropic":
+        headers.update({
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        })
+    else:
+        headers["Authorization"] = "Bearer " + api_key
+    request = urllib.request.Request(base_url + endpoint, data=json.dumps(payload).encode(), headers=headers)
     retries = 2
     timeout = 180
     for attempt in range(retries + 1):
@@ -194,9 +255,9 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
         except urllib.error.HTTPError as exc:
             body = _redact(exc.read().decode(errors="replace")[:400], api_key)
             body = body.replace("\r", " ").replace("\n", " ")
-            if exc.code in {429, 500, 502, 503, 504} and attempt < retries:
+            if exc.code in {429, 500, 502, 503, 504, 529} and attempt < retries:
                 print(f"vision: HTTP {exc.code}, retrying ({attempt + 1}/{retries})", file=sys.stderr)
-                time.sleep(min(2 ** attempt, 4))
+                time.sleep(_retry_delay(exc, attempt))
                 continue
             raise VisionError(f"Vision API HTTP {exc.code}: {body}") from exc
         except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as exc:

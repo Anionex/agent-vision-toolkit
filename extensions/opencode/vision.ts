@@ -16,11 +16,12 @@
  * auto-detect vision-capable primaries; set VISION_REWRITE=off in the
  * environment to disable rewriting when running a multimodal model.
  *
- * Configuration comes from the same env chain as the agent-vision-toolkit repo
+ * Configuration comes from this extension's env chain
  * (VISION_API_KEY / VISION_BASE_URL / VISION_MODEL, optional LANG=zh|en):
  * $VISION_ENV_FILE, %LOCALAPPDATA%/agent-vision-toolkit/env,
  * ~/.config/agent-vision-toolkit/env, ./.env — later files override earlier ones
- * and the process environment, matching vision_client.py.
+ * and the process environment. Unlike the Python client, this standalone
+ * extension keeps loading later fallback files after VISION_ENV_FILE.
  *
  * A sibling implementation for Pi / Oh My Pi lives at extensions/pi/vision.ts;
  * both files deliberately duplicate the small describe core so each stays a
@@ -81,7 +82,7 @@ export interface VisionConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Env-chain configuration (ported from vision_client.load_default_env).
+// Env-chain configuration for this standalone extension.
 
 function parseEnvFile(path: string, into: Record<string, string>): void {
   let raw: string;
@@ -98,7 +99,7 @@ function parseEnvFile(path: string, into: Record<string, string>): void {
     let value = line.slice(eq + 1).trim();
     value = value.replace(/^["']/, "").replace(/["']$/, "");
     // The env file is the user's explicit configuration: whatever it sets
-    // wins, even over the process environment — same as vision_client.py.
+    // wins over values already collected from the process or earlier files.
     if (key) into[key] = value;
   }
 }
