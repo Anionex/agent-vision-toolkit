@@ -27,7 +27,7 @@
 
 - 已接入纯文本模型并能正常对话的宿主（Codex 或 Claude Code）
 - Python 3.11+
-- 一个支持 `/chat/completions` 和 `image_url` 的 OpenAI-compatible 视觉 API
+- 一个支持 `/chat/completions` 和 `image_url` 的 OpenAI-compatible 视觉 API；Python 客户端/代理也可配置 `/responses` + `input_image`
 
 ## 1. 定位并备份现有配置
 
@@ -58,6 +58,8 @@ VISION_API_KEY=...
 VISION_BASE_URL=...
 VISION_MODEL=...
 LANG=zh  # 可选：视觉模型输出语言（zh/en），不填保持默认中文
+# VISION_API_PROTOCOL=chat_completions  # 可选：Python 客户端/代理可改用 responses 协议
+# VISION_REASONING_EFFORT=medium        # 可选：responses 协议下的推理强度
 # VISION_USER_AGENT=custom-vision-client/1.0  # 可选：覆盖默认的浏览器兼容 User-Agent
 ```
 

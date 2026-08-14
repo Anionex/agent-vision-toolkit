@@ -22,10 +22,12 @@ class Handler(BaseHTTPRequestHandler):
     calls = 0
     last_body = b""
     last_headers = {}
+    last_path = ""
 
     def do_POST(self):
         Handler.calls += 1
         Handler.last_headers = dict(self.headers)
+        Handler.last_path = self.path
         length = int(self.headers.get("Content-Length", 0))
         Handler.last_body = self.rfile.read(length)
         status = Handler.statuses.pop(0)
@@ -67,8 +69,12 @@ def main():
     environment = dict(os.environ, VISION_API_KEY="test-key",
                        VISION_BASE_URL=f"http://127.0.0.1:{server.server_port}/v1",
                        VISION_MODEL="fixture-model")
+    environment.pop("VISION_API_PROTOCOL", None)
+    environment.pop("VISION_REASONING_EFFORT", None)
     environment.pop("VISION_USER_AGENT", None)
     saved = dict(os.environ)
+    os.environ.pop("VISION_API_PROTOCOL", None)
+    os.environ.pop("VISION_REASONING_EFFORT", None)
     os.environ.pop("VISION_USER_AGENT", None)
     os.environ.update(environment)
     try:
@@ -134,7 +140,8 @@ def main():
             vision_client.describe_image("data:image/png;base64,AAAA")
         finally:
             os.environ.pop("LANG", None)
-        text = json.loads(Handler.last_body)["messages"][0]["content"][0]["text"]
+        parts = json.loads(Handler.last_body)["messages"][0]["content"]
+        text = next(part["text"] for part in parts if part.get("type") == "text")
         assert text.startswith("Please respond in English.")
         assert Handler.calls == 1
 
@@ -144,14 +151,16 @@ def main():
             vision_client.describe_image("data:image/png;base64,AAAA")
         finally:
             os.environ.pop("LANG", None)
-        text = json.loads(Handler.last_body)["messages"][0]["content"][0]["text"]
+        parts = json.loads(Handler.last_body)["messages"][0]["content"]
+        text = next(part["text"] for part in parts if part.get("type") == "text")
         assert text.startswith("请使用简体中文回答。")
         assert Handler.calls == 1
 
         Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         os.environ.pop("LANG", None)
         vision_client.describe_image("data:image/png;base64,AAAA")
-        text = json.loads(Handler.last_body)["messages"][0]["content"][0]["text"]
+        parts = json.loads(Handler.last_body)["messages"][0]["content"]
+        text = next(part["text"] for part in parts if part.get("type") == "text")
         assert "Please respond in English." not in text
         assert "请使用简体中文回答。" not in text
         assert Handler.calls == 1
@@ -159,9 +168,52 @@ def main():
         Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         vision_client.describe_image(["data:image/png;base64,AAAA", "data:image/png;base64,BBBB"])
         content = json.loads(Handler.last_body)["messages"][0]["content"]
+        assert content[0].get("type") == "image_url", \
+            "vision payloads must put image parts before text for OpenCode Go MiMo compatibility"
+        assert Handler.last_headers.get("User-Agent") == vision_client.DEFAULT_USER_AGENT
         image_parts = [part for part in content if part.get("type") == "image_url"]
         assert len(image_parts) == 2, "a list of URLs must become one request with all images"
         assert Handler.calls == 1
+
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [200], [json.dumps({
+            "object": "response",
+            "output": [{
+                "type": "message",
+                "content": [{"type": "output_text", "text": "responses fixture answer"}],
+            }],
+        }).encode()]
+        os.environ["VISION_API_PROTOCOL"] = "responses"
+        os.environ["VISION_REASONING_EFFORT"] = "medium"
+        try:
+            assert vision_client.describe_image(
+                ["data:image/png;base64,AAAA", "data:image/png;base64,BBBB"],
+                prompt="read both images",
+                max_tokens=123,
+            ) == "responses fixture answer"
+        finally:
+            os.environ.pop("VISION_API_PROTOCOL", None)
+            os.environ.pop("VISION_REASONING_EFFORT", None)
+        assert Handler.last_path == "/v1/responses"
+        payload = json.loads(Handler.last_body)
+        content = payload["input"][0]["content"]
+        assert [part["type"] for part in content] == ["input_image", "input_image", "input_text"]
+        assert payload["store"] is False
+        assert payload["max_output_tokens"] == 123
+        assert payload["reasoning"] == {"effort": "medium"}
+        assert Handler.calls == 1
+
+        Handler.calls, Handler.statuses, Handler.bodies = 0, [], []
+        os.environ["VISION_API_PROTOCOL"] = "unsupported"
+        try:
+            try:
+                vision_client.describe_image("data:image/png;base64,AAAA")
+            except vision_client.VisionError as exc:
+                assert "Unsupported VISION_API_PROTOCOL" in str(exc)
+            else:
+                raise AssertionError("an unsupported protocol must fail before making a request")
+        finally:
+            os.environ.pop("VISION_API_PROTOCOL", None)
+        assert Handler.calls == 0
 
         Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         with tempfile.TemporaryDirectory() as raw:
@@ -174,6 +226,7 @@ def main():
                 "VISION_API_KEY=test-key\n"
                 f"VISION_BASE_URL=http://127.0.0.1:{server.server_port}/v1\n"
                 "VISION_MODEL=fixture-model\n"
+                "VISION_API_PROTOCOL=chat_completions\n"
             )
             isolated_env = dict(environment, HOME=raw)
             glance = Path(__file__).resolve().parent.parent / "bin/glance"

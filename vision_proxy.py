@@ -105,6 +105,14 @@ _ANTHROPIC_CHANNEL_NOTE = (
     "is written to answer that."
 )
 
+_OPENAI_CHAT_CHANNEL_NOTE = (
+    "[vision proxy] Images reach you as text here: a vision model reads each image "
+    "and writes a description — you never receive visual tokens. Each description "
+    "is written to answer the text sent with that image. Whenever a description "
+    "misses what you need, state the missing detail and submit the image again with "
+    "that specific question so the next description can focus on it."
+)
+
 
 # Codex-injected user-role blocks that are never "the user's current request".
 _INJECTED_PREFIXES = ("<environment_context>", "<user_instructions>", "# AGENTS.md instructions")
@@ -326,6 +334,38 @@ def _collect_anthropic_jobs(parsed):
     return jobs
 
 
+def _openai_image_url(block):
+    """Return an OpenAI Chat Completions image URL from a content block."""
+    value = block.get("image_url")
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict) and isinstance(value.get("url"), str):
+        return value["url"]
+    return None
+
+
+def _collect_openai_chat_jobs(parsed):
+    """OpenAI Chat Completions API: messages[].content[] image_url blocks."""
+    jobs = []
+    for message in parsed["messages"]:
+        if not isinstance(message, dict) or message.get("role") != "user":
+            continue
+        content = message.get("content")
+        if not isinstance(content, list):
+            continue
+        text = "\n".join(
+            block["text"] for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+            and isinstance(block.get("text"), str)
+        )
+        for index, block in enumerate(content):
+            if isinstance(block, dict) and block.get("type") == "image_url":
+                url = _openai_image_url(block)
+                if url:
+                    jobs.append((content, index, url, _vision_prompt(text, "user")))
+    return jobs
+
+
 def _detect_format(parsed):
     if isinstance(parsed.get("input"), list):
         return "responses"
@@ -342,6 +382,8 @@ def _detect_format(parsed):
             if not isinstance(block, dict):
                 continue
             kind = block.get("type")
+            if kind == "image_url":
+                return "openai_chat"
             if kind == "image":
                 return "anthropic"
             if kind == "tool_result":
@@ -355,6 +397,7 @@ def _detect_format(parsed):
 _FORMATS = {
     "responses": (_collect_responses_jobs, lambda text: {"type": "input_text", "text": text}, _CHANNEL_NOTE),
     "anthropic": (_collect_anthropic_jobs, lambda text: {"type": "text", "text": text}, _ANTHROPIC_CHANNEL_NOTE),
+    "openai_chat": (_collect_openai_chat_jobs, lambda text: {"type": "text", "text": text}, _OPENAI_CHAT_CHANNEL_NOTE),
 }
 
 

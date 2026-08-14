@@ -152,7 +152,7 @@ VISION_BASE_URL=https://openrouter.ai/api/v1
 VISION_MODEL=google/gemini-3.6-flash
 ```
 
-任何支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 端点都可以（如阿里云百炼：`https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`）。需要英文描述时加 `LANG=en`（默认中文）。
+任何支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 端点都可以（如阿里云百炼：`https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen-vl-max-latest`）。Python 客户端/代理也可设置 `VISION_API_PROTOCOL=responses` 使用 `/responses` + `input_image`。需要英文描述时加 `LANG=en`（默认中文）。
 
 **2. 把 CLI 放进 PATH：**
 
@@ -320,7 +320,7 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 <details>
 <summary><b>环境变量</b></summary>
 
-工具箱与代理都只需要这些环境变量，必填的只有3个：
+独立 CLI 和 Python 代理使用这些环境变量，必填的只有 3 个。Pi 与 OpenCode 原生扩展使用各自设置，目前仅调用 `/chat/completions`。
 
 | 变量 | 必需 | 说明 |
 |---|---:|---|
@@ -328,6 +328,8 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 | `VISION_BASE_URL` | 是 | OpenAI-compatible API 地址 |
 | `VISION_MODEL` | 是 | 多模态模型名 |
 | `LANG` | 否 | 视觉模型输出语言：`zh`=中文，`en`=English（默认 `zh`） |
+| `VISION_API_PROTOCOL` | 否 | Python 客户端/代理的视觉 API 协议：`chat_completions`（默认）或 `responses` |
+| `VISION_REASONING_EFFORT` | 否 | Python 客户端/代理使用 `responses` 时可选的服务商支持推理强度 |
 | `VISION_USER_AGENT` | 否 | Python 客户端/代理的出站 User-Agent；默认使用浏览器兼容值，也可按服务商要求覆盖 |
 
 </details>
@@ -347,7 +349,7 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 ## 前置条件
 
 - 已接入(纯文本)模型（如 DeepSeek V4）并可正常使用的 coding agent
-- 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API
+- 一个支持 `/chat/completions` 与 `image_url` 的 OpenAI-compatible 视觉 API；Python 客户端/代理也可通过 `VISION_API_PROTOCOL=responses` 使用 `/responses` + `input_image`
 - 没有其他需要的配置
 
 ## 常见问题
