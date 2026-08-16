@@ -397,3 +397,11 @@ Codex（携带原有 Authorization）
 如果 agent-vision-toolkit 为你节省了时间，欢迎 Star、分享、参与贡献，[或赞助项目～](FUNDING.md)。
 
 我是 [anionex](https://anionex.me/)，一名 AI 原生开发者，曾上榜 GitHub 全球开发者趋势榜第 4 名，总 Star 数超过 16k。如果你想了解我后续的更多工作，欢迎在 [X](https://x.com/anion_ex) 或 [GitHub](https://github.com/Anionex) 关注我～
+
+## 加入交流群
+
+欢迎加入 `agent-vision-toolkit` 项目交流群，交流使用经验、反馈问题并提出建议。请扫描下方二维码入群。
+
+<p align="center">
+  <img src="assets/community-group-qr.png" alt="agent-vision-toolkit 项目交流群二维码" width="320">
+</p>

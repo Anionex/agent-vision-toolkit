@@ -403,6 +403,14 @@ If agent-vision-toolkit saves you time, you are welcome to star it, share it, co
 
 I'm [anionex](https://anionex.me/), an AI-native developer who once ranked No. 4 on GitHub's global developer trending list, with more than 16k stars across my projects. If you would like to follow my future work, [follow me on X](https://x.com/anion_ex) or [GitHub](https://github.com/Anionex).
 
+## Join the Community Group
+
+You are welcome to join the `agent-vision-toolkit` community group to exchange usage tips, share feedback, and suggest improvements. Scan the QR code below to join.
+
+<p align="center">
+  <img src="assets/community-group-qr.png" alt="QR code for the agent-vision-toolkit community group" width="320">
+</p>
+
 <a href="https://www.star-history.com/?repos=Anionex%2Fagent-vision-toolkit&type=date&legend=top-left">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Anionex/agent-vision-toolkit&type=date&theme=dark&legend=top-left&sealed_token=gCPJbPhF9qWnhHaryfGRnXebnoHYk7jJWj37Lq7wSzXbFbPbyhfY9Y63nYAFRmiEPfGHAWEpRlWMCTdMW6vbTJMa7Wq7uTl5fDmkxTy4Mqdjz1QujbUwqw" />
