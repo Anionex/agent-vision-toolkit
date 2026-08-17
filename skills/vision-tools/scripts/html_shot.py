@@ -37,6 +37,7 @@ CHROME_CANDIDATES = (
 FULL_PAGE_TIMEOUT_SECONDS = 30.0
 FULL_PAGE_MAX_GROWTH_ROUNDS = 25
 FULL_PAGE_MAX_SCROLL_STEPS = 2000
+FULL_PAGE_QUIET_MILLISECONDS = 1250
 
 
 def find_chrome() -> str | None:
@@ -264,7 +265,7 @@ def pause_for_frame(seconds: float) -> None:
     time.sleep(max(0.02, seconds))
 
 
-def build_full_page_command(chrome: str, source: str, profile: Path,
+def build_full_page_command(chrome: str, profile: Path,
                             width: int, height: int, scale: int) -> list[str]:
     command = [
         chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars",
@@ -277,7 +278,7 @@ def build_full_page_command(chrome: str, source: str, profile: Path,
     ]
     if scale != 1:
         command.append(f"--force-device-scale-factor={scale}")
-    command.append(source)
+    command.append("about:blank")
     return command
 
 
@@ -305,6 +306,58 @@ def ensure_before_deadline(deadline: float, message: str) -> None:
         raise RuntimeError(message)
 
 
+def wait_for_dom_quiet(client: DevToolsSocket, deadline: float) -> None:
+    remaining_ms = int((deadline - time.monotonic()) * 1000)
+    if remaining_ms <= FULL_PAGE_QUIET_MILLISECONDS:
+        raise RuntimeError("timed out before the page reached a quiet state")
+    max_wait_ms = min(4500, remaining_ms)
+    result = evaluate(client, f"""
+        (() => new Promise(resolve => {{
+          const quietMs = {FULL_PAGE_QUIET_MILLISECONDS};
+          const maxWaitMs = {max_wait_ms};
+          const height = () => Math.max(
+            document.documentElement.scrollHeight,
+            document.body ? document.body.scrollHeight : 0
+          );
+          let lastHeight = height();
+          let quietTimer;
+          let pollTimer;
+          let maxTimer;
+          let observer;
+          let finished = false;
+          const finish = quiet => {{
+            if (finished) return;
+            finished = true;
+            clearTimeout(quietTimer);
+            clearInterval(pollTimer);
+            clearTimeout(maxTimer);
+            observer.disconnect();
+            resolve({{quiet, height: height()}});
+          }};
+          const activity = () => {{
+            lastHeight = height();
+            clearTimeout(quietTimer);
+            quietTimer = setTimeout(() => finish(true), quietMs);
+          }};
+          observer = new MutationObserver(activity);
+          observer.observe(document.documentElement, {{
+            attributes: true,
+            characterData: true,
+            childList: true,
+            subtree: true
+          }});
+          pollTimer = setInterval(() => {{
+            const currentHeight = height();
+            if (currentHeight !== lastHeight) activity();
+          }}, 100);
+          maxTimer = setTimeout(() => finish(false), maxWaitMs);
+          activity();
+        }}))()
+    """)
+    if not isinstance(result, dict) or result.get("quiet") is not True:
+        raise RuntimeError("page did not become quiet before the full-page deadline")
+
+
 def settle_full_page(client: DevToolsSocket, width: int, height: int, scale: int,
                      max_pixels: int | None, deadline: float) -> int:
     page_height = measure_page_height(client)
@@ -326,6 +379,7 @@ def settle_full_page(client: DevToolsSocket, width: int, height: int, scale: int
             pause_for_frame(0.12)
         evaluate(client, f"window.scrollTo(0, {measured_before_sweep}); true")
         pause_for_frame(0.12)
+        wait_for_dom_quiet(client, deadline)
 
         measured_after_sweep = measure_page_height(client)
         enforce_pixel_limit(width, measured_after_sweep, scale, max_pixels)
@@ -366,7 +420,7 @@ def settle_full_page(client: DevToolsSocket, width: int, height: int, scale: int
                 continue
 
         evaluate(client, "window.scrollTo(0, 0); true")
-        pause_for_frame(0.5)
+        wait_for_dom_quiet(client, deadline)
         final_height = measure_page_height(client)
         enforce_pixel_limit(width, final_height, scale, max_pixels)
         if final_height == page_height:
@@ -385,7 +439,7 @@ def capture_full_page(chrome: str, source: str, output: Path, width: int, height
     process: subprocess.Popen | None = None
     client: DevToolsSocket | None = None
     try:
-        command = build_full_page_command(chrome, source, profile, width, height, scale)
+        command = build_full_page_command(chrome, profile, width, height, scale)
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         startup_deadline = time.monotonic() + 15.0
         port = wait_for_devtools_port(profile, process, startup_deadline)

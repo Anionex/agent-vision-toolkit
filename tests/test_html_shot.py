@@ -7,6 +7,7 @@ skipped, matching the optional-tool convention of the other CLIs.
 
 import importlib.machinery
 import importlib.util
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import os
 from pathlib import Path
 import socket
@@ -14,6 +15,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -61,13 +63,13 @@ def test_full_page_command_isolated():
     mod = _load_html_shot()
     profile = Path("disposable-profile")
     command = mod.build_full_page_command(
-        "chrome", "file:///tmp/page.html", profile,
-        1280, 800, 2,
+        "chrome", profile, 1280, 800, 2,
     )
     assert "--use-mock-keychain" in command
     assert "--remote-debugging-port=0" in command
     assert f"--user-data-dir={profile}" in command
     assert "--force-device-scale-factor=2" in command
+    assert command[-1] == "about:blank"
     assert not any(arg.startswith("--remote-debugging-port=") and arg != "--remote-debugging-port=0"
                    for arg in command)
 
@@ -80,6 +82,16 @@ def _server_frame(payload, opcode=0x1, final=True):
     if length < 65536:
         return struct.pack("!BBH", first, 126, length) + payload
     return struct.pack("!BBQ", first, 127, length) + payload
+
+
+def _recv_exact(connection, length):
+    data = bytearray()
+    while len(data) < length:
+        chunk = connection.recv(length - len(data))
+        if not chunk:
+            raise AssertionError("socket closed before the expected test frame arrived")
+        data.extend(chunk)
+    return bytes(data)
 
 
 def test_websocket_frame_codec():
@@ -99,15 +111,15 @@ def test_websocket_frame_codec():
             + _server_frame(b"lo", opcode=0x0)
         )
         assert client._read_message() == (0x1, b"hello")
-        pong = server_socket.recv(1024)
+        pong = _recv_exact(server_socket, 10)
         assert pong[0] == 0x8A and pong[1] & 0x80
 
         client._send_frame(0x1, b"masked")
-        header = server_socket.recv(2)
+        header = _recv_exact(server_socket, 2)
         assert header[0] == 0x81 and header[1] & 0x80
         length = header[1] & 0x7F
-        mask = server_socket.recv(4)
-        masked = server_socket.recv(length)
+        mask = _recv_exact(server_socket, 4)
+        masked = _recv_exact(server_socket, length)
         assert bytes(value ^ mask[index % 4]
                      for index, value in enumerate(masked)) == b"masked"
     finally:
@@ -210,9 +222,13 @@ def test_cli_full_page_stabilizes_incremental_growth():
                 "function add(){const node=document.createElement('div');"
                 "node.className='block';document.body.appendChild(node);count++;}"
                 "add();add();"
+                "let loading=false;"
                 "addEventListener('scroll',()=>{"
-                "if(count<10 && scrollY+innerHeight>=document.documentElement.scrollHeight-1){"
-                "add();add();}});"
+                "if(!loading && count<10 && "
+                "scrollY+innerHeight>=document.documentElement.scrollHeight-1){"
+                "loading=true;setTimeout(()=>{"
+                "for(let i=0;i<4 && count<10;i++)add();loading=false;"
+                "},1000);}});"
                 "</script></body></html>"
             )
         output = os.path.join(temp_dir, "incremental.png")
@@ -227,6 +243,47 @@ def test_cli_full_page_stabilizes_incremental_growth():
         assert _png_size(output) == (320, 2000)
 
 
+class CountingHandler(BaseHTTPRequestHandler):
+    paths = []
+
+    def do_GET(self):
+        CountingHandler.paths.append(self.path)
+        body = (b"<!doctype html><html><body style='margin:0;height:400px'>"
+                b"single navigation</body></html>")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *_args):
+        pass
+
+
+def test_cli_full_page_loads_url_once():
+    server = HTTPServer(("127.0.0.1", 0), CountingHandler)
+    CountingHandler.paths = []
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = os.path.join(temp_dir, "url.png")
+            source = f"http://127.0.0.1:{server.server_port}/page"
+            result = subprocess.run([
+                sys.executable, SCRIPT, source,
+                "--width", "320", "--height", "200", "--full-page",
+                "--max-pixels", "1000000", "-o", output,
+            ], text=True, capture_output=True, timeout=30)
+            if result.returncode != 0:
+                raise AssertionError(result.stderr)
+            assert _png_size(output) == (320, 400)
+            assert CountingHandler.paths.count("/page") == 1, CountingHandler.paths
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def main():
     test_default_output_naming()
     test_full_page_command_isolated()
@@ -238,6 +295,7 @@ def main():
         test_cli_full_page_keeps_layout_viewport()
         test_cli_full_page_max_pixels_guard()
         test_cli_full_page_stabilizes_incremental_growth()
+        test_cli_full_page_loads_url_once()
     print("HTML SHOT TEST PASS")
 
 
