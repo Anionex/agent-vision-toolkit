@@ -36,6 +36,7 @@ jobs:
           python tests/test_image_rewrite_shapes.py
           python tests/test_focus_hint.py
           python tests/test_anthropic_rewrite.py
+          python tests/test_request_content_encoding.py
           python tests/smoke_test_proxy.py
           python tests/smoke_test_egress_failover.py
           python tests/test_vision_client.py
@@ -58,6 +59,7 @@ jobs:
         env:
           HTML_SHOT_REQUIRE_BROWSER: "1"
         run: |
+          python tests/test_request_content_encoding.py
           python tests/smoke_test_egress_failover.py
           python tests/test_html_shot.py
           python tests/test_trace.py
