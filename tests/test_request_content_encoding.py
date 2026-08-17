@@ -113,6 +113,28 @@ def main():
     else:
         raise AssertionError("invalid zstd frames must remain client errors")
 
+    try:
+        module._raise_python_zstd_error(
+            RuntimeError("Allocation error : not enough memory"))
+    except module._ContentDecoderError:
+        pass
+    else:
+        raise AssertionError("Python zstd allocation failures must be server errors")
+
+    try:
+        module._raise_python_zstd_error(RuntimeError("Unknown frame descriptor"))
+    except module._InvalidContentEncoding:
+        pass
+    else:
+        raise AssertionError("Python zstd frame errors must remain client errors")
+
+    try:
+        module._configure_zstd_library(object())
+    except AttributeError:
+        pass
+    else:
+        raise AssertionError("native zstd candidates must expose every required symbol")
+
     original_limit = module.MAX_DECODED_BODY_BYTES
     module.MAX_DECODED_BODY_BYTES = len(RAW)
     assert module._decode_request_body(gzip.compress(RAW), "gzip") == RAW

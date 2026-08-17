@@ -89,6 +89,30 @@ _ZSTD_LIBRARY = None
 _ZSTD_LIBRARY_LOCK = threading.Lock()
 
 
+def _configure_zstd_library(library):
+    library.ZSTD_createDStream.argtypes = []
+    library.ZSTD_createDStream.restype = ctypes.c_void_p
+    library.ZSTD_freeDStream.argtypes = [ctypes.c_void_p]
+    library.ZSTD_freeDStream.restype = ctypes.c_size_t
+    library.ZSTD_initDStream.argtypes = [ctypes.c_void_p]
+    library.ZSTD_initDStream.restype = ctypes.c_size_t
+    library.ZSTD_DStreamOutSize.argtypes = []
+    library.ZSTD_DStreamOutSize.restype = ctypes.c_size_t
+    library.ZSTD_decompressStream.argtypes = [ctypes.c_void_p,
+                                               ctypes.POINTER(_ZstdOutBuffer),
+                                               ctypes.POINTER(_ZstdInBuffer)]
+    library.ZSTD_decompressStream.restype = ctypes.c_size_t
+    library.ZSTD_DCtx_setParameter.argtypes = [ctypes.c_void_p, ctypes.c_int,
+                                                ctypes.c_int]
+    library.ZSTD_DCtx_setParameter.restype = ctypes.c_size_t
+    library.ZSTD_isError.argtypes = [ctypes.c_size_t]
+    library.ZSTD_isError.restype = ctypes.c_uint
+    library.ZSTD_getErrorCode.argtypes = [ctypes.c_size_t]
+    library.ZSTD_getErrorCode.restype = ctypes.c_uint
+    library.ZSTD_getErrorName.argtypes = [ctypes.c_size_t]
+    library.ZSTD_getErrorName.restype = ctypes.c_char_p
+
+
 def _load_zstd_library():
     global _ZSTD_LIBRARY
     if _ZSTD_LIBRARY is not None:
@@ -117,34 +141,15 @@ def _load_zstd_library():
                 continue
             try:
                 library = ctypes.CDLL(candidate)
+                _configure_zstd_library(library)
                 break
-            except OSError:
+            except (OSError, AttributeError):
+                library = None
                 continue
         if library is None:
             raise _UnsupportedContentEncoding(
                 "Unsupported Content-Encoding: zstd (no decoder is available)")
 
-        library.ZSTD_createDStream.argtypes = []
-        library.ZSTD_createDStream.restype = ctypes.c_void_p
-        library.ZSTD_freeDStream.argtypes = [ctypes.c_void_p]
-        library.ZSTD_freeDStream.restype = ctypes.c_size_t
-        library.ZSTD_initDStream.argtypes = [ctypes.c_void_p]
-        library.ZSTD_initDStream.restype = ctypes.c_size_t
-        library.ZSTD_DStreamOutSize.argtypes = []
-        library.ZSTD_DStreamOutSize.restype = ctypes.c_size_t
-        library.ZSTD_decompressStream.argtypes = [ctypes.c_void_p,
-                                                   ctypes.POINTER(_ZstdOutBuffer),
-                                                   ctypes.POINTER(_ZstdInBuffer)]
-        library.ZSTD_decompressStream.restype = ctypes.c_size_t
-        library.ZSTD_DCtx_setParameter.argtypes = [ctypes.c_void_p, ctypes.c_int,
-                                                    ctypes.c_int]
-        library.ZSTD_DCtx_setParameter.restype = ctypes.c_size_t
-        library.ZSTD_isError.argtypes = [ctypes.c_size_t]
-        library.ZSTD_isError.restype = ctypes.c_uint
-        library.ZSTD_getErrorCode.argtypes = [ctypes.c_size_t]
-        library.ZSTD_getErrorCode.restype = ctypes.c_uint
-        library.ZSTD_getErrorName.argtypes = [ctypes.c_size_t]
-        library.ZSTD_getErrorName.restype = ctypes.c_char_p
         _ZSTD_LIBRARY = library
         return library
 
@@ -163,6 +168,17 @@ def _raise_zstd_decode_error(library, result):
     if library.ZSTD_getErrorCode(result) in ZSTD_INTERNAL_ERROR_CODES:
         raise _ContentDecoderError(f"zstd decoder failed: {error}")
     raise _InvalidContentEncoding(f"Invalid zstd request body: {error}")
+
+
+def _raise_python_zstd_error(exc):
+    message = str(exc)
+    internal_markers = (
+        "allocation", "not enough memory", "workspace", "internal error",
+        "stage wrong", "init missing",
+    )
+    if any(marker in message.lower() for marker in internal_markers):
+        raise _ContentDecoderError(f"zstd decoder failed: {message}") from exc
+    raise _InvalidContentEncoding(f"Invalid zstd request body: {message}") from exc
 
 
 def _append_decoded(output, chunk):
@@ -233,8 +249,10 @@ def _decompress_zstd(body):
             options = {zstd.DecompressionParameter.window_log_max: ZSTD_WINDOW_LOG_MAX}
             with zstd.open(io.BytesIO(body), "rb", options=options) as reader:
                 return _read_decoded_stream(reader)
+        except MemoryError as exc:
+            raise _ContentDecoderError("zstd decoder ran out of memory") from exc
         except zstd.ZstdError as exc:
-            raise _InvalidContentEncoding(f"Invalid zstd request body: {exc}") from exc
+            _raise_python_zstd_error(exc)
 
     try:
         return _decompress_zstd_native(body)
@@ -250,8 +268,10 @@ def _decompress_zstd(body):
                 max_window_size=1 << ZSTD_WINDOW_LOG_MAX)
             with decompressor.stream_reader(io.BytesIO(body)) as reader:
                 return _read_decoded_stream(reader)
+        except MemoryError as exc:
+            raise _ContentDecoderError("zstd decoder ran out of memory") from exc
         except zstandard.ZstdError as exc:
-            raise _InvalidContentEncoding(f"Invalid zstd request body: {exc}") from exc
+            _raise_python_zstd_error(exc)
 
 
 def _decompress_deflate(body, wbits):
