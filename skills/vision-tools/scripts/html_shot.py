@@ -225,7 +225,8 @@ def wait_for_target(port: int, deadline: float) -> dict:
             targets = read_http_json(port, "/json/list")
             if isinstance(targets, list):
                 for target in targets:
-                    if isinstance(target, dict) and target.get("type") == "page" and target.get("webSocketDebuggerUrl"):
+                    if (isinstance(target, dict) and target.get("type") == "page"
+                            and target.get("webSocketDebuggerUrl")):
                         return target
         except (OSError, URLError, ValueError) as error:
             last_error = error
