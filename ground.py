@@ -4,6 +4,7 @@ import argparse
 import base64
 import io
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -28,12 +29,23 @@ class GroundError(Exception):
     pass
 
 
-def build_prompt(target: str) -> str:
+def coordinate_order() -> str:
+    configured = os.environ.get("VISION_BOX_ORDER", "").strip().lower()
+    if configured:
+        if configured not in {"xyxy", "yxyx"}:
+            raise GroundError("VISION_BOX_ORDER must be either xyxy or yxyx")
+        return configured
+    model = os.environ.get("VISION_MODEL", "").lower()
+    return "xyxy" if "qwen" in model else "yxyx"
+
+
+def build_prompt(target: str, box_order: str = "yxyx") -> str:
+    coordinates = "[x0, y0, x1, y1]" if box_order == "xyxy" else "[y0, x0, y1, x1]"
     return (
         "Locate every visible object or region matching this target:\n"
         f"{target}\n\n"
         'Return only a JSON array. Each item must contain "box_2d" as '
-        '[y0, x0, y1, x1] on a 0-1000 grid and "label" as a short description. '
+        f'{coordinates} on a 0-1000 grid and "label" as a short description. '
         "Use tight boxes in the original image. Return [] when nothing matches."
     )
 
@@ -70,6 +82,8 @@ def _items(text: str) -> list[Any]:
     try:
         payload = json.loads(cleaned)
     except json.JSONDecodeError:
+        if cleaned.count("```") % 2 or _has_unclosed_json(cleaned):
+            raise GroundError("Vision API bounding-box JSON was truncated or incomplete") from None
         fallback = _fallback_items(cleaned)
         if fallback:
             return fallback
@@ -83,7 +97,37 @@ def _items(text: str) -> list[Any]:
     raise GroundError("Vision API returned an incompatible bounding-box JSON structure")
 
 
-def _normalize_box(item: dict[str, Any], width: int, height: int) -> tuple[int, int, int, int] | None:
+def _has_unclosed_json(text: str) -> bool:
+    start_positions = [position for position in (text.find("["), text.find("{")) if position >= 0]
+    if not start_positions:
+        return False
+    stack = []
+    in_string = False
+    escaped = False
+    pairs = {"]": "[", "}": "{"}
+    for character in text[min(start_positions):]:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character in "[{":
+            stack.append(character)
+        elif character in "]}":
+            if not stack or stack[-1] != pairs[character]:
+                return False
+            stack.pop()
+    return bool(stack)
+
+
+def _normalize_box(
+    item: dict[str, Any], width: int, height: int, box_order: str = "yxyx",
+) -> tuple[int, int, int, int] | None:
     raw = item.get("box_2d")
     if not isinstance(raw, list):
         for key in ("bbox_2d", "box2d", "bbox", "box"):
@@ -93,9 +137,13 @@ def _normalize_box(item: dict[str, Any], width: int, height: int) -> tuple[int, 
     if not isinstance(raw, list) or len(raw) != 4:
         return None
     try:
-        y0, x0, y1, x1 = (float(value) for value in raw)
+        values = tuple(float(value) for value in raw)
     except (TypeError, ValueError):
         return None
+    if box_order == "xyxy":
+        x0, y0, x1, y1 = values
+    else:
+        y0, x0, y1, x1 = values
     if x0 > x1:
         x0, x1 = x1, x0
     if y0 > y1:
@@ -109,12 +157,14 @@ def _normalize_box(item: dict[str, Any], width: int, height: int) -> tuple[int, 
     return box if box[2] > box[0] and box[3] > box[1] else None
 
 
-def parse_matches(text: str, width: int, height: int, target: str) -> list[Match]:
+def parse_matches(
+    text: str, width: int, height: int, target: str, box_order: str = "yxyx",
+) -> list[Match]:
     matches = []
     for item in _items(text):
         if not isinstance(item, dict):
             continue
-        box = _normalize_box(item, width, height)
+        box = _normalize_box(item, width, height, box_order)
         if box is None:
             continue
         label = str(item.get("label") or item.get("caption") or item.get("description") or target).strip()
@@ -156,8 +206,9 @@ def locate(image_path: Path, target: str, region: str | None = None) -> list[Mat
         width_used, height_used = box[2] - box[0], box[3] - box[1]
     # 8192 leaves room for exhaustive targets ("every UI element"): a dense
     # screen can emit dozens of boxes and 2048 truncated the JSON mid-array.
-    response = describe_image(url, build_prompt(target), max_tokens=8192)
-    matches = parse_matches(response, width_used, height_used, target)
+    box_order = coordinate_order()
+    response = describe_image(url, build_prompt(target, box_order), max_tokens=8192)
+    matches = parse_matches(response, width_used, height_used, target, box_order)
     if box is None:
         return matches
     # Matches were parsed in crop coordinates; report them in the original image.

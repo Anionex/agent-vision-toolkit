@@ -16,8 +16,12 @@ DEFAULT_CATEGORY = ("UI element (buttons, links, inputs, icons, labels, "
 
 
 def build_target(category: str | None) -> str:
-    return (f"every distinct {category or DEFAULT_CATEGORY} — "
-            "include the exact visible text in each label")
+    target = (category or DEFAULT_CATEGORY).strip()
+    if not target.lower().startswith("every distinct "):
+        target = f"every distinct {target}"
+    if "exact visible text" not in target.lower():
+        target += " — include the exact visible text in each label"
+    return target
 
 
 def format_inventory(matches, width: int, height: int) -> list[str]:
