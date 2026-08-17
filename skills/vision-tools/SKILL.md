@@ -29,7 +29,7 @@ Pick the tool by the question you are answering:
 | "Cut this box out as its own image file" | `crop` |
 | "OCR this long screenshot / scrolling page / chat history" | `scripts/long_screenshot_ocr.py` |
 | "Extract the icon/logo foreground as transparent PNG — manual region or auto (cropped+scaled screenshots)" | `scripts/extract_fg.py` |
-| "Turn this HTML file into a screenshot" | `scripts/html_shot.py` |
+| "Turn this HTML file into a viewport or full-page screenshot" | `scripts/html_shot.py` |
 | "Which colours dominate a region, and which palette value fits it?" | `scripts/dominant_colors.py` |
 | A relation none of them return — a gap, a distance between two located things | code over the pixels (Pillow) |
 
@@ -56,7 +56,7 @@ work is not hand-coded differently every time:
 - locate / inventory elements → `ground` / `detect`
 - describe / OCR an image → `glance`
 - safely split, OCR, and merge a long screenshot → `scripts/long_screenshot_ocr.py`
-- HTML file to a screenshot → `scripts/html_shot.py`
+- HTML file to a viewport or full-page screenshot → `scripts/html_shot.py`
 
 Hand-written Pillow is only for what none of them return: a relation
 between two things you already located (a gap, a distance), a resize or
@@ -213,15 +213,19 @@ Requires the optional `pillow` (and `numpy` for auto mode).
 python3 scripts/html_shot.py page.html                      # writes page.png, 1280x800
 python3 scripts/html_shot.py page.html --width 1440 --height 900 -o page.png
 python3 scripts/html_shot.py page.html --scale 2            # 2x pixels: small text stays readable
+python3 scripts/html_shot.py page.html --full-page           # complete scroll height, same layout viewport
+python3 scripts/html_shot.py page.html --full-page --max-pixels 40000000
 ```
 
 The visual-alignment loop: write HTML, screenshot it at the reference
 viewport, then compare it with the design. Use `pixel_diff` to locate
 material differences, not to chase a zero-difference score. Rendering
-happens in headless Chrome/Chromium/Edge — no Python dependencies. Only the
-viewport is captured, so pass `--height` for pages taller than the window;
-`--wait-ms N` pauses for fonts, images, or animation before capturing.
-Paths are relative to this skill's own directory.
+happens in headless Chrome/Chromium/Edge — no Python dependencies. The default
+captures only the viewport. Use `--full-page` for the complete document while
+keeping `--width` and `--height` as the layout viewport, so `vh`/`svh` and
+responsive breakpoints do not change. Add `--max-pixels N` when the page height
+is untrusted. `--wait-ms N` pauses for fonts, images, or animation before
+capturing. Paths are relative to this skill's own directory.
 
 ## pixel_diff — where two images differ (local, no vision API)
 

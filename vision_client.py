@@ -160,6 +160,29 @@ def _retry_delay(error: urllib.error.HTTPError, attempt: int) -> float:
     return min(2 ** attempt, 4)
 
 
+def _api_error_code(body: bytes) -> str:
+    try:
+        payload = json.loads(body.decode(errors="replace"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return ""
+    code = error.get("code")
+    return code if isinstance(code, str) else ""
+
+
+def _retryable_http_error(status: int, body: bytes) -> bool:
+    if status not in {429, 500, 502, 503, 504, 529}:
+        return False
+    return _api_error_code(body) not in {
+        "daily_rate_limit_exceeded",
+        "global_daily_limit_exceeded",
+    }
+
+
 def describe_image(image_url: str | list[str], prompt: str | None = None, max_tokens: int = 4096,
                    apply_lang: bool = True) -> str:
     """Describe one data/http image URL (str) or several (list) in a single call."""
@@ -253,9 +276,10 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
                 raise VisionError("Vision API returned an empty description")
             return text
         except urllib.error.HTTPError as exc:
-            body = _redact(exc.read().decode(errors="replace")[:400], api_key)
+            raw_body = exc.read()
+            body = _redact(raw_body.decode(errors="replace")[:400], api_key)
             body = body.replace("\r", " ").replace("\n", " ")
-            if exc.code in {429, 500, 502, 503, 504, 529} and attempt < retries:
+            if _retryable_http_error(exc.code, raw_body) and attempt < retries:
                 print(f"vision: HTTP {exc.code}, retrying ({attempt + 1}/{retries})", file=sys.stderr)
                 time.sleep(_retry_delay(exc, attempt))
                 continue
