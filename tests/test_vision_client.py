@@ -143,6 +143,26 @@ def main():
         assert Handler.last_headers.get("User-Agent") == vision_client.DEFAULT_USER_AGENT
         assert not Handler.last_headers["User-Agent"].startswith("Python-urllib/")
 
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0,
+            [429],
+            [b'{"error":{"code":"daily_rate_limit_exceeded","message":"Daily limit reached"}}'],
+            [{"Retry-After": "3600"}],
+        )
+        delays = []
+        original_sleep = vision_client.time.sleep
+        vision_client.time.sleep = delays.append
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        except vision_client.VisionError as exc:
+            assert "daily_rate_limit_exceeded" in str(exc)
+        else:
+            raise AssertionError("daily quota exhaustion must fail immediately")
+        finally:
+            vision_client.time.sleep = original_sleep
+        assert Handler.calls == 1, "daily quota exhaustion must not be retried"
+        assert delays == []
+
         Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         os.environ["VISION_USER_AGENT"] = "custom-vision-client/2.0"
         try:
