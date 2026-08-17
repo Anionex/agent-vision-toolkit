@@ -2,6 +2,14 @@
 
 All notable user-facing changes to agent-vision-toolkit are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- Parse Qwen-family grounding boxes as `x0,y0,x1,y1` while preserving Gemini's `y0,x0,y1,x1` convention, with `VISION_BOX_ORDER` available for custom providers.
+- Reject truncated bounding-box JSON instead of silently returning the complete objects that happened to appear before truncation.
+- Avoid duplicating `every distinct` and visible-text instructions when callers pass a complete detect category.
+
 ## [0.2.0] - 2026-08-14
 
 ### Added

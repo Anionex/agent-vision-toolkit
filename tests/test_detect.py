@@ -18,6 +18,8 @@ def test_target_construction():
     assert "every distinct UI element" in detect.build_target(None)
     assert "exact visible text" in detect.build_target(None)
     assert "every distinct buttons" in detect.build_target("buttons")
+    complete = "every distinct UI element — include the exact visible text in each label"
+    assert detect.build_target(complete) == complete
 
 
 def test_region_boxes_map_back_to_original_coordinates():
