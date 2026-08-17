@@ -39,6 +39,8 @@ DECODE_CHUNK_BYTES = 64 * 1024
 ZSTD_WINDOW_LOG_MAX = 26
 MAX_CONTENT_CODINGS = 4
 REQUEST_BODY_READ_TIMEOUT = 30.0
+SUPPORTED_CONTENT_CODINGS = {"identity", "gzip", "x-gzip", "deflate", "zstd"}
+ZSTD_INTERNAL_ERROR_CODES = {60, 62, 64, 66, 70, 74, 80, 82}
 
 
 def _header_value(headers, name):
@@ -139,6 +141,8 @@ def _load_zstd_library():
         library.ZSTD_DCtx_setParameter.restype = ctypes.c_size_t
         library.ZSTD_isError.argtypes = [ctypes.c_size_t]
         library.ZSTD_isError.restype = ctypes.c_uint
+        library.ZSTD_getErrorCode.argtypes = [ctypes.c_size_t]
+        library.ZSTD_getErrorCode.restype = ctypes.c_uint
         library.ZSTD_getErrorName.argtypes = [ctypes.c_size_t]
         library.ZSTD_getErrorName.restype = ctypes.c_char_p
         _ZSTD_LIBRARY = library
@@ -150,6 +154,15 @@ def _zstd_error(library, result):
         return None
     name = library.ZSTD_getErrorName(result)
     return name.decode("utf-8", errors="replace") if name else "unknown zstd error"
+
+
+def _raise_zstd_decode_error(library, result):
+    error = _zstd_error(library, result)
+    if not error:
+        return
+    if library.ZSTD_getErrorCode(result) in ZSTD_INTERNAL_ERROR_CODES:
+        raise _ContentDecoderError(f"zstd decoder failed: {error}")
+    raise _InvalidContentEncoding(f"Invalid zstd request body: {error}")
 
 
 def _append_decoded(output, chunk):
@@ -198,9 +211,7 @@ def _decompress_zstd_native(body):
             previous_input_pos = input_buffer.pos
             result = library.ZSTD_decompressStream(
                 stream, ctypes.byref(output_buffer), ctypes.byref(input_buffer))
-            error = _zstd_error(library, result)
-            if error:
-                raise _InvalidContentEncoding(f"Invalid zstd request body: {error}")
+            _raise_zstd_decode_error(library, result)
             if output_buffer.pos:
                 _append_decoded(output_bytes, output.raw[:output_buffer.pos])
             if result == 0 and input_buffer.pos == input_buffer.size:
@@ -273,6 +284,11 @@ def _content_codings(content_encoding):
     if len(codings) > MAX_CONTENT_CODINGS:
         raise _InvalidContentEncoding(
             f"Too many Content-Encoding layers (maximum {MAX_CONTENT_CODINGS})")
+    unsupported = next((coding for coding in codings
+                        if coding not in SUPPORTED_CONTENT_CODINGS), None)
+    if unsupported:
+        raise _UnsupportedContentEncoding(
+            f"Unsupported Content-Encoding: {unsupported}")
     return codings
 
 
@@ -1207,15 +1223,25 @@ class Proxy:
                 return
             content_encoding = _header_values(incoming_headers, "content-encoding")
             try:
-                _content_codings(content_encoding)
+                content_codings = _content_codings(content_encoding)
+            except _UnsupportedContentEncoding as exc:
+                await self._send_error(writer, 415, str(exc))
+                return
             except _InvalidContentEncoding as exc:
                 await self._send_error(writer, 400, str(exc))
                 return
-            if content_encoding:
-                await self._decode_semaphore.acquire()
+            body_deadline = asyncio.get_running_loop().time() + REQUEST_BODY_READ_TIMEOUT
+            if any(coding != "identity" for coding in content_codings):
+                try:
+                    await asyncio.wait_for(
+                        self._decode_semaphore.acquire(),
+                        timeout=max(0, body_deadline - asyncio.get_running_loop().time()),
+                    )
+                except TimeoutError:
+                    await self._send_error(writer, 408, "request body read timed out")
+                    return
                 decode_slot_acquired = True
             body = bytearray(body_start)
-            body_deadline = asyncio.get_running_loop().time() + REQUEST_BODY_READ_TIMEOUT
             while len(body) < content_length:
                 remaining = body_deadline - asyncio.get_running_loop().time()
                 if remaining <= 0:
@@ -1257,9 +1283,6 @@ class Proxy:
                 _log(f"[vision-proxy] request decoder failed: {exc}")
                 await self._send_error(writer, 500, "Request decoder failed")
                 return
-            if decode_slot_acquired:
-                self._decode_semaphore.release()
-                decode_slot_acquired = False
             parsed = None
             if body:
                 try:
@@ -1275,6 +1298,11 @@ class Proxy:
             model = parsed.get("model") if isinstance(parsed, dict) else None
             _log(f"[vision-proxy] request {method} {path} model={model} body_bytes={len(body)}")
             response = await self._open_upstream(method, path, bytes(body), self._upstream_headers(incoming_headers))
+            parsed = None
+            body = None
+            if decode_slot_acquired:
+                self._decode_semaphore.release()
+                decode_slot_acquired = False
             response_started = True
             await self._send_response(writer, response)
         except VisionError as exc:

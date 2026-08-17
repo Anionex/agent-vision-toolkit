@@ -282,15 +282,19 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
             print("ZSTD PASS: compressed function_call_output image is decoded, rewritten, and forwarded")
 
             unsupported = http.client.HTTPConnection("127.0.0.1", 19102, timeout=5)
-            unsupported.request(
-                "POST", "/responses", body=b"{}",
-                headers={"Content-Type": "application/json", "Content-Encoding": "br"},
-            )
+            unsupported.putrequest("POST", "/responses")
+            unsupported.putheader("Content-Type", "application/json")
+            unsupported.putheader("Content-Encoding", "br")
+            unsupported.putheader("Content-Length", str(module.MAX_REQUEST_BODY_BYTES))
+            unsupported.endheaders()
+            unsupported_started = time.monotonic()
             unsupported_response = unsupported.getresponse()
+            unsupported_elapsed = time.monotonic() - unsupported_started
             unsupported_body = unsupported_response.read()
             unsupported.close()
             assert unsupported_response.status == 415, unsupported_response.status
             assert b"Unsupported Content-Encoding: br" in unsupported_body, unsupported_body
+            assert unsupported_elapsed < 1, unsupported_elapsed
 
             invalid = http.client.HTTPConnection("127.0.0.1", 19102, timeout=5)
             invalid.request(

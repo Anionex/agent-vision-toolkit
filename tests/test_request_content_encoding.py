@@ -87,6 +87,32 @@ def main():
     finally:
         module._load_zstd_library = original_loader
 
+    internal_error = type(
+        "InternalZstdError", (), {
+            "ZSTD_isError": lambda self, result: 1,
+            "ZSTD_getErrorCode": lambda self, result: 64,
+            "ZSTD_getErrorName": lambda self, result: b"allocation failed",
+        })()
+    try:
+        module._raise_zstd_decode_error(internal_error, 1)
+    except module._ContentDecoderError:
+        pass
+    else:
+        raise AssertionError("runtime decoder allocation failures must be server errors")
+
+    invalid_frame = type(
+        "InvalidZstdFrame", (), {
+            "ZSTD_isError": lambda self, result: 1,
+            "ZSTD_getErrorCode": lambda self, result: 20,
+            "ZSTD_getErrorName": lambda self, result: b"corrupt frame",
+        })()
+    try:
+        module._raise_zstd_decode_error(invalid_frame, 1)
+    except module._InvalidContentEncoding:
+        pass
+    else:
+        raise AssertionError("invalid zstd frames must remain client errors")
+
     original_limit = module.MAX_DECODED_BODY_BYTES
     module.MAX_DECODED_BODY_BYTES = len(RAW)
     assert module._decode_request_body(gzip.compress(RAW), "gzip") == RAW
