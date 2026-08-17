@@ -23,6 +23,10 @@ ZSTD_SIZELESS_FIXTURE = base64.b64decode(
     "aiAc7QFSV9H5QkCTDmXKTA6cc6QmC51ZS49pTu1p8HCenmJfFPKFr6nJ7Hwl5NiL"
     "CAA0JVcBtIhiwoWtDNiZKGZjGKuCAg=="
 )
+ZSTD_CHECKSUM_FIXTURE = base64.b64decode(
+    "KLUv/SQa0QAAeyJtb2RlbCI6Im0iLCJpbnB1dCI6Im9rIn0wlGBP"
+)
+ZSTD_CHECKSUM_RAW = b'{"model":"m","input":"ok"}'
 RAW = (b'{"model":"m","input":[{"type":"function_call_output",'
        b'"call_id":"c1","output":[{"type":"input_image",'
        b'"image_url":"data:image/png;base64,AAAA"}]}]}')
@@ -149,6 +153,30 @@ def main():
         pass
     else:
         raise AssertionError("native zstd candidates must expose every required symbol")
+
+    try:
+        import zstandard
+    except ImportError:
+        pass
+    else:
+        assert module._decompress_zstandard_fallback(
+            ZSTD_CHECKSUM_FIXTURE, zstandard) == ZSTD_CHECKSUM_RAW
+        assert module._decompress_zstandard_fallback(
+            ZSTD_CHECKSUM_FIXTURE + ZSTD_CHECKSUM_FIXTURE,
+            zstandard,
+        ) == ZSTD_CHECKSUM_RAW * 2
+        for truncated in (
+            ZSTD_CHECKSUM_FIXTURE[:-1],
+            ZSTD_CHECKSUM_FIXTURE[:-4],
+            ZSTD_CHECKSUM_FIXTURE + ZSTD_CHECKSUM_FIXTURE[:-1],
+            ZSTD_CHECKSUM_FIXTURE + b"JUNK",
+        ):
+            try:
+                module._decompress_zstandard_fallback(truncated, zstandard)
+            except module._InvalidContentEncoding:
+                pass
+            else:
+                raise AssertionError("third-party zstd fallback accepted a truncated frame")
 
     original_limit = module.MAX_DECODED_BODY_BYTES
     module.MAX_DECODED_BODY_BYTES = len(RAW)

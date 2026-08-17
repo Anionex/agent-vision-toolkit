@@ -25,6 +25,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install fallback decoder test dependency
+        if: matrix.python-version == '3.11'
+        run: python -m pip install zstandard==0.25.0
       - name: Compile Python entry points
         run: >-
           python -m py_compile vision_proxy.py vision_client.py ground.py detect.py

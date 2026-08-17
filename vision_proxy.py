@@ -36,6 +36,7 @@ EGRESS_READ_TIMEOUT = 600.0
 MAX_REQUEST_BODY_BYTES = 64 * 1024 * 1024
 MAX_DECODED_BODY_BYTES = 64 * 1024 * 1024
 DECODE_CHUNK_BYTES = 64 * 1024
+ZSTD_FALLBACK_INPUT_CHUNK_BYTES = 256
 ZSTD_WINDOW_LOG_MAX = 26
 MAX_CONTENT_CODINGS = 4
 REQUEST_BODY_READ_TIMEOUT = 30.0
@@ -183,6 +184,42 @@ def _raise_python_zstd_error(exc):
     raise _InvalidContentEncoding(f"Invalid zstd request body: {message}") from exc
 
 
+def _decompress_zstandard_fallback(body, zstandard):
+    if not body:
+        raise _InvalidContentEncoding("Invalid zstd request body: empty frame")
+    output = bytearray()
+    offset = 0
+    pending = b""
+    while offset < len(body) or pending:
+        try:
+            decoder = zstandard.ZstdDecompressor(
+                max_window_size=1 << ZSTD_WINDOW_LOG_MAX).decompressobj()
+            while not decoder.eof:
+                if pending:
+                    chunk = pending
+                    pending = b""
+                elif offset < len(body):
+                    end = min(len(body), offset + ZSTD_FALLBACK_INPUT_CHUNK_BYTES)
+                    chunk = body[offset:end]
+                    offset = end
+                else:
+                    raise _InvalidContentEncoding(
+                        "Invalid zstd request body: truncated frame")
+                decoded = decoder.decompress(chunk)
+                _append_decoded(output, decoded)
+                if decoder.unconsumed_tail:
+                    if decoder.unconsumed_tail == chunk and not decoded:
+                        raise _InvalidContentEncoding(
+                            "Invalid zstd request body: decoder made no progress")
+                    pending = decoder.unconsumed_tail + pending
+            pending = decoder.unused_data + pending
+        except MemoryError as exc:
+            raise _ContentDecoderError("zstd decoder ran out of memory") from exc
+        except zstandard.ZstdError as exc:
+            _raise_python_zstd_error(exc)
+    return output
+
+
 def _append_decoded(output, chunk):
     if len(output) + len(chunk) > MAX_DECODED_BODY_BYTES:
         raise _RequestBodyTooLarge(
@@ -256,7 +293,14 @@ def _decompress_zstd(body):
         except zstd.ZstdError as exc:
             _raise_python_zstd_error(exc)
 
-    return _decompress_zstd_native(body)
+    try:
+        return _decompress_zstd_native(body)
+    except _UnsupportedContentEncoding as native_error:
+        try:
+            import zstandard
+        except ImportError:
+            raise native_error
+        return _decompress_zstandard_fallback(body, zstandard)
 
 
 def _decompress_deflate(body, wbits):
