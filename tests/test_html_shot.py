@@ -2,7 +2,8 @@
 """Focused tests for the html_shot case script (HTML file -> PNG).
 
 The CLI half needs a Chrome-family browser; when none is found it is
-skipped, matching the optional-tool convention of the other CLIs.
+skipped unless HTML_SHOT_REQUIRE_BROWSER=1, matching the optional-tool
+convention of the other CLIs while keeping CI coverage mandatory.
 """
 
 import importlib.machinery
@@ -43,6 +44,8 @@ def _png_size(path):
 def test_chrome_discovery():
     chrome = _load_html_shot().find_chrome()
     if chrome is None:
+        if os.environ.get("HTML_SHOT_REQUIRE_BROWSER") == "1":
+            raise AssertionError("HTML_SHOT_REQUIRE_BROWSER=1 but no Chrome-family browser was found")
         print("SKIP: no Chrome-family browser found; CLI run is optional")
         return False
     assert os.path.isfile(chrome) or chrome in (
@@ -243,6 +246,29 @@ def test_cli_full_page_stabilizes_incremental_growth():
         assert _png_size(output) == (320, 2000)
 
 
+def test_cli_full_page_ignores_fixed_height_text_updates():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        html = os.path.join(temp_dir, "clock.html")
+        with open(html, "w") as handle:
+            handle.write(
+                "<!doctype html><html><head><style>"
+                "html,body{margin:0;height:600px}"
+                "</style></head><body><div id='clock'></div><script>"
+                "setInterval(()=>{document.getElementById('clock').textContent=Date.now()},500);"
+                "</script></body></html>"
+            )
+        output = os.path.join(temp_dir, "clock.png")
+        result = subprocess.run([
+            sys.executable, SCRIPT, html,
+            "--width", "320", "--height", "200", "--full-page",
+            "--max-pixels", "1000000", "-o", output,
+        ], text=True, capture_output=True, timeout=30)
+        if result.returncode != 0:
+            raise AssertionError(result.stderr)
+        assert "pageHeight=600" in result.stdout
+        assert _png_size(output) == (320, 600)
+
+
 class CountingHandler(BaseHTTPRequestHandler):
     paths = []
 
@@ -295,6 +321,7 @@ def main():
         test_cli_full_page_keeps_layout_viewport()
         test_cli_full_page_max_pixels_guard()
         test_cli_full_page_stabilizes_incremental_growth()
+        test_cli_full_page_ignores_fixed_height_text_updates()
         test_cli_full_page_loads_url_once()
     print("HTML SHOT TEST PASS")
 

@@ -30,6 +30,8 @@ jobs:
           python -m py_compile vision_proxy.py vision_client.py ground.py detect.py
           bin/glance bin/trace bin/crop skills/vision-tools/scripts/html_shot.py
       - name: Run core tests
+        env:
+          HTML_SHOT_REQUIRE_BROWSER: "1"
         run: |
           python tests/test_image_rewrite_shapes.py
           python tests/test_focus_hint.py
@@ -52,7 +54,9 @@ jobs:
         run: >-
           python -m py_compile vision_proxy.py vision_client.py
           skills/vision-tools/scripts/html_shot.py tests/smoke_test_egress_failover.py
-      - name: Run Windows egress smoke test
+      - name: Run Windows tests
+        env:
+          HTML_SHOT_REQUIRE_BROWSER: "1"
         run: |
           python tests/smoke_test_egress_failover.py
           python tests/test_html_shot.py

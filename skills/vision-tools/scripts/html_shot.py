@@ -323,7 +323,6 @@ def wait_for_dom_quiet(client: DevToolsSocket, deadline: float) -> None:
           let quietTimer;
           let pollTimer;
           let maxTimer;
-          let observer;
           let finished = false;
           const finish = quiet => {{
             if (finished) return;
@@ -331,27 +330,21 @@ def wait_for_dom_quiet(client: DevToolsSocket, deadline: float) -> None:
             clearTimeout(quietTimer);
             clearInterval(pollTimer);
             clearTimeout(maxTimer);
-            observer.disconnect();
             resolve({{quiet, height: height()}});
           }};
-          const activity = () => {{
-            lastHeight = height();
+          const restartQuietTimer = () => {{
             clearTimeout(quietTimer);
             quietTimer = setTimeout(() => finish(true), quietMs);
           }};
-          observer = new MutationObserver(activity);
-          observer.observe(document.documentElement, {{
-            attributes: true,
-            characterData: true,
-            childList: true,
-            subtree: true
-          }});
           pollTimer = setInterval(() => {{
             const currentHeight = height();
-            if (currentHeight !== lastHeight) activity();
+            if (currentHeight !== lastHeight) {{
+              lastHeight = currentHeight;
+              restartQuietTimer();
+            }}
           }}, 100);
           maxTimer = setTimeout(() => finish(false), maxWaitMs);
-          activity();
+          restartQuietTimer();
         }}))()
     """)
     if not isinstance(result, dict) or result.get("quiet") is not True:
