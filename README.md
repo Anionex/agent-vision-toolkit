@@ -5,6 +5,8 @@
 <div align="center">
 
 # agent-vision-toolkit
+<a href="https://trendshift.io/repositories/99395?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-99395" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/99395/daily?language=Python" alt="Anionex%2Fagent-vision-toolkit | Trendshift" width="250" height="55"/></a>
+
 
 [![X (Twitter)](https://img.shields.io/badge/-@anion__ex-000000?style=flat-square&logo=x&logoColor=white)](https://x.com/anion_ex)
 [![GitHub stars](https://img.shields.io/github/stars/Anionex/agent-vision-toolkit?style=flat-square&logo=github)](https://github.com/Anionex/agent-vision-toolkit/stargazers)
