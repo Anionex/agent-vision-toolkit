@@ -61,6 +61,32 @@ def main():
     else:
         raise AssertionError("unsupported content encodings must fail explicitly")
 
+    try:
+        module._decode_request_body(RAW, "gzip, gzip, gzip, gzip, gzip")
+    except module._InvalidContentEncoding as exc:
+        assert "Too many Content-Encoding layers" in str(exc)
+    else:
+        raise AssertionError("content encoding layers must be bounded")
+
+    try:
+        module._decode_request_body(zlib.compress(RAW) + b"JUNK", "deflate")
+    except module._InvalidContentEncoding as exc:
+        assert "trailing data" in str(exc)
+    else:
+        raise AssertionError("deflate trailing data must not be discarded")
+
+    original_loader = module._load_zstd_library
+    module._load_zstd_library = lambda: type(
+        "UnavailableZstd", (), {"ZSTD_createDStream": lambda self: 0})()
+    try:
+        module._decompress_zstd_native(bytearray(ZSTD_FIXTURE))
+    except module._ContentDecoderError:
+        pass
+    else:
+        raise AssertionError("decoder initialization failures must be server errors")
+    finally:
+        module._load_zstd_library = original_loader
+
     original_limit = module.MAX_DECODED_BODY_BYTES
     module.MAX_DECODED_BODY_BYTES = len(RAW)
     assert module._decode_request_body(gzip.compress(RAW), "gzip") == RAW
