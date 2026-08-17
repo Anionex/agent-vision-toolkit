@@ -58,7 +58,8 @@ typography, shadows, decorative details, and icon geometry.
 ### Render once, fix once, deliver
 
 1. Render the target viewport with `scripts/html_shot.py` or the project's
-   existing browser setup.
+   existing browser setup. Use `--full-page` only when the reference covers a
+   complete scrolling document; keep the same logical viewport either way.
 2. Inspect the screenshot once. If there is an obvious structural failure such
    as a missing major region, broken wrapping, or a wildly wrong scale, make
    one focused correction and render once more.
@@ -173,7 +174,8 @@ sheet instead of checking them from filenames alone.
 For an existing implementation, start here.
 
 1. Render at the same logical viewport with `scripts/html_shot.py` or the
-   project's browser test setup.
+   project's browser test setup. For a long-page reference, add `--full-page`
+   rather than increasing `--height`, which would change `vh`-based layout.
 2. Compare the render and reference at the same dimensions. Inspect them side
    by side; use `scripts/pixel_diff.py` to locate differences that are hard to
    spot or explain.

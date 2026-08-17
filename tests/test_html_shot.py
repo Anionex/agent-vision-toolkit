@@ -58,7 +58,7 @@ def test_cli_screenshot():
                          "<h1>probe</h1></body></html>")
         output = os.path.join(temp_dir, "out.png")
         result = subprocess.run([sys.executable, SCRIPT, html, "--width", "320", "--height", "200",
-                                 "-o", output], text=True, capture_output=True)
+                                 "-o", output], text=True, capture_output=True, timeout=30)
         if result.returncode != 0:
             raise AssertionError(result.stderr)
         assert os.path.isfile(output)
@@ -73,7 +73,7 @@ def test_cli_default_output_in_cwd():
             handle.write("<!doctype html><html><body style=\"margin:0;background:#fff\">"
                          "<p>hi</p></body></html>")
         result = subprocess.run([sys.executable, SCRIPT, html, "--width", "200", "--height", "100"],
-                                cwd=temp_dir, text=True, capture_output=True)
+                                cwd=temp_dir, text=True, capture_output=True, timeout=30)
         if result.returncode != 0:
             raise AssertionError(result.stderr)
         assert os.path.isfile(os.path.join(temp_dir, "probe.png"))
@@ -82,8 +82,59 @@ def test_cli_default_output_in_cwd():
 def test_cli_missing_file_error():
     with tempfile.TemporaryDirectory() as temp_dir:
         result = subprocess.run([sys.executable, SCRIPT, os.path.join(temp_dir, "nope.html")],
-                                text=True, capture_output=True)
+                                text=True, capture_output=True, timeout=30)
         assert result.returncode != 0 and "not found" in result.stderr
+
+
+def test_cli_full_page_keeps_layout_viewport():
+    try:
+        from PIL import Image
+    except ImportError:
+        print("SKIP: Pillow not installed; cannot verify the full-page PNG")
+        return
+    with tempfile.TemporaryDirectory() as temp_dir:
+        html = os.path.join(temp_dir, "full-page.html")
+        with open(html, "w") as handle:
+            handle.write(
+                "<!doctype html><html><head><style>"
+                "html,body{margin:0}"
+                ".viewport{height:100vh;background:#ff0000}"
+                ".tail{height:240px;background:#0000ff}"
+                "</style></head><body>"
+                '<div class="viewport"></div><div class="tail"></div>'
+                "</body></html>"
+            )
+        output = os.path.join(temp_dir, "full-page.png")
+        result = subprocess.run([
+            sys.executable, SCRIPT, html,
+            "--width", "320", "--height", "200", "--scale", "2",
+            "--full-page", "--max-pixels", "1000000", "-o", output,
+        ], text=True, capture_output=True, timeout=30)
+        if result.returncode != 0:
+            raise AssertionError(result.stderr)
+        assert "pageHeight=440" in result.stdout
+        with Image.open(output) as shot:
+            assert shot.size == (640, 880)
+            assert shot.getpixel((20, 398))[:3] == (255, 0, 0)
+            assert shot.getpixel((20, 402))[:3] == (0, 0, 255)
+
+
+def test_cli_full_page_max_pixels_guard():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        html = os.path.join(temp_dir, "too-tall.html")
+        with open(html, "w") as handle:
+            handle.write(
+                "<!doctype html><html><body style=\"margin:0;height:1000px\"></body></html>"
+            )
+        output = os.path.join(temp_dir, "blocked.png")
+        result = subprocess.run([
+            sys.executable, SCRIPT, html,
+            "--width", "320", "--height", "200", "--full-page",
+            "--max-pixels", "1000", "-o", output,
+        ], text=True, capture_output=True, timeout=30)
+        assert result.returncode != 0
+        assert "exceed --max-pixels" in result.stderr
+        assert not os.path.exists(output)
 
 
 def main():
@@ -92,6 +143,8 @@ def main():
     if test_chrome_discovery():
         test_cli_screenshot()
         test_cli_default_output_in_cwd()
+        test_cli_full_page_keeps_layout_viewport()
+        test_cli_full_page_max_pixels_guard()
     print("HTML SHOT TEST PASS")
 
 
