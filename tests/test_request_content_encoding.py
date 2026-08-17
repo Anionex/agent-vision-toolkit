@@ -121,6 +121,21 @@ def main():
     else:
         raise AssertionError("Python zstd allocation failures must be server errors")
 
+    for message in (
+        "Operation not authorized at current processing stage",
+        "Context should be init first",
+        "Destination buffer is too small",
+        "Operation on NULL destination buffer",
+        "Operation made no progress over multiple calls, due to output buffer being full",
+        "Operation made no progress over multiple calls, due to input being empty",
+    ):
+        try:
+            module._raise_python_zstd_error(RuntimeError(message))
+        except module._ContentDecoderError:
+            pass
+        else:
+            raise AssertionError(f"Python zstd internal error was misclassified: {message}")
+
     try:
         module._raise_python_zstd_error(RuntimeError("Unknown frame descriptor"))
     except module._InvalidContentEncoding:

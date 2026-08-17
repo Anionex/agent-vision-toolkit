@@ -174,7 +174,9 @@ def _raise_python_zstd_error(exc):
     message = str(exc)
     internal_markers = (
         "allocation", "not enough memory", "workspace", "internal error",
-        "stage wrong", "init missing",
+        "current processing stage", "context should be init first",
+        "destination buffer is too small", "null destination buffer",
+        "output buffer being full", "input being empty",
     )
     if any(marker in message.lower() for marker in internal_markers):
         raise _ContentDecoderError(f"zstd decoder failed: {message}") from exc
@@ -254,24 +256,7 @@ def _decompress_zstd(body):
         except zstd.ZstdError as exc:
             _raise_python_zstd_error(exc)
 
-    try:
-        return _decompress_zstd_native(body)
-    except _UnsupportedContentEncoding as native_error:
-        # Keep the proxy dependency-free, but use the widely available Python
-        # binding when a platform does not expose libzstd as a shared library.
-        try:
-            import zstandard
-        except ImportError:
-            raise native_error
-        try:
-            decompressor = zstandard.ZstdDecompressor(
-                max_window_size=1 << ZSTD_WINDOW_LOG_MAX)
-            with decompressor.stream_reader(io.BytesIO(body)) as reader:
-                return _read_decoded_stream(reader)
-        except MemoryError as exc:
-            raise _ContentDecoderError("zstd decoder ran out of memory") from exc
-        except zstandard.ZstdError as exc:
-            _raise_python_zstd_error(exc)
+    return _decompress_zstd_native(body)
 
 
 def _decompress_deflate(body, wbits):
