@@ -109,6 +109,12 @@ ground <image> "<target>" --region X1,Y1,X2,Y2
 Output: `x1: .., y1: .., x2: .., y2: ..` in original-image pixels — with
 `--region` too (crop hits are mapped back).
 
+Provider-native 0-1000 boxes do not all use the same array order: Gemini uses
+`[y0, x0, y1, x1]`, while Qwen3-VL, Qwen3.5, and Qwen3.6 use
+`[x0, y0, x1, y1]`. Grounding code must select the order by model family (or
+an explicit override) before scaling to pixels; never parse every provider as
+Gemini-style `yxyx`.
+
 If several boxes come back numbered, your description matched more than
 one element rather than picking out a single thing. Narrow it with what
 distinguishes the one you mean — its text, its position, the block it sits
