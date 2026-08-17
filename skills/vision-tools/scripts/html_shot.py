@@ -34,6 +34,10 @@ CHROME_CANDIDATES = (
     "microsoft-edge", "brave-browser",
 )
 
+FULL_PAGE_TIMEOUT_SECONDS = 30.0
+FULL_PAGE_MAX_GROWTH_ROUNDS = 25
+FULL_PAGE_MAX_SCROLL_STEPS = 2000
+
 
 def find_chrome() -> str | None:
     for candidate in CHROME_CANDIDATES:
@@ -59,12 +63,6 @@ def default_output(source: str) -> str:
         stem = Path(urlparse(source).path).stem
         return f"{stem or 'page'}.png"
     return f"{Path(source).stem}.png"
-
-
-def reserve_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-        listener.bind(("127.0.0.1", 0))
-        return int(listener.getsockname()[1])
 
 
 def read_http_json(port: int, path: str) -> object:
@@ -235,6 +233,25 @@ def wait_for_target(port: int, deadline: float) -> dict:
     raise RuntimeError(f"timed out waiting for Chrome DevTools{detail}")
 
 
+def wait_for_devtools_port(profile: Path, process: subprocess.Popen,
+                           deadline: float) -> int:
+    active_port = profile / "DevToolsActivePort"
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(f"Chrome exited before DevTools was ready (code {process.returncode})")
+        try:
+            lines = active_port.read_text().splitlines()
+            port = int(lines[0])
+            if 0 < port <= 65535:
+                return port
+        except (OSError, ValueError, IndexError) as error:
+            last_error = error
+        time.sleep(0.05)
+    detail = f": {last_error}" if last_error else ""
+    raise RuntimeError(f"timed out waiting for Chrome DevTools port{detail}")
+
+
 def wait_for_ready(client: DevToolsSocket, deadline: float) -> None:
     while time.monotonic() < deadline:
         if evaluate(client, "document.readyState") == "complete":
@@ -247,27 +264,132 @@ def pause_for_frame(seconds: float) -> None:
     time.sleep(max(0.02, seconds))
 
 
+def build_full_page_command(chrome: str, source: str, profile: Path,
+                            width: int, height: int, scale: int) -> list[str]:
+    command = [
+        chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+        "--no-first-run", "--no-default-browser-check", "--use-mock-keychain",
+        "--blink-settings=imagesLazyLoadingEnabled=false",
+        f"--window-size={width},{height}",
+        "--remote-debugging-port=0",
+        "--remote-debugging-address=127.0.0.1",
+        f"--user-data-dir={profile}",
+    ]
+    if scale != 1:
+        command.append(f"--force-device-scale-factor={scale}")
+    command.append(source)
+    return command
+
+
+def measure_page_height(client: DevToolsSocket) -> int:
+    return int(evaluate(client, """
+        Math.max(document.documentElement.scrollHeight,
+                 document.body ? document.body.scrollHeight : 0)
+    """) or 0)
+
+
+def enforce_pixel_limit(width: int, page_height: int, scale: int,
+                        max_pixels: int | None) -> None:
+    if page_height <= 0:
+        raise RuntimeError("document has no measurable scroll height")
+    output_pixels = width * page_height * scale * scale
+    if max_pixels is not None and output_pixels > max_pixels:
+        raise RuntimeError(
+            f"full-page screenshot would exceed --max-pixels "
+            f"({output_pixels} > {max_pixels})"
+        )
+
+
+def ensure_before_deadline(deadline: float, message: str) -> None:
+    if time.monotonic() >= deadline:
+        raise RuntimeError(message)
+
+
+def settle_full_page(client: DevToolsSocket, width: int, height: int, scale: int,
+                     max_pixels: int | None, deadline: float) -> int:
+    page_height = measure_page_height(client)
+    enforce_pixel_limit(width, page_height, scale, max_pixels)
+    scan_start = 0
+    growth_rounds = 0
+    scroll_steps = 0
+    waited_for_images = False
+
+    while True:
+        ensure_before_deadline(deadline, "timed out while stabilizing the full page")
+        measured_before_sweep = page_height
+        for position in range(scan_start, measured_before_sweep, max(1, height)):
+            scroll_steps += 1
+            if scroll_steps > FULL_PAGE_MAX_SCROLL_STEPS:
+                raise RuntimeError("full page requires too many scroll steps to capture safely")
+            ensure_before_deadline(deadline, "timed out while scrolling the full page")
+            evaluate(client, f"window.scrollTo(0, {position}); true")
+            pause_for_frame(0.12)
+        evaluate(client, f"window.scrollTo(0, {measured_before_sweep}); true")
+        pause_for_frame(0.12)
+
+        measured_after_sweep = measure_page_height(client)
+        enforce_pixel_limit(width, measured_after_sweep, scale, max_pixels)
+        if measured_after_sweep != measured_before_sweep:
+            growth_rounds += 1
+            if growth_rounds > FULL_PAGE_MAX_GROWTH_ROUNDS:
+                raise RuntimeError("page is still changing after repeated full-page sweeps")
+            scan_start = (max(0, measured_before_sweep - height)
+                          if measured_after_sweep > measured_before_sweep else 0)
+            page_height = measured_after_sweep
+            waited_for_images = False
+            continue
+
+        if not waited_for_images:
+            evaluate(client, """
+                Promise.race([
+                  Promise.all(Array.from(document.images)
+                    .filter(image => !image.complete)
+                    .map(image => new Promise(resolve => {
+                      image.addEventListener('load', resolve, {once: true});
+                      image.addEventListener('error', resolve, {once: true});
+                    }))),
+                  new Promise(resolve => setTimeout(resolve, 3000))
+                ]).then(() => true)
+            """)
+            waited_for_images = True
+            ensure_before_deadline(deadline, "timed out while waiting for full-page images")
+            measured_after_images = measure_page_height(client)
+            enforce_pixel_limit(width, measured_after_images, scale, max_pixels)
+            if measured_after_images != page_height:
+                growth_rounds += 1
+                if growth_rounds > FULL_PAGE_MAX_GROWTH_ROUNDS:
+                    raise RuntimeError("page is still changing after image loading")
+                scan_start = (max(0, page_height - height)
+                              if measured_after_images > page_height else 0)
+                page_height = measured_after_images
+                waited_for_images = False
+                continue
+
+        evaluate(client, "window.scrollTo(0, 0); true")
+        pause_for_frame(0.5)
+        final_height = measure_page_height(client)
+        enforce_pixel_limit(width, final_height, scale, max_pixels)
+        if final_height == page_height:
+            return final_height
+        growth_rounds += 1
+        if growth_rounds > FULL_PAGE_MAX_GROWTH_ROUNDS:
+            raise RuntimeError("page is still changing before full-page capture")
+        scan_start = max(0, page_height - height) if final_height > page_height else 0
+        page_height = final_height
+        waited_for_images = False
+
+
 def capture_full_page(chrome: str, source: str, output: Path, width: int, height: int,
                       scale: int, wait_ms: int, max_pixels: int | None) -> int:
-    port = reserve_port()
-    profile = tempfile.mkdtemp(prefix="agent-vision-html-shot-")
+    profile = Path(tempfile.mkdtemp(prefix="agent-vision-html-shot-"))
     process: subprocess.Popen | None = None
     client: DevToolsSocket | None = None
     try:
-        command = [
-            chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-            "--no-first-run", "--no-default-browser-check",
-            "--blink-settings=imagesLazyLoadingEnabled=false",
-            f"--window-size={width},{height}",
-            f"--remote-debugging-port={port}",
-            "--remote-debugging-address=127.0.0.1",
-        ]
-        command.append(f"--user-data-dir={profile}")
-        if scale != 1:
-            command.append(f"--force-device-scale-factor={scale}")
-        command.append(source)
+        command = build_full_page_command(chrome, source, profile, width, height, scale)
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        target = wait_for_target(port, time.monotonic() + 15.0)
+        startup_deadline = time.monotonic() + 15.0
+        port = wait_for_devtools_port(profile, process, startup_deadline)
+        target = wait_for_target(port, startup_deadline)
         client = DevToolsSocket(str(target["webSocketDebuggerUrl"]))
         client.command("Page.enable")
         client.command("Runtime.enable")
@@ -294,48 +416,10 @@ def capture_full_page(chrome: str, source: str, output: Path, width: int, height
               return true;
             })()
         """)
-        page_height = int(evaluate(client, """
-            Math.max(document.documentElement.scrollHeight,
-                     document.body ? document.body.scrollHeight : 0)
-        """) or 0)
-        for _ in range(2):
-            measured_before_sweep = page_height
-            for position in range(0, page_height, max(1, height)):
-                evaluate(client, f"window.scrollTo(0, {position}); true")
-                pause_for_frame(0.12)
-            evaluate(client, f"window.scrollTo(0, {page_height}); true")
-            pause_for_frame(0.12)
-            page_height = int(evaluate(client, """
-                Math.max(document.documentElement.scrollHeight,
-                         document.body ? document.body.scrollHeight : 0)
-            """) or 0)
-            if page_height <= measured_before_sweep:
-                break
-        evaluate(client, """
-            Promise.race([
-              Promise.all(Array.from(document.images)
-                .filter(image => !image.complete)
-                .map(image => new Promise(resolve => {
-                  image.addEventListener('load', resolve, {once: true});
-                  image.addEventListener('error', resolve, {once: true});
-                }))),
-              new Promise(resolve => setTimeout(resolve, 3000))
-            ]).then(() => true)
-        """)
-        evaluate(client, "window.scrollTo(0, 0); true")
-        pause_for_frame(0.5)
-        page_height = int(evaluate(client, """
-            Math.max(document.documentElement.scrollHeight,
-                     document.body ? document.body.scrollHeight : 0)
-        """) or 0)
-        if page_height <= 0:
-            raise RuntimeError("document has no measurable scroll height")
-        output_pixels = width * page_height * scale * scale
-        if max_pixels is not None and output_pixels > max_pixels:
-            raise RuntimeError(
-                f"full-page screenshot would exceed --max-pixels "
-                f"({output_pixels} > {max_pixels})"
-            )
+        page_height = settle_full_page(
+            client, width, height, scale, max_pixels,
+            time.monotonic() + FULL_PAGE_TIMEOUT_SECONDS,
+        )
         result = client.command("Page.captureScreenshot", {
             "format": "png",
             "fromSurface": True,

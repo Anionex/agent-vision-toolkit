@@ -26,7 +26,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile Python entry points
-        run: python -m py_compile vision_proxy.py vision_client.py ground.py detect.py bin/glance bin/trace bin/crop
+        run: python -m py_compile vision_proxy.py vision_client.py ground.py detect.py bin/glance bin/trace bin/crop skills/vision-tools/scripts/html_shot.py
       - name: Run core tests
         run: |
           python tests/test_image_rewrite_shapes.py
@@ -35,6 +35,7 @@ jobs:
           python tests/smoke_test_proxy.py
           python tests/smoke_test_egress_failover.py
           python tests/test_vision_client.py
+          python tests/test_html_shot.py
           python tests/test_restore_ui_playbook.py
           python tests/test_trace.py
 
@@ -46,10 +47,11 @@ jobs:
         with:
           python-version: "3.14"
       - name: Compile proxy entry points
-        run: python -m py_compile vision_proxy.py vision_client.py tests/smoke_test_egress_failover.py
+        run: python -m py_compile vision_proxy.py vision_client.py skills/vision-tools/scripts/html_shot.py tests/smoke_test_egress_failover.py
       - name: Run Windows egress smoke test
         run: |
           python tests/smoke_test_egress_failover.py
+          python tests/test_html_shot.py
           python tests/test_trace.py
 
   extensions:

@@ -163,6 +163,42 @@ def main():
         assert Handler.calls == 1, "daily quota exhaustion must not be retried"
         assert delays == []
 
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0,
+            [429],
+            [b'{"error":{"code":"global_daily_limit_exceeded","message":"Capacity reached"}}'],
+            [{"Retry-After": "3600"}],
+        )
+        delays = []
+        original_sleep = vision_client.time.sleep
+        vision_client.time.sleep = delays.append
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        except vision_client.VisionError as exc:
+            assert "global_daily_limit_exceeded" in str(exc)
+        else:
+            raise AssertionError("global daily quota exhaustion must fail immediately")
+        finally:
+            vision_client.time.sleep = original_sleep
+        assert Handler.calls == 1
+        assert delays == []
+
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0,
+            [429, 200],
+            [b'{"error":{"code":"rate_limit_exceeded","message":"Retry shortly"}}'],
+            [{"Retry-After": "2"}, {}],
+        )
+        delays = []
+        original_sleep = vision_client.time.sleep
+        vision_client.time.sleep = delays.append
+        try:
+            assert vision_client.describe_image("data:image/png;base64,AAAA") == "fixture answer"
+        finally:
+            vision_client.time.sleep = original_sleep
+        assert Handler.calls == 2, "transient rate limits should remain retryable"
+        assert delays == [2.0]
+
         Handler.calls, Handler.statuses, Handler.bodies = 0, [200], []
         os.environ["VISION_USER_AGENT"] = "custom-vision-client/2.0"
         try:
