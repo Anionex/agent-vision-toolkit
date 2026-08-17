@@ -11,6 +11,7 @@ that carries Codex identity signals, and checks:
 """
 
 import base64
+import gzip
 import http.client
 import importlib.util
 import json
@@ -18,6 +19,7 @@ import os
 import subprocess
 import sys
 import time
+import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -203,6 +205,36 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
         assert status == 200 and raw == anth_body.encode(), (status, raw)
         assert next((v for k, v in ups2.items() if k.lower() == "x-api-key"), None) == "existing-anthropic-key"
         print("DIALECT PASS: anthropic text-only bodies pass through byte-for-byte")
+
+        layered_raw = b'{"model":"m","input":"compressed text"}'
+        layered_body = zlib.compress(gzip.compress(layered_raw))
+        layered = http.client.HTTPConnection("127.0.0.1", 19101, timeout=5)
+        layered.putrequest("POST", "/responses")
+        layered.putheader("Content-Type", "application/json")
+        layered.putheader("Content-Encoding", "gzip")
+        layered.putheader("Content-Encoding", "deflate")
+        layered.putheader("Content-Length", str(len(layered_body)))
+        layered.endheaders(layered_body)
+        layered_response = layered.getresponse()
+        layered_response.read()
+        layered.close()
+        layered_headers = json.load(open("/tmp/up_headers.json"))
+        assert layered_response.status == 200, layered_response.status
+        assert open("/tmp/up_body.json", "rb").read() == layered_raw
+        assert not any(k.lower() == "content-encoding" for k in layered_headers)
+        print("LAYERED ENCODING PASS: repeated headers decode in wire order")
+
+        oversized = http.client.HTTPConnection("127.0.0.1", 19101, timeout=5)
+        oversized.putrequest("POST", "/responses")
+        oversized.putheader("Content-Type", "application/json")
+        oversized.putheader("Content-Length", str(module.MAX_REQUEST_BODY_BYTES + 1))
+        oversized.endheaders()
+        oversized_response = oversized.getresponse()
+        oversized_body = oversized_response.read()
+        oversized.close()
+        assert oversized_response.status == 413, oversized_response.status
+        assert b"Request body exceeds" in oversized_body, oversized_body
+        print("REQUEST LIMIT PASS: oversized wire bodies return 413 before reading")
 
         # ---- degraded: image bodies without vision config become a visible note ----
         env2 = {k: v for k, v in os.environ.items() if not k.startswith("VISION_")}

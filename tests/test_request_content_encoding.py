@@ -41,10 +41,17 @@ def main():
     assert module._decode_request_body(ZSTD_SIZELESS_FIXTURE, "zstd") == RAW
     assert module._decode_request_body(gzip.compress(RAW), "gzip") == RAW
     assert module._decode_request_body(zlib.compress(RAW), "deflate") == RAW
+    raw_encoder = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+    raw_deflate = raw_encoder.compress(RAW) + raw_encoder.flush()
+    assert module._decode_request_body(raw_deflate, "deflate") == RAW
+    layered = zlib.compress(gzip.compress(RAW))
+    assert module._decode_request_body(layered, "gzip, deflate") == RAW
 
-    forwarded = module.Proxy(1, "http://example", "", False, False)._upstream_headers([
-        ("Content-Encoding", "zstd"), ("Content-Type", "application/json")])
-    assert ("Content-Encoding", "zstd") not in forwarded
+    incoming = [("Content-Encoding", "gzip"), ("Content-Encoding", "deflate"),
+                ("Content-Type", "application/json")]
+    assert module._header_values(incoming, "content-encoding") == "gzip, deflate"
+    forwarded = module.Proxy(1, "http://example", "", False, False)._upstream_headers(incoming)
+    assert not any(key.lower() == "content-encoding" for key, _ in forwarded)
     assert ("Content-Type", "application/json") in forwarded
 
     try:
@@ -53,6 +60,19 @@ def main():
         assert "Unsupported Content-Encoding: br" in str(exc)
     else:
         raise AssertionError("unsupported content encodings must fail explicitly")
+
+    original_limit = module.MAX_DECODED_BODY_BYTES
+    module.MAX_DECODED_BODY_BYTES = len(RAW)
+    assert module._decode_request_body(gzip.compress(RAW), "gzip") == RAW
+    module.MAX_DECODED_BODY_BYTES = len(RAW) - 1
+    try:
+        module._decode_request_body(gzip.compress(RAW), "gzip")
+    except module._RequestBodyTooLarge:
+        pass
+    else:
+        raise AssertionError("decoded request bodies must enforce the size limit")
+    finally:
+        module.MAX_DECODED_BODY_BYTES = original_limit
 
     parsed = json.loads(module._decode_request_body(ZSTD_FIXTURE, "zstd"))
     assert parsed["input"][0]["type"] == "function_call_output"

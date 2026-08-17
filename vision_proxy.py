@@ -18,6 +18,7 @@ import re
 import signal
 import socket
 import ssl
+import threading
 import time
 import urllib.parse
 import zlib
@@ -32,10 +33,18 @@ CODEX_HEADERS = {"originator", "session-id", "thread-id", "user-agent"}
 # streaming keeps the long read timeout the proxy always had (600s).
 EGRESS_CONNECT_TIMEOUT = 5.0
 EGRESS_READ_TIMEOUT = 600.0
+MAX_REQUEST_BODY_BYTES = 64 * 1024 * 1024
+MAX_DECODED_BODY_BYTES = 64 * 1024 * 1024
+DECODE_CHUNK_BYTES = 64 * 1024
+ZSTD_WINDOW_LOG_MAX = 26
 
 
 def _header_value(headers, name):
     return next((value for key, value in headers if key.lower() == name.lower()), None)
+
+
+def _header_values(headers, name):
+    return ", ".join(value for key, value in headers if key.lower() == name.lower())
 
 
 def _authority(host, port):
@@ -52,6 +61,10 @@ class _InvalidContentEncoding(ValueError):
     pass
 
 
+class _RequestBodyTooLarge(ValueError):
+    pass
+
+
 class _ZstdInBuffer(ctypes.Structure):
     _fields_ = [("src", ctypes.c_void_p),
                 ("size", ctypes.c_size_t),
@@ -65,58 +78,65 @@ class _ZstdOutBuffer(ctypes.Structure):
 
 
 _ZSTD_LIBRARY = None
+_ZSTD_LIBRARY_LOCK = threading.Lock()
 
 
 def _load_zstd_library():
     global _ZSTD_LIBRARY
     if _ZSTD_LIBRARY is not None:
         return _ZSTD_LIBRARY
+    with _ZSTD_LIBRARY_LOCK:
+        if _ZSTD_LIBRARY is not None:
+            return _ZSTD_LIBRARY
 
-    candidates = [ctypes.util.find_library("zstd"),
-                  "/opt/homebrew/lib/libzstd.dylib",
-                  "/usr/local/lib/libzstd.dylib",
-                  "/usr/lib/libzstd.so.1",
-                  "/usr/lib/x86_64-linux-gnu/libzstd.so.1",
-                  "/usr/lib/aarch64-linux-gnu/libzstd.so.1",
-                  "libzstd.so.1", "libzstd.so", "libzstd.dylib",
-                  "libzstd.dll", "zstd.dll"]
-    for root in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)"),
-                 os.environ.get("LOCALAPPDATA")):
-        if root:
-            candidates.append(os.path.join(root, "Git", "mingw64", "bin", "libzstd.dll"))
-            candidates.append(os.path.join(root, "Programs", "Git", "mingw64", "bin",
-                                           "libzstd.dll"))
-    library = None
-    for candidate in candidates:
-        if not candidate:
-            continue
-        try:
-            library = ctypes.CDLL(candidate)
-            break
-        except OSError:
-            continue
-    if library is None:
-        raise _UnsupportedContentEncoding(
-            "Unsupported Content-Encoding: zstd (libzstd is unavailable)")
+        candidates = [ctypes.util.find_library("zstd"),
+                      "/opt/homebrew/lib/libzstd.dylib",
+                      "/usr/local/lib/libzstd.dylib",
+                      "/usr/lib/libzstd.so.1",
+                      "/usr/lib/x86_64-linux-gnu/libzstd.so.1",
+                      "/usr/lib/aarch64-linux-gnu/libzstd.so.1",
+                      "libzstd.so.1", "libzstd.so", "libzstd.dylib",
+                      "libzstd.dll", "zstd.dll"]
+        for root in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)"),
+                     os.environ.get("LOCALAPPDATA")):
+            if root:
+                candidates.append(os.path.join(root, "Git", "mingw64", "bin", "libzstd.dll"))
+                candidates.append(os.path.join(root, "Programs", "Git", "mingw64", "bin",
+                                               "libzstd.dll"))
+        library = None
+        for candidate in dict.fromkeys(candidates):
+            if not candidate:
+                continue
+            try:
+                library = ctypes.CDLL(candidate)
+                break
+            except OSError:
+                continue
+        if library is None:
+            raise _UnsupportedContentEncoding(
+                "Unsupported Content-Encoding: zstd (no decoder is available)")
 
-    library.ZSTD_createDStream.argtypes = []
-    library.ZSTD_createDStream.restype = ctypes.c_void_p
-    library.ZSTD_freeDStream.argtypes = [ctypes.c_void_p]
-    library.ZSTD_freeDStream.restype = ctypes.c_size_t
-    library.ZSTD_initDStream.argtypes = [ctypes.c_void_p]
-    library.ZSTD_initDStream.restype = ctypes.c_size_t
-    library.ZSTD_DStreamOutSize.argtypes = []
-    library.ZSTD_DStreamOutSize.restype = ctypes.c_size_t
-    library.ZSTD_decompressStream.argtypes = [ctypes.c_void_p,
-                                               ctypes.POINTER(_ZstdOutBuffer),
-                                               ctypes.POINTER(_ZstdInBuffer)]
-    library.ZSTD_decompressStream.restype = ctypes.c_size_t
-    library.ZSTD_isError.argtypes = [ctypes.c_size_t]
-    library.ZSTD_isError.restype = ctypes.c_uint
-    library.ZSTD_getErrorName.argtypes = [ctypes.c_size_t]
-    library.ZSTD_getErrorName.restype = ctypes.c_char_p
-    _ZSTD_LIBRARY = library
-    return library
+        library.ZSTD_createDStream.argtypes = []
+        library.ZSTD_createDStream.restype = ctypes.c_void_p
+        library.ZSTD_freeDStream.argtypes = [ctypes.c_void_p]
+        library.ZSTD_freeDStream.restype = ctypes.c_size_t
+        library.ZSTD_initDStream.argtypes = [ctypes.c_void_p]
+        library.ZSTD_initDStream.restype = ctypes.c_size_t
+        library.ZSTD_DStreamOutSize.argtypes = []
+        library.ZSTD_DStreamOutSize.restype = ctypes.c_size_t
+        library.ZSTD_decompressStream.argtypes = [ctypes.c_void_p,
+                                                   ctypes.POINTER(_ZstdOutBuffer),
+                                                   ctypes.POINTER(_ZstdInBuffer)]
+        library.ZSTD_decompressStream.restype = ctypes.c_size_t
+        library.ZSTD_DCtx_setParameter.argtypes = [ctypes.c_void_p, ctypes.c_int,
+                                                    ctypes.c_int]
+        library.ZSTD_DCtx_setParameter.restype = ctypes.c_size_t
+        library.ZSTD_isError.argtypes = [ctypes.c_size_t]
+        library.ZSTD_isError.restype = ctypes.c_uint
+        library.ZSTD_getErrorName.argtypes = [ctypes.c_size_t]
+        library.ZSTD_getErrorName.restype = ctypes.c_char_p
+        _ZSTD_LIBRARY = library
+        return library
 
 
 def _zstd_error(library, result):
@@ -124,6 +144,23 @@ def _zstd_error(library, result):
         return None
     name = library.ZSTD_getErrorName(result)
     return name.decode("utf-8", errors="replace") if name else "unknown zstd error"
+
+
+def _append_decoded(output, chunk):
+    if len(output) + len(chunk) > MAX_DECODED_BODY_BYTES:
+        raise _RequestBodyTooLarge(
+            f"Decoded request body exceeds {MAX_DECODED_BODY_BYTES} bytes")
+    output.extend(chunk)
+
+
+def _read_decoded_stream(reader):
+    output = bytearray()
+    while True:
+        chunk = reader.read(min(DECODE_CHUNK_BYTES,
+                                MAX_DECODED_BODY_BYTES - len(output) + 1))
+        if not chunk:
+            return output
+        _append_decoded(output, chunk)
 
 
 def _decompress_zstd_native(body):
@@ -134,8 +171,12 @@ def _decompress_zstd_native(body):
 
     source = ctypes.create_string_buffer(body)
     input_buffer = _ZstdInBuffer(ctypes.cast(source, ctypes.c_void_p), len(body), 0)
-    chunks = []
+    output_bytes = bytearray()
     try:
+        result = library.ZSTD_DCtx_setParameter(stream, 100, ZSTD_WINDOW_LOG_MAX)
+        error = _zstd_error(library, result)
+        if error:
+            raise _InvalidContentEncoding(f"Invalid zstd request body: {error}")
         result = library.ZSTD_initDStream(stream)
         error = _zstd_error(library, result)
         if error:
@@ -152,14 +193,14 @@ def _decompress_zstd_native(body):
             if error:
                 raise _InvalidContentEncoding(f"Invalid zstd request body: {error}")
             if output_buffer.pos:
-                chunks.append(output.raw[:output_buffer.pos])
+                _append_decoded(output_bytes, output.raw[:output_buffer.pos])
             if result == 0 and input_buffer.pos == input_buffer.size:
                 break
             if input_buffer.pos == previous_input_pos and output_buffer.pos == 0:
                 raise _InvalidContentEncoding("Invalid zstd request body: truncated frame")
     finally:
         library.ZSTD_freeDStream(stream)
-    return b"".join(chunks)
+    return output_bytes
 
 
 def _decompress_zstd(body):
@@ -169,8 +210,10 @@ def _decompress_zstd(body):
         pass
     else:
         try:
-            return zstd.decompress(body)
-        except Exception as exc:
+            options = {zstd.DecompressionParameter.window_log_max: ZSTD_WINDOW_LOG_MAX}
+            with zstd.open(io.BytesIO(body), "rb", options=options) as reader:
+                return _read_decoded_stream(reader)
+        except zstd.ZstdError as exc:
             raise _InvalidContentEncoding(f"Invalid zstd request body: {exc}") from exc
 
     try:
@@ -183,10 +226,33 @@ def _decompress_zstd(body):
         except ImportError:
             raise native_error
         try:
-            with zstandard.ZstdDecompressor().stream_reader(io.BytesIO(body)) as reader:
-                return reader.read()
-        except Exception as exc:
+            decompressor = zstandard.ZstdDecompressor(
+                max_window_size=1 << ZSTD_WINDOW_LOG_MAX)
+            with decompressor.stream_reader(io.BytesIO(body)) as reader:
+                return _read_decoded_stream(reader)
+        except zstandard.ZstdError as exc:
             raise _InvalidContentEncoding(f"Invalid zstd request body: {exc}") from exc
+
+
+def _decompress_deflate(body, wbits):
+    decoder = zlib.decompressobj(wbits)
+    output = bytearray()
+    pending = body
+    while pending:
+        before = len(pending)
+        chunk = decoder.decompress(
+            pending, min(DECODE_CHUNK_BYTES, MAX_DECODED_BODY_BYTES - len(output) + 1))
+        _append_decoded(output, chunk)
+        pending = decoder.unconsumed_tail
+        if pending and len(pending) == before and not chunk:
+            raise _InvalidContentEncoding("Invalid deflate request body: decoder made no progress")
+    if not decoder.eof:
+        raise _InvalidContentEncoding("Invalid deflate request body: truncated stream")
+    _append_decoded(
+        output,
+        decoder.flush(min(DECODE_CHUNK_BYTES, MAX_DECODED_BODY_BYTES - len(output) + 1)),
+    )
+    return output
 
 
 def _decode_request_body(body, content_encoding):
@@ -197,12 +263,13 @@ def _decode_request_body(body, content_encoding):
             if coding == "identity":
                 continue
             if coding in ("gzip", "x-gzip"):
-                body = gzip.decompress(body)
+                with gzip.GzipFile(fileobj=io.BytesIO(body)) as reader:
+                    body = _read_decoded_stream(reader)
             elif coding == "deflate":
                 try:
-                    body = zlib.decompress(body)
+                    body = _decompress_deflate(body, zlib.MAX_WBITS)
                 except zlib.error:
-                    body = zlib.decompress(body, -zlib.MAX_WBITS)
+                    body = _decompress_deflate(body, -zlib.MAX_WBITS)
             elif coding == "zstd":
                 body = _decompress_zstd(body)
             else:
@@ -1081,6 +1148,7 @@ class Proxy:
             self._routes.append(_EgressRoute("proxy", upstream_proxy))
         if proxy_first and len(self._routes) > 1:
             self._routes.reverse()
+        self._decode_semaphore = asyncio.Semaphore(2)
         os.environ["VISION_LOG_FILE"] = log_path
 
     def _upstream_headers(self, incoming):
@@ -1111,6 +1179,11 @@ class Proxy:
             except ValueError:
                 await self._send_error(writer, 400, "invalid Content-Length")
                 return
+            if content_length > MAX_REQUEST_BODY_BYTES:
+                await self._send_error(
+                    writer, 413,
+                    f"Request body exceeds {MAX_REQUEST_BODY_BYTES} bytes")
+                return
             body = bytearray(body_start)
             while len(body) < content_length:
                 chunk = await reader.read(min(65536, content_length - len(body)))
@@ -1120,9 +1193,18 @@ class Proxy:
             if len(body) < content_length:
                 await self._send_error(writer, 400, "incomplete request body")
                 return
+            content_encoding = _header_values(incoming_headers, "content-encoding")
             try:
-                body = bytearray(_decode_request_body(
-                    bytes(body), _header_value(incoming_headers, "content-encoding")))
+                if content_encoding:
+                    async with self._decode_semaphore:
+                        body = await asyncio.to_thread(
+                            _decode_request_body, bytes(body), content_encoding)
+                    if not isinstance(body, bytearray):
+                        body = bytearray(body)
+            except _RequestBodyTooLarge as exc:
+                _log(f"[vision-proxy] request decode rejected: {exc}")
+                await self._send_error(writer, 413, str(exc))
+                return
             except _UnsupportedContentEncoding as exc:
                 _log(f"[vision-proxy] request decode rejected: {exc}")
                 await self._send_error(writer, 415, str(exc))
