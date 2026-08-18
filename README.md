@@ -37,6 +37,8 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 
 ## Latest Update
 
+**2026-08-18 — Skill renamed:** the included agent skill is now `vision-skills` (formerly `vision-tools`), so the name describes the capability rather than the underlying tools.
+
 **2026-08-13 — Native DeepSeek Harness support is now available.** The new [`dsh-vision-toolkit`](https://github.com/Anionex/dsh-vision-toolkit) linked package brings this toolkit into DSH Web and Headless profiles as a native Profile Bundle. It provides 10 structured visual tools for intent-aware image Q&A, grounding, detection, tracing, cropping, pixel diff, long-screenshot OCR, foreground extraction, dominant-color analysis, and HTML screenshots, while adding DSH Credentials, a managed isolated runtime, previewable Artifacts, Web Settings, and Agent-scoped progressive tool exposure.
 
 The package is tracked here as a Git submodule and maintained independently at [`Anionex/dsh-vision-toolkit`](https://github.com/Anionex/dsh-vision-toolkit). Clone this repository with `--recurse-submodules`, or run `git submodule update --init --recursive` in an existing checkout.
@@ -70,16 +72,16 @@ The package is tracked here as a Git submodule and maintained independently at [
 
 ## Use-case Playbooks
 
-The included `vision-tools` skill contains complete examples that an agent can follow directly.
+The included `vision-skills` skill contains complete examples that an agent can follow directly.
 When to use them, the order in which to call tools, and how to verify the result are all documented in the corresponding skill guides:
 
 | Use case | What the agent learns to do |
 |---|---|
-| [Extract long screenshots, chat histories, and scrolling pages](skills/vision-tools/references/long-screenshot-ocr.md) | Find low-content cut bands, OCR each chunk in order, preserve chat speakers/timestamps/quotes, merge only duplicated overlap, and surface risky boundaries for verification. [See the Telegram reference run →](examples/long-screenshot-ocr/) |
-| [Rebuild a UI from a screenshot or design](skills/vision-tools/references/restore-ui.md) | Reuse project components and assets first, then combine code-native UI, extracted visuals, rendered screenshots, and visual comparison to align a page or component. |
-| [Restore an icon, logo, illustration, or other graphic](skills/vision-tools/references/restore-graphic.md) | Extract a transparent PNG from the source image, or rebuild an editable/scalable SVG when needed, then verify shape, color, and alpha edges. |
-| [Turn a sketch, diagram, or whiteboard into structured code](skills/vision-tools/references/restore-structure.md) | Recover nodes, labels, connections, and directions as editable Mermaid, Graphviz, or another structured representation. |
-| [Operate a GUI from screenshots](skills/vision-tools/references/gui.md) | Locate a control, perform one action, capture the screen again, and verify the resulting state before continuing. |
+| [Extract long screenshots, chat histories, and scrolling pages](skills/vision-skills/references/long-screenshot-ocr.md) | Find low-content cut bands, OCR each chunk in order, preserve chat speakers/timestamps/quotes, merge only duplicated overlap, and surface risky boundaries for verification. [See the Telegram reference run →](examples/long-screenshot-ocr/) |
+| [Rebuild a UI from a screenshot or design](skills/vision-skills/references/restore-ui.md) | Reuse project components and assets first, then combine code-native UI, extracted visuals, rendered screenshots, and visual comparison to align a page or component. |
+| [Restore an icon, logo, illustration, or other graphic](skills/vision-skills/references/restore-graphic.md) | Extract a transparent PNG from the source image, or rebuild an editable/scalable SVG when needed, then verify shape, color, and alpha edges. |
+| [Turn a sketch, diagram, or whiteboard into structured code](skills/vision-skills/references/restore-structure.md) | Recover nodes, labels, connections, and directions as editable Mermaid, Graphviz, or another structured representation. |
+| [Operate a GUI from screenshots](skills/vision-skills/references/gui.md) | Locate a control, perform one action, capture the screen again, and verify the resulting state before continuing. |
 | **More use cases** | Other step-by-step visual-agent playbooks are being added gradually. |
 
 
@@ -103,7 +105,7 @@ When to use them, the order in which to call tools, and how to verify the result
   <img src="assets/ui-restore-result.png" alt="Restored JupyterLab workspace made from the hand-drawn reference" width="49%">
 </p>
 
-*Left: the hand-drawn reference. Right: the restored JupyterLab workspace made from it. See the [UI restoration playbook](skills/vision-tools/references/restore-ui.md) for the workflow. Executed in Codex with `deepseek-v4-flash`.*
+*Left: the hand-drawn reference. Right: the restored JupyterLab workspace made from it. See the [UI restoration playbook](skills/vision-skills/references/restore-ui.md) for the workflow. Executed in Codex with `deepseek-v4-flash`.*
 
 ### Fast UI restoration: an approximate first pass
 
@@ -168,10 +170,10 @@ export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # add to your shell profile 
 **3. Install the skill** so your agent knows the tools exist and how to combine them:
 
 ```bash
-npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y
+npx skills add Anionex/agent-vision-toolkit --skill vision-skills -a codex -g --copy -y
 ```
 
-Or copy `skills/vision-tools/` into your agent's skills directory (e.g. `~/.codex/skills/`) and restart the agent.
+Or copy `skills/vision-skills/` into your agent's skills directory (e.g. `~/.codex/skills/`) and restart the agent.
 
 </details>
 
@@ -204,7 +206,7 @@ finds safe cut bands, OCRs the chunks with `glance`, merges overlap, and writes
 a boundary audit:
 
 ```bash
-python3 skills/vision-tools/scripts/long_screenshot_ocr.py long-chat.png --mode chat -o long-chat.ocr.md
+python3 skills/vision-skills/scripts/long_screenshot_ocr.py long-chat.png --mode chat -o long-chat.ocr.md
 ```
 
 </details>

@@ -39,7 +39,7 @@ From the repository root, first configure the normal `VISION_*` variables,
 then run:
 
 ```bash
-python3 skills/vision-tools/scripts/long_screenshot_ocr.py \
+python3 skills/vision-skills/scripts/long_screenshot_ocr.py \
   examples/long-screenshot-ocr/telegram-chat-long.png \
   --mode chat \
   --chunks-dir work/telegram-chat-ocr \
@@ -55,7 +55,7 @@ audit marks for review.
 To regenerate the input screenshot from the offline HTML source:
 
 ```bash
-python3 skills/vision-tools/scripts/html_shot.py \
+python3 skills/vision-skills/scripts/html_shot.py \
   examples/long-screenshot-ocr/telegram-chat.html \
   --width 390 \
   --height 15593 \

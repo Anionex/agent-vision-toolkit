@@ -4,6 +4,10 @@ All notable user-facing changes to agent-vision-toolkit are documented in this f
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed the bundled agent skill from `vision-tools` to `vision-skills` so the name describes the capability instead of the underlying tools.
+
 ### Fixed
 
 - Parse Qwen-family grounding boxes as `x0,y0,x1,y1` while preserving Gemini's `y0,x0,y1,x1` convention, with `VISION_BOX_ORDER` available for custom providers.

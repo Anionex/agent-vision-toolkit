@@ -22,7 +22,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir,
-                      "skills", "vision-tools", "scripts", "html_shot.py")
+                      "skills", "vision-skills", "scripts", "html_shot.py")
 
 
 def _load_html_shot():

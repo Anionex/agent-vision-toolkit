@@ -1,4 +1,4 @@
 interface:
   display_name: "Agent Vision Toolkit"
   short_description: "Ask, OCR long screenshots, locate, inventory, and vectorize images"
-  default_prompt: "Use $vision-tools to inspect this image or run the long-screenshot OCR workflow."
+  default_prompt: "Use $vision-skills to inspect this image or run the long-screenshot OCR workflow."

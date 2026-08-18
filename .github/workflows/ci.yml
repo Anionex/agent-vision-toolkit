@@ -28,7 +28,7 @@ jobs:
       - name: Compile Python entry points
         run: >-
           python -m py_compile vision_proxy.py vision_client.py ground.py detect.py
-          bin/glance bin/trace bin/crop skills/vision-tools/scripts/html_shot.py
+          bin/glance bin/trace bin/crop skills/vision-skills/scripts/html_shot.py
       - name: Run core tests
         env:
           HTML_SHOT_REQUIRE_BROWSER: "1"
@@ -53,7 +53,7 @@ jobs:
       - name: Compile proxy entry points
         run: >-
           python -m py_compile vision_proxy.py vision_client.py
-          skills/vision-tools/scripts/html_shot.py tests/smoke_test_egress_failover.py
+          skills/vision-skills/scripts/html_shot.py tests/smoke_test_egress_failover.py
       - name: Run Windows tests
         env:
           HTML_SHOT_REQUIRE_BROWSER: "1"

@@ -35,6 +35,8 @@
 
 ## 最新动态
 
+**2026-08-18——Skill 改名：** 内置 agent skill 由 `vision-tools` 改名为 `vision-skills`，让名称描述能力而非底层工具。
+
 **2026-08-13——现已支持 DeepSeek Harness 原生接入。** 新增链接子包 [`dsh-vision-toolkit`](https://github.com/Anionex/dsh-vision-toolkit)，可将本工具箱作为原生 Profile Bundle 接入 DSH Web 与 Headless Profile。它提供 10 个结构化视觉工具，覆盖带意图的图片问答、目标定位、元素检测、图形描摹、裁图、像素差异对比、长截图 OCR、前景提取、主色分析和 HTML 截图，并补齐 DSH Credentials、托管隔离运行时、可预览 Artifacts、Web Settings 与 Agent 级渐进工具暴露。
 
 该子包以 Git submodule 形式链接在本仓库中，并在 [`Anionex/dsh-vision-toolkit`](https://github.com/Anionex/dsh-vision-toolkit) 独立维护。克隆本仓库时可使用 `--recurse-submodules`，已有 checkout 可运行 `git submodule update --init --recursive`。
@@ -68,16 +70,16 @@
 
 ## 用例技能
 
-随项目提供的 `vision-tools` skill 内置了可以直接对照执行的完整用例。
+随项目提供的 `vision-skills` skill 内置了可以直接对照执行的完整用例。
 使用时机、工具调用顺序、最后如何验收，都写在对应的技能文档里：
 
 | 用例 | Agent 会如何完成 |
 |---|---|
-| [识别长截图、聊天记录与滚动页面](skills/vision-tools/references/long-screenshot-ocr.md) | 避开文字寻找安全切口，按顺序逐块 OCR，保留聊天发言人、时间和引用关系，只合并确实重复的内容，并标出需要复查的边界。 [查看 Telegram 实跑示例 →](examples/long-screenshot-ocr/) |
-| [根据截图或设计稿还原 UI](skills/vision-tools/references/restore-ui.md) | 优先复用项目已有组件和素材，再结合原生 UI 代码、截图素材、渲染截图与视觉对比，逐轮对齐页面或组件。 |
-| [还原图标、Logo、插画等图形素材](skills/vision-tools/references/restore-graphic.md) | 从原图提取透明 PNG；需要可编辑或无损缩放时重建 SVG，并验证形状、颜色和透明边缘。 |
-| [把草图、示意图或白板转成结构化代码](skills/vision-tools/references/restore-structure.md) | 识别节点、文字、连线与方向，输出可编辑的 Mermaid、Graphviz 或其他结构化表示。 |
-| [根据截图操作 GUI](skills/vision-tools/references/gui.md) | 定位控件、执行一次操作、重新截图并验证结果，再继续下一步，避免在过期截图上连续操作。 |
+| [识别长截图、聊天记录与滚动页面](skills/vision-skills/references/long-screenshot-ocr.md) | 避开文字寻找安全切口，按顺序逐块 OCR，保留聊天发言人、时间和引用关系，只合并确实重复的内容，并标出需要复查的边界。 [查看 Telegram 实跑示例 →](examples/long-screenshot-ocr/) |
+| [根据截图或设计稿还原 UI](skills/vision-skills/references/restore-ui.md) | 优先复用项目已有组件和素材，再结合原生 UI 代码、截图素材、渲染截图与视觉对比，逐轮对齐页面或组件。 |
+| [还原图标、Logo、插画等图形素材](skills/vision-skills/references/restore-graphic.md) | 从原图提取透明 PNG；需要可编辑或无损缩放时重建 SVG，并验证形状、颜色和透明边缘。 |
+| [把草图、示意图或白板转成结构化代码](skills/vision-skills/references/restore-structure.md) | 识别节点、文字、连线与方向，输出可编辑的 Mermaid、Graphviz 或其他结构化表示。 |
+| [根据截图操作 GUI](skills/vision-skills/references/gui.md) | 定位控件、执行一次操作、重新截图并验证结果，再继续下一步，避免在过期截图上连续操作。 |
 | **更多用例** | 其他可让 agent 直接照着执行的视觉任务用例正在逐步加入。 |
 
 
@@ -101,7 +103,7 @@
   <img src="assets/ui-restore-result.png" alt="依据手绘参考还原出的 JupyterLab 工作区界面" width="49%">
 </p>
 
-*左：作为输入的手绘参考；右：依据该手绘稿还原出的 JupyterLab 工作区界面。完整流程见 [UI 还原 playbook](skills/vision-tools/references/restore-ui.md)。由 Codex 搭配 `deepseek-v4-flash` 实际执行。*
+*左：作为输入的手绘参考；右：依据该手绘稿还原出的 JupyterLab 工作区界面。完整流程见 [UI 还原 playbook](skills/vision-skills/references/restore-ui.md)。由 Codex 搭配 `deepseek-v4-flash` 实际执行。*
 
 ### 快速 UI 还原：先交付近似复原
 
@@ -166,10 +168,10 @@ export PATH="$PWD/agent-vision-toolkit/bin:$PATH"   # 写进 shell 配置以持�
 **3. 安装 skill**，让 agent 知道这些工具的存在以及如何组合使用：
 
 ```bash
-npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y
+npx skills add Anionex/agent-vision-toolkit --skill vision-skills -a codex -g --copy -y
 ```
 
-也可以把 `skills/vision-tools/` 复制到你的 agent 的 skills 目录（如 `~/.codex/skills/`），重启生效。
+也可以把 `skills/vision-skills/` 复制到你的 agent 的 skills 目录（如 `~/.codex/skills/`），重启生效。
 
 </details>
 
@@ -201,7 +203,7 @@ glance screenshot.png --ocr
 `glance` 逐块 OCR，合并重叠内容，并生成边界复查报告：
 
 ```bash
-python3 skills/vision-tools/scripts/long_screenshot_ocr.py long-chat.png --mode chat -o long-chat.ocr.md
+python3 skills/vision-skills/scripts/long_screenshot_ocr.py long-chat.png --mode chat -o long-chat.ocr.md
 ```
 
 </details>

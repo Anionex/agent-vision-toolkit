@@ -34,7 +34,7 @@ def _make_badge(size=(200, 200), disc_r=60):
 
 def _cli():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir,
-                        "skills", "vision-tools", "scripts", "extract_fg.py")
+                        "skills", "vision-skills", "scripts", "extract_fg.py")
 
 
 def _run(*args, check=True):
