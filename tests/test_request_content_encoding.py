@@ -2,12 +2,14 @@
 """Focused checks for compressed request-body handling in vision_proxy."""
 
 import base64
+import asyncio
 import gzip
 import importlib.util
 import json
 import os
 import sys
 import zlib
+from contextlib import asynccontextmanager
 
 
 PROXY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -94,15 +96,18 @@ def main():
     internal_error = type(
         "InternalZstdError", (), {
             "ZSTD_isError": lambda self, result: 1,
-            "ZSTD_getErrorCode": lambda self, result: 64,
-            "ZSTD_getErrorName": lambda self, result: b"allocation failed",
+            "ZSTD_getErrorCode": lambda self, result: self.error_code,
+            "ZSTD_getErrorName": lambda self, result: b"internal decoder error",
         })()
-    try:
-        module._raise_zstd_decode_error(internal_error, 1)
-    except module._ContentDecoderError:
-        pass
-    else:
-        raise AssertionError("runtime decoder allocation failures must be server errors")
+    for code in (60, 64, 104, 105, 106, 107):
+        internal_error.error_code = code
+        try:
+            module._raise_zstd_decode_error(internal_error, 1)
+        except module._ContentDecoderError:
+            pass
+        else:
+            raise AssertionError(
+                f"runtime decoder internal error code {code} must be a server error")
 
     invalid_frame = type(
         "InvalidZstdFrame", (), {
@@ -193,7 +198,100 @@ def main():
 
     parsed = json.loads(module._decode_request_body(ZSTD_FIXTURE, "zstd"))
     assert parsed["input"][0]["type"] == "function_call_output"
+    asyncio.run(_concurrent_compressed_requests_do_not_wait_for_upstream())
+    asyncio.run(_identity_body_read_keeps_original_no_timeout())
     print("REQUEST CONTENT-ENCODING PASS")
+
+
+class _FakeUpstreamResponse:
+    def close(self):
+        pass
+
+
+async def _http_exchange(port, request):
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(request)
+    await writer.drain()
+    data = await reader.read()
+    writer.close()
+    try:
+        await writer.wait_closed()
+    except Exception:
+        pass
+    return data
+
+
+@asynccontextmanager
+async def _patched_proxy(module, read_timeout, upstream_delay):
+    proxy = module.Proxy(1, "http://127.0.0.1:9", "", False, False)
+    original_timeout = module.REQUEST_BODY_READ_TIMEOUT
+    original_rewrite = module._rewrite_image_inputs
+    original_open = module.Proxy._open_upstream
+    original_send = module.Proxy._send_response
+
+    async def no_rewrite(parsed):
+        return False
+
+    async def delayed_open(self, method, path, body, headers):
+        if upstream_delay:
+            await asyncio.sleep(upstream_delay)
+        return _FakeUpstreamResponse()
+
+    async def send_ok(self, writer, response):
+        writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+        await writer.drain()
+
+    module.REQUEST_BODY_READ_TIMEOUT = read_timeout
+    module._rewrite_image_inputs = no_rewrite
+    module.Proxy._open_upstream = delayed_open
+    module.Proxy._send_response = send_ok
+    try:
+        server = await asyncio.start_server(proxy.handle, "127.0.0.1", 0)
+        async with server:
+            yield proxy, server.sockets[0].getsockname()[1]
+    finally:
+        module.REQUEST_BODY_READ_TIMEOUT = original_timeout
+        module._rewrite_image_inputs = original_rewrite
+        module.Proxy._open_upstream = original_open
+        module.Proxy._send_response = original_send
+
+
+async def _concurrent_compressed_requests_do_not_wait_for_upstream():
+    module = load_proxy()
+    async with _patched_proxy(module, read_timeout=0.4, upstream_delay=1.0) as (proxy, port):
+        request = (
+            f"POST /responses HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n"
+            "Content-Type: application/json\r\nContent-Encoding: zstd\r\n"
+            f"Content-Length: {len(ZSTD_FIXTURE)}\r\nConnection: close\r\n\r\n"
+        ).encode() + ZSTD_FIXTURE
+        responses = await asyncio.gather(
+            _http_exchange(port, request),
+            _http_exchange(port, request),
+        )
+    for data in responses:
+        assert b"200 OK" in data, data
+        assert b"408" not in data, data
+
+
+async def _identity_body_read_keeps_original_no_timeout():
+    module = load_proxy()
+    async with _patched_proxy(module, read_timeout=0.2, upstream_delay=0.0) as (proxy, port):
+        body = b'{"model":"m","input":"ok"}'
+        head = (
+            f"POST /responses HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n"
+        ).encode()
+        reader, writer = await asyncio.open_connection("127.0.0.1", port)
+        writer.write(head)
+        await writer.drain()
+        await asyncio.sleep(0.3)
+        writer.write(body)
+        await writer.drain()
+        data = await reader.read()
+        writer.close()
+        await writer.wait_closed()
+        assert b"200 OK" in data, data
 
 
 if __name__ == "__main__":

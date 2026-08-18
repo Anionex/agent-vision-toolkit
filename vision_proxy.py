@@ -41,7 +41,8 @@ ZSTD_WINDOW_LOG_MAX = 26
 MAX_CONTENT_CODINGS = 4
 REQUEST_BODY_READ_TIMEOUT = 30.0
 SUPPORTED_CONTENT_CODINGS = {"identity", "gzip", "x-gzip", "deflate", "zstd"}
-ZSTD_INTERNAL_ERROR_CODES = {60, 62, 64, 66, 70, 74, 80, 82}
+# Stable libzstd internal-error codes plus unstable buffer/sequence misuse codes.
+ZSTD_INTERNAL_ERROR_CODES = {60, 62, 64, 66, 70, 74, 80, 82, 104, 105, 106, 107}
 
 
 def _header_value(headers, name):
@@ -207,16 +208,22 @@ def _decompress_zstandard_fallback(body, zstandard):
                         "Invalid zstd request body: truncated frame")
                 decoded = decoder.decompress(chunk)
                 _append_decoded(output, decoded)
-                if decoder.unconsumed_tail:
-                    if decoder.unconsumed_tail == chunk and not decoded:
+                unconsumed = decoder.unconsumed_tail
+                if unconsumed:
+                    if bytes(unconsumed) == bytes(chunk) and not decoded:
                         raise _InvalidContentEncoding(
                             "Invalid zstd request body: decoder made no progress")
-                    pending = decoder.unconsumed_tail + pending
-            pending = decoder.unused_data + pending
+                    pending = unconsumed
+            pending += decoder.unused_data
+        except (_UnsupportedContentEncoding, _InvalidContentEncoding,
+                _RequestBodyTooLarge, _ContentDecoderError):
+            raise
         except MemoryError as exc:
             raise _ContentDecoderError("zstd decoder ran out of memory") from exc
         except zstandard.ZstdError as exc:
             _raise_python_zstd_error(exc)
+        except Exception as exc:
+            raise _ContentDecoderError(f"zstd fallback decoder failed: {exc!r}") from exc
     return output
 
 
@@ -1279,39 +1286,48 @@ class Proxy:
             except _InvalidContentEncoding as exc:
                 await self._send_error(writer, 400, str(exc))
                 return
-            body_deadline = asyncio.get_running_loop().time() + REQUEST_BODY_READ_TIMEOUT
-            if any(coding != "identity" for coding in content_codings):
+            compressed_body = any(coding != "identity" for coding in content_codings)
+            body_deadline = None
+            if compressed_body:
+                body_deadline = asyncio.get_running_loop().time() + REQUEST_BODY_READ_TIMEOUT
                 try:
                     await asyncio.wait_for(
                         self._decode_semaphore.acquire(),
                         timeout=max(0, body_deadline - asyncio.get_running_loop().time()),
                     )
                 except TimeoutError:
-                    await self._send_error(writer, 408, "request body read timed out")
+                    await self._send_error(
+                        writer, 408, "request timed out waiting for another request to decode")
                     return
                 decode_slot_acquired = True
             body = bytearray(body_start)
             while len(body) < content_length:
-                remaining = body_deadline - asyncio.get_running_loop().time()
-                if remaining <= 0:
-                    await self._send_error(writer, 408, "request body read timed out")
-                    return
-                try:
-                    chunk = await asyncio.wait_for(
-                        reader.read(min(65536, content_length - len(body))),
-                        timeout=remaining,
-                    )
-                except TimeoutError:
-                    await self._send_error(writer, 408, "request body read timed out")
-                    return
+                if body_deadline is None:
+                    chunk = await reader.read(min(65536, content_length - len(body)))
+                else:
+                    remaining = body_deadline - asyncio.get_running_loop().time()
+                    if remaining <= 0:
+                        await self._send_error(writer, 408, "request body read timed out")
+                        return
+                    try:
+                        chunk = await asyncio.wait_for(
+                            reader.read(min(65536, content_length - len(body))),
+                            timeout=remaining,
+                        )
+                    except TimeoutError:
+                        await self._send_error(writer, 408, "request body read timed out")
+                        return
                 if not chunk:
                     break
                 body.extend(chunk)
             if len(body) < content_length:
                 await self._send_error(writer, 400, "incomplete request body")
                 return
+            # The decode slot guards only CPU/memory-bound decompression.
+            # Holding it through image rewrite or upstream egress would
+            # serialize concurrent compressed requests for up to minutes.
             try:
-                if content_encoding:
+                if compressed_body:
                     body = await asyncio.to_thread(
                         _decode_request_body, body, content_encoding)
                     if not isinstance(body, bytearray):
@@ -1332,6 +1348,10 @@ class Proxy:
                 _log(f"[vision-proxy] request decoder failed: {exc}")
                 await self._send_error(writer, 500, "Request decoder failed")
                 return
+            finally:
+                if decode_slot_acquired:
+                    self._decode_semaphore.release()
+                    decode_slot_acquired = False
             parsed = None
             if body:
                 try:
@@ -1349,9 +1369,6 @@ class Proxy:
             response = await self._open_upstream(method, path, bytes(body), self._upstream_headers(incoming_headers))
             parsed = None
             body = None
-            if decode_slot_acquired:
-                self._decode_semaphore.release()
-                decode_slot_acquired = False
             response_started = True
             await self._send_response(writer, response)
         except VisionError as exc:
