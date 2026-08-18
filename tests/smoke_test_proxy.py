@@ -10,6 +10,8 @@ that carries Codex identity signals, and checks:
   - the response body streams through successfully
 """
 
+import base64
+import gzip
 import http.client
 import importlib.util
 import json
@@ -17,6 +19,7 @@ import os
 import subprocess
 import sys
 import time
+import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -203,6 +206,36 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
         assert next((v for k, v in ups2.items() if k.lower() == "x-api-key"), None) == "existing-anthropic-key"
         print("DIALECT PASS: anthropic text-only bodies pass through byte-for-byte")
 
+        layered_raw = b'{"model":"m","input":"compressed text"}'
+        layered_body = zlib.compress(gzip.compress(layered_raw))
+        layered = http.client.HTTPConnection("127.0.0.1", 19101, timeout=5)
+        layered.putrequest("POST", "/responses")
+        layered.putheader("Content-Type", "application/json")
+        layered.putheader("Content-Encoding", "gzip")
+        layered.putheader("Content-Encoding", "deflate")
+        layered.putheader("Content-Length", str(len(layered_body)))
+        layered.endheaders(layered_body)
+        layered_response = layered.getresponse()
+        layered_response.read()
+        layered.close()
+        layered_headers = json.load(open("/tmp/up_headers.json"))
+        assert layered_response.status == 200, layered_response.status
+        assert open("/tmp/up_body.json", "rb").read() == layered_raw
+        assert not any(k.lower() == "content-encoding" for k in layered_headers)
+        print("LAYERED ENCODING PASS: repeated headers decode in wire order")
+
+        oversized = http.client.HTTPConnection("127.0.0.1", 19101, timeout=5)
+        oversized.putrequest("POST", "/responses")
+        oversized.putheader("Content-Type", "application/json")
+        oversized.putheader("Content-Length", str(module.MAX_REQUEST_BODY_BYTES + 1))
+        oversized.endheaders()
+        oversized_response = oversized.getresponse()
+        oversized_body = oversized_response.read()
+        oversized.close()
+        assert oversized_response.status == 413, oversized_response.status
+        assert b"Request body exceeds" in oversized_body, oversized_body
+        print("REQUEST LIMIT PASS: oversized wire bodies return 413 before reading")
+
         # ---- degraded: image bodies without vision config become a visible note ----
         env2 = {k: v for k, v in os.environ.items() if not k.startswith("VISION_")}
         pr2 = subprocess.Popen(
@@ -227,6 +260,53 @@ HTTPServer(('127.0.0.1', 19999), H).serve_forever()
                 resp3.read()
                 conn3.close()
                 assert resp3.status == 200, (path, resp3.status)
+
+            # Codex Desktop compresses larger Responses requests with zstd.
+            # This shape is the image returned by view_image, not a pasted image.
+            zstd_body = base64.b64decode(
+                "KLUv/SCRbQMAQgYVGYCpGgN4agW4pCOzJ1shzES6VBL05YCjqI/RiEa8lFKIYJASaiAc7QFSV9H5QkCTDmXKTA6cc6QmC51ZS49pTu1p8HCenmJfFPKFr6nJ7Hwl5NiLCAA0JVcBtIhiwoWtDNiZKGZjGKuCAg=="
+            )
+            conn_zstd = http.client.HTTPConnection("127.0.0.1", 19102, timeout=5)
+            conn_zstd.request(
+                "POST", "/responses", body=zstd_body,
+                headers={"Content-Type": "application/json", "Content-Encoding": "zstd"},
+            )
+            zstd_response = conn_zstd.getresponse()
+            zstd_response.read()
+            conn_zstd.close()
+            assert zstd_response.status == 200, zstd_response.status
+            zstd_upstream = json.load(open("/tmp/up_body.json"))
+            zstd_headers = json.load(open("/tmp/up_headers.json"))
+            assert "input_image" not in json.dumps(zstd_upstream), zstd_upstream
+            assert not any(k.lower() == "content-encoding" for k in zstd_headers), zstd_headers
+            print("ZSTD PASS: compressed function_call_output image is decoded, rewritten, and forwarded")
+
+            unsupported = http.client.HTTPConnection("127.0.0.1", 19102, timeout=5)
+            unsupported.putrequest("POST", "/responses")
+            unsupported.putheader("Content-Type", "application/json")
+            unsupported.putheader("Content-Encoding", "br")
+            unsupported.putheader("Content-Length", str(module.MAX_REQUEST_BODY_BYTES))
+            unsupported.endheaders()
+            unsupported_started = time.monotonic()
+            unsupported_response = unsupported.getresponse()
+            unsupported_elapsed = time.monotonic() - unsupported_started
+            unsupported_body = unsupported_response.read()
+            unsupported.close()
+            assert unsupported_response.status == 415, unsupported_response.status
+            assert b"Unsupported Content-Encoding: br" in unsupported_body, unsupported_body
+            assert unsupported_elapsed < 1, unsupported_elapsed
+
+            invalid = http.client.HTTPConnection("127.0.0.1", 19102, timeout=5)
+            invalid.request(
+                "POST", "/responses", body=b"not a zstd frame",
+                headers={"Content-Type": "application/json", "Content-Encoding": "zstd"},
+            )
+            invalid_response = invalid.getresponse()
+            invalid_body = invalid_response.read()
+            invalid.close()
+            assert invalid_response.status == 400, invalid_response.status
+            assert b"Invalid zstd request body" in invalid_body, invalid_body
+            print("ENCODING ERROR PASS: unsupported and invalid bodies return explicit 4xx errors")
             upb3 = json.load(open("/tmp/up_body.json"))
             assert "[vision unavailable:" in json.dumps(upb3, ensure_ascii=False), upb3
             log3 = open("/tmp/ds_proxy_test2.log").read()

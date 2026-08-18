@@ -25,6 +25,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install fallback decoder test dependency
+        if: matrix.python-version == '3.11'
+        run: python -m pip install zstandard==0.25.0
       - name: Compile Python entry points
         run: >-
           python -m py_compile vision_proxy.py vision_client.py ground.py detect.py
@@ -36,6 +39,7 @@ jobs:
           python tests/test_image_rewrite_shapes.py
           python tests/test_focus_hint.py
           python tests/test_anthropic_rewrite.py
+          python tests/test_request_content_encoding.py
           python tests/smoke_test_proxy.py
           python tests/smoke_test_egress_failover.py
           python tests/test_vision_client.py
@@ -44,12 +48,16 @@ jobs:
           python tests/test_trace.py
 
   python-egress-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: ${{ matrix.python-version }}
       - name: Compile proxy entry points
         run: >-
           python -m py_compile vision_proxy.py vision_client.py
@@ -58,6 +66,7 @@ jobs:
         env:
           HTML_SHOT_REQUIRE_BROWSER: "1"
         run: |
+          python tests/test_request_content_encoding.py
           python tests/smoke_test_egress_failover.py
           python tests/test_html_shot.py
           python tests/test_trace.py
