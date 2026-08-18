@@ -15,7 +15,7 @@ By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 The repository has two layers:
 
-1. Five standalone CLIs (`glance`, `ground`, `detect`, `trace`, and `crop`) plus the `vision-tools` skill.
+1. Five standalone CLIs (`glance`, `ground`, `detect`, `trace`, and `crop`) plus the `vision-skills` skill.
 2. Optional seamless integration through the local proxy or single-file native extensions.
 
 Contributions must preserve these boundaries:
@@ -59,10 +59,10 @@ Add the focused check for each changed area:
 | `bin/glance` | `python3 tests/test_glance_region.py` |
 | `bin/trace` | `python3 tests/test_trace.py` |
 | `bin/crop` | `python3 tests/test_crop.py` |
-| `skills/vision-tools/scripts/html_shot.py` | `python3 tests/test_html_shot.py` |
-| `skills/vision-tools/scripts/dominant_colors.py` | `python3 tests/test_dominant_colors.py` |
-| `skills/vision-tools/scripts/extract_fg.py` | `python3 tests/test_extract_fg.py` |
-| `skills/vision-tools/scripts/long_screenshot_ocr.py` | `python3 tests/test_long_screenshot_ocr.py` |
+| `skills/vision-skills/scripts/html_shot.py` | `python3 tests/test_html_shot.py` |
+| `skills/vision-skills/scripts/dominant_colors.py` | `python3 tests/test_dominant_colors.py` |
+| `skills/vision-skills/scripts/extract_fg.py` | `python3 tests/test_extract_fg.py` |
+| `skills/vision-skills/scripts/long_screenshot_ocr.py` | `python3 tests/test_long_screenshot_ocr.py` |
 | `extensions/**/*.ts` | `node tests/test_extensions.mjs` |
 
 Some focused tests skip optional CLI cases when their external dependency is unavailable. Mention any skipped check in the pull request.

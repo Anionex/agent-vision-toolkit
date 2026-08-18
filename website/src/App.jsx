@@ -39,7 +39,7 @@ import './App.css'
 
 const repoUrl = 'https://github.com/Anionex/agent-vision-toolkit'
 const installCommand =
-  'npx skills add Anionex/agent-vision-toolkit --skill vision-tools -a codex -g --copy -y'
+  'npx skills add Anionex/agent-vision-toolkit --skill vision-skills -a codex -g --copy -y'
 const landingAsset = (file) => `${import.meta.env.BASE_URL}landing/${file}`
 
 const platforms = ['Codex', 'Claude Code', 'Pi', 'Oh My Pi', 'OpenCode']
@@ -480,7 +480,7 @@ function App() {
         <section className="section integration-section">
           <div className="integration-card page-width reveal">
             <div className="integration-card__glow" />
-            <div className="integration-card__content"><span className="integration-icon"><PlugZap aria-hidden="true" /></span><p className="eyebrow eyebrow--light"><span />START WITH THE TOOLKIT</p><h2>给你正在使用的 coding agent 装上眼睛。</h2><p>安装 CLI 与 vision-tools skill；需要无缝粘贴图片时，再启用 Codex / Claude Code 代理或 Pi / OpenCode 原生扩展。</p><div className="integration-actions"><a className="button button--light" href={repoUrl} target="_blank" rel="noreferrer">阅读 Quick Start<ArrowRight aria-hidden="true" /></a><a className="button button--ghost-light" href={`${repoUrl}/blob/main/AGENT_INSTALL.md`} target="_blank" rel="noreferrer"><Code2 aria-hidden="true" />无缝接入指南</a></div></div>
+            <div className="integration-card__content"><span className="integration-icon"><PlugZap aria-hidden="true" /></span><p className="eyebrow eyebrow--light"><span />START WITH THE TOOLKIT</p><h2>给你正在使用的 coding agent 装上眼睛。</h2><p>安装 CLI 与 vision-skills skill；需要无缝粘贴图片时，再启用 Codex / Claude Code 代理或 Pi / OpenCode 原生扩展。</p><div className="integration-actions"><a className="button button--light" href={repoUrl} target="_blank" rel="noreferrer">阅读 Quick Start<ArrowRight aria-hidden="true" /></a><a className="button button--ghost-light" href={`${repoUrl}/blob/main/AGENT_INSTALL.md`} target="_blank" rel="noreferrer"><Code2 aria-hidden="true" />无缝接入指南</a></div></div>
             <div className="install-terminal"><div className="install-terminal__bar"><div><span /><span /><span /></div><span>terminal</span></div><div className="install-terminal__body"><p><span>$</span> install the vision skill</p><code>{installCommand}</code><button type="button" onClick={copyInstallCommand}>{copied ? <CheckCircle2 aria-hidden="true" /> : <Copy aria-hidden="true" />}{copied ? '已复制' : '复制命令'}</button></div><div className="install-terminal__status"><span><Zap aria-hidden="true" /> ready for visual tasks</span><span>MIT License</span></div></div>
           </div>
         </section>

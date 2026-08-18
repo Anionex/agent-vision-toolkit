@@ -5,8 +5,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-PLAYBOOK = ROOT / "skills" / "vision-tools" / "references" / "restore-ui.md"
-SKILL = ROOT / "skills" / "vision-tools" / "SKILL.md"
+PLAYBOOK = ROOT / "skills" / "vision-skills" / "references" / "restore-ui.md"
+SKILL = ROOT / "skills" / "vision-skills" / "SKILL.md"
 
 
 def fast_mode_section() -> str:

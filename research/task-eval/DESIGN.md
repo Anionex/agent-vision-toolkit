@@ -33,7 +33,7 @@ flag 启动（`--codex-header-compat` 与 `--inject-reasoning-summary` 保持关
 | `blind` | 代理变体，图片一律替换为固定占位文字 | 视觉通道整体的价值（下限） |
 | `naive` | 代理变体，`DEFAULT_PROMPT`（"describe this image in detail"） | 普通转接方案 |
 | `hint` | 生产代理（`_ROLE_PROMPT` + hint + 转写条款） | **线上实际行为** |
-| `hint_tools` | 生产代理 + 已发布的 `vision-tools` skill | 回查工具的价值 |
+| `hint_tools` | 生产代理 + 已发布的 `vision-skills` skill | 回查工具的价值 |
 | `native` | Codex 直连原生多模态模型 | 文字中转的代价（上限） |
 
 四个判断：

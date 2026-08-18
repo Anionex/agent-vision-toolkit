@@ -1,5 +1,5 @@
 ---
-name: vision-tools
+name: vision-skills
 description: >-
   Local vision CLIs: glance (describe/ask/OCR an image), ground (locate a
   target, pixel box), detect (element inventory), trace (image to SVG
@@ -11,7 +11,7 @@ description: >-
   image yourself when a description you were given lacks a detail.
 ---
 
-# vision-tools
+# vision-skills
 
 Five local CLIs that give a text-only agent eyes. They read one shared
 vision config (`VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL` /

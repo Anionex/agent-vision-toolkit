@@ -17,7 +17,7 @@ except ImportError:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills" / "vision-tools" / "scripts" / "long_screenshot_ocr.py"
+SCRIPT = ROOT / "skills" / "vision-skills" / "scripts" / "long_screenshot_ocr.py"
 
 
 def load_module():

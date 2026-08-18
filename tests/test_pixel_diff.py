@@ -9,7 +9,7 @@ import sys
 import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(REPO, "skills", "vision-tools", "scripts", "pixel_diff.py")
+SCRIPT = os.path.join(REPO, "skills", "vision-skills", "scripts", "pixel_diff.py")
 
 
 def main():
