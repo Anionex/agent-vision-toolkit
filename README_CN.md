@@ -33,6 +33,22 @@
 
 > 如果项目对你有用或为你带来了一些启发，欢迎 star🌟 & fork。
 
+## ❤️ 赞助
+
+> 想赞助本项目？详见 [FUNDING.md](FUNDING.md) 或发送邮件到 davidyang042@gmail.com。
+
+<details open>
+<summary>点击折叠</summary>
+
+<table>
+<tr>
+<td width="220"><a href="https://inferera.com/?aff=5wj6sgx8"><img src="assets/logo_aihubmix.png" alt="AIHubMix" height="48"></a></td>
+<td>感谢 <a href="https://inferera.com/?aff=5wj6sgx8">AIHubMix</a> 赞助本项目！AIHubMix 是稳定、高并发的 AI 大模型 API 聚合平台，一个 API Key 即可接入 Claude、GPT、Gemini、DeepSeek 等主流模型，兼容多种协议，并提供<b>免费模型选择</b>。国内用户请通过<a href="https://inferera.com/?aff=5wj6sgx8">国内入口</a>使用。</td>
+</tr>
+</table>
+
+</details>
+
 ## 最新动态
 
 **2026-08-18——Skill 改名：** 内置 agent skill 由 `vision-tools` 改名为 `vision-skills`，让名称描述能力而非底层工具。
@@ -54,6 +70,7 @@
 - [工作原理](#工作原理)
 - [配置](#配置)
 - [常见问题](#常见问题)
+- [赞赏](#赞赏)
 - [社区](#社区)
 - [关于](#关于)
 
@@ -384,6 +401,12 @@ Codex（携带原有 Authorization）
 - 这是图片转文字的一层，不会把视觉 token 直接交给纯文本模型。
 - 视觉任务的整体质量由主llm+多模态llm共同决定。
 - 代理的缓存只存在于进程内，重启后清空。
+
+## 赞赏
+
+如果本项目对你有价值，欢迎请开发者喝杯咖啡☕️
+
+<img width="240" alt="微信收款码" src="assets/wechat-reward.png" />
 
 ## 社区
 

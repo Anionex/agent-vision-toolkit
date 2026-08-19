@@ -35,6 +35,22 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 
 > If this project helps you or gives you some inspiration, feel free to star🌟 & fork.
 
+## ❤️ Sponsor
+
+> Want to sponsor this project? See [FUNDING.md](FUNDING.md) or email davidyang042@gmail.com.
+
+<details open>
+<summary>Click to collapse</summary>
+
+<table>
+<tr>
+<td width="220"><a href="https://inferera.com/?aff=5wj6sgx8"><img src="assets/logo_aihubmix.png" alt="AIHubMix" height="48"></a></td>
+<td>Thanks to <a href="https://inferera.com/?aff=5wj6sgx8">AIHubMix</a> for sponsoring this project! AIHubMix is a stable, high-concurrency AI model API gateway that connects Claude, GPT, Gemini, DeepSeek, and other mainstream models through a single API key, compatible with multiple protocols, with <b>free model options</b> available. Users in China can use it via the <a href="https://inferera.com/?aff=5wj6sgx8">China entry</a>.</td>
+</tr>
+</table>
+
+</details>
+
 ## Latest Update
 
 **2026-08-18 — Skill renamed:** the included agent skill is now `vision-skills` (formerly `vision-tools`), so the name describes the capability rather than the underlying tools.
@@ -56,6 +72,7 @@ The package is tracked here as a Git submodule and maintained independently at [
 - [How It Works](#how-it-works)
 - [Configuration](#configuration)
 - [FAQ](#faq)
+- [Donation](#donation)
 - [Community](#community)
 - [About](#about)
 
@@ -391,6 +408,12 @@ To reduce costs further, you can use a locally deployed small multimodal side mo
 - This is an image-to-text layer; it doesn't hand vision tokens directly to the text model.
 - Overall visual-task quality is determined jointly by the primary LLM and the multimodal LLM.
 - The proxy's cache lives only inside its process and is cleared on restart.
+
+## Donation
+
+If this project is valuable to you, you are welcome to buy the developer a coffee ☕️
+
+<img width="240" alt="WeChat reward code" src="assets/wechat-reward.png" />
 
 ## Community
 
