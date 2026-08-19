@@ -44,8 +44,8 @@ All code has been verified in real Codex + DeepSeek sessions, and the same pipel
 
 <table>
 <tr>
-<td width="220"><a href="https://inferera.com/?aff=5wj6sgx8"><img src="assets/logo_aihubmix.png" alt="AIHubMix" height="48"></a></td>
-<td>Thanks to <a href="https://inferera.com/?aff=5wj6sgx8">AIHubMix</a> for sponsoring this project! AIHubMix is a stable, high-concurrency AI model API gateway that connects Claude, GPT, Gemini, DeepSeek, and other mainstream models through a single API key, compatible with multiple protocols, with <b>free model options</b> available. Users in China can use it via the <a href="https://inferera.com/?aff=5wj6sgx8">China entry</a>.</td>
+<td width="220"><a href="https://aihubmix.com/?aff=5wj6sgx8"><img src="assets/logo_aihubmix.png" alt="AIHubMix" height="48"></a></td>
+<td>Thanks to <a href="https://aihubmix.com/?aff=5wj6sgx8">AIHubMix</a> for sponsoring this project! AIHubMix is a stable, high-concurrency AI model API gateway that connects Claude, GPT, Gemini, DeepSeek, and other mainstream models through a single API key, compatible with multiple protocols, with <b>free model options</b> available. Users in China can use it via the <a href="https://inferera.com/?aff=5wj6sgx8">China entry</a>, and users abroad via the <a href="https://aihubmix.com/?aff=5wj6sgx8">Global entry</a>.</td>
 </tr>
 </table>
 
