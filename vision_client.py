@@ -227,6 +227,11 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
         }
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
+        # Some OpenAI-compatible endpoints default to SSE streaming even for
+        # non-streaming requests, returning a data:-prefixed body that
+        # json.load cannot parse. Setting stream:false explicitly avoids that.
+        if os.environ.get("VISION_FORCE_NON_STREAM", "").strip().lower() in ("1", "true", "on", "yes"):
+            payload["stream"] = False
         endpoint = "/chat/completions"
         extract_text = lambda data: _message_text(data["choices"][0]["message"]["content"])
     elif protocol == "anthropic":

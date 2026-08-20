@@ -356,6 +356,7 @@ The standalone CLIs and Python proxy use these environment variables; just three
 | `VISION_REASONING_EFFORT` | No | Optional provider-supported reasoning effort for the Python client/proxy when using `responses` |
 | `VISION_ANTHROPIC_THINKING` | No | Anthropic thinking mode. `omit` (default) sends no thinking field and has the broadest compatibility. Use `disabled` or `adaptive` only when the selected model documents that mode; restore `omit` first if the provider returns HTTP 400. Manual `enabled` plus `budget_tokens` is not exposed. |
 | `VISION_USER_AGENT` | No | Outbound User-Agent for the Python client/proxy; defaults to a browser-compatible value and can be overridden for provider requirements |
+| `VISION_FORCE_NON_STREAM` | No | Set to `1`/`true`/`on`/`yes` to send `stream: false` explicitly in `chat_completions` requests. Some OpenAI-compatible endpoints default to SSE streaming, causing `Vision API returned invalid JSON`. Leave unset for standard endpoints that already return non-streaming JSON |
 
 </details>
 

@@ -351,6 +351,7 @@ Codex -> 127.0.0.1:19100 -> 用户原有的纯文本模型上游
 | `VISION_REASONING_EFFORT` | 否 | Python 客户端/代理使用 `responses` 时可选的服务商支持推理强度 |
 | `VISION_ANTHROPIC_THINKING` | 否 | Anthropic thinking 模式。`omit`（默认）不发送 thinking 字段，兼容性最好；仅当所选模型明确支持时使用 `disabled` 或 `adaptive`，提供方返回 HTTP 400 时应先恢复 `omit`。当前不提供手动 `enabled` + `budget_tokens`。 |
 | `VISION_USER_AGENT` | 否 | Python 客户端/代理的出站 User-Agent；默认使用浏览器兼容值，也可按服务商要求覆盖 |
+| `VISION_FORCE_NON_STREAM` | 否 | 设为 `1`/`true`/`on`/`yes` 时在 `chat_completions` 请求中显式发送 `stream: false`。部分 OpenAI 兼容端点默认返回 SSE 流式格式，导致 `Vision API returned invalid JSON`；标准端点无需设置 |
 
 </details>
 
