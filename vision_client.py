@@ -221,6 +221,7 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
     elif protocol == "chat_completions":
         payload = {
             "model": model,
+            "stream": False,
             "messages": [{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": url}} for url in urls
             ] + [{"type": "text", "text": text}]}],
