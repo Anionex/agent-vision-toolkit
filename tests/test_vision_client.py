@@ -2,6 +2,7 @@
 """Core retry/error test for the shared vision client and glance CLI."""
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import gzip
 import json
 import os
 from pathlib import Path
@@ -288,6 +289,85 @@ def main():
         assert Handler.last_headers.get("User-Agent") == vision_client.DEFAULT_USER_AGENT
         image_parts = [part for part in content if part.get("type") == "image_url"]
         assert len(image_parts) == 2, "a list of URLs must become one request with all images"
+        assert Handler.calls == 1
+
+        gzip_body = gzip.compress(json.dumps({
+            "choices": [{"message": {"content": "gzip fixture answer"}}],
+        }).encode())
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0, [200], [gzip_body], [{"Content-Encoding": "gzip"}]
+        )
+        assert vision_client.describe_image("data:image/png;base64,AAAA") == "gzip fixture answer"
+        assert Handler.calls == 1, "a gzip response must be decompressed on the first try"
+
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0,
+            [500, 500, 500],
+            [gzip.compress(b'{"error":{"message":"gzip error body"}}')] * 3,
+            [{"Content-Encoding": "gzip"}] * 3,
+        )
+        delays = []
+        original_sleep = vision_client.time.sleep
+        vision_client.time.sleep = delays.append
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        except vision_client.VisionError as exc:
+            assert "gzip error body" in str(exc)
+        else:
+            raise AssertionError("a gzip HTTP error body must still surface the decoded message")
+        finally:
+            vision_client.time.sleep = original_sleep
+
+        invalid_gzip = b"\x1f\x8btruncated"
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0,
+            [200, 200, 200],
+            [invalid_gzip] * 3,
+            [{"Content-Encoding": "gzip"}] * 3,
+        )
+        delays = []
+        original_sleep = vision_client.time.sleep
+        vision_client.time.sleep = delays.append
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        except vision_client.VisionError as exc:
+            assert "Invalid gzip response body" in str(exc)
+        else:
+            raise AssertionError("a corrupt gzip success response must raise VisionError")
+        finally:
+            vision_client.time.sleep = original_sleep
+        assert Handler.calls == 3, "a corrupt gzip success response must use bounded retries"
+        assert delays == [1, 2]
+
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0,
+            [500, 500, 500],
+            [invalid_gzip] * 3,
+            [{"Content-Encoding": "gzip"}] * 3,
+        )
+        delays = []
+        original_sleep = vision_client.time.sleep
+        vision_client.time.sleep = delays.append
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        except vision_client.VisionError as exc:
+            assert "Vision API HTTP 500: Invalid gzip response body" in str(exc)
+        else:
+            raise AssertionError("a corrupt gzip HTTP error body must raise VisionError")
+        finally:
+            vision_client.time.sleep = original_sleep
+        assert Handler.calls == 3, "a corrupt gzip HTTP error body must use bounded retries"
+        assert delays == [1, 2]
+
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = 0, [200], [], []
+        os.environ["VISION_API_PROTOCOL"] = "chat_completions"
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        finally:
+            os.environ.pop("VISION_API_PROTOCOL", None)
+        payload = json.loads(Handler.last_body)
+        assert payload.get("stream") is False, \
+            "chat_completions must request a non-streaming response"
         assert Handler.calls == 1
 
         Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = 0, [200], [json.dumps({
