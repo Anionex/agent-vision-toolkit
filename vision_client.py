@@ -15,6 +15,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import zlib
 
 DEFAULT_PROMPT = "Please describe the contents of this image in detail."
 DEFAULT_USER_AGENT = (
@@ -31,6 +32,10 @@ LANG_INSTRUCTIONS = {
 
 class VisionError(RuntimeError):
     """A safe, user-facing vision request failure."""
+
+
+class _ResponseDecodeError(RuntimeError):
+    """An upstream response body could not be decoded safely."""
 
 
 def load_env_file(path: str | os.PathLike[str] | None) -> None:
@@ -181,9 +186,12 @@ def _decompress_body(raw: bytes, response) -> bytes:
     urllib does not transparently decompress gzip responses; the bundled
     http.client leaves the raw compressed bytes untouched.
     """
-    encoding = (response.headers.get("Content-Encoding") or "").lower()
+    encoding = (response.headers.get("Content-Encoding") or "").strip().lower()
     if encoding == "gzip" and raw[:2] == b"\x1f\x8b":
-        return gzip.decompress(raw)
+        try:
+            return gzip.decompress(raw)
+        except (OSError, EOFError, zlib.error) as exc:
+            raise _ResponseDecodeError("Invalid gzip response body") from exc
     return raw
 
 
@@ -291,7 +299,14 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
                 raise VisionError("Vision API returned an empty description")
             return text
         except urllib.error.HTTPError as exc:
-            raw_body = _decompress_body(exc.read(), exc)
+            try:
+                raw_body = _decompress_body(exc.read(), exc)
+            except _ResponseDecodeError as decode_exc:
+                if _retryable_http_error(exc.code, b"") and attempt < retries:
+                    print(f"vision: HTTP {exc.code}, retrying ({attempt + 1}/{retries})", file=sys.stderr)
+                    time.sleep(_retry_delay(exc, attempt))
+                    continue
+                raise VisionError(f"Vision API HTTP {exc.code}: {decode_exc}") from decode_exc
             body = _redact(raw_body.decode(errors="replace")[:400], api_key)
             body = body.replace("\r", " ").replace("\n", " ")
             if _retryable_http_error(exc.code, raw_body) and attempt < retries:
@@ -306,6 +321,12 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
                 continue
             reason = _redact(str(getattr(exc, "reason", str(exc))), api_key)
             raise VisionError(f"Vision API network error: {reason}") from exc
+        except _ResponseDecodeError as exc:
+            if attempt < retries:
+                print(f"vision: response decode error, retrying ({attempt + 1}/{retries})", file=sys.stderr)
+                time.sleep(min(2 ** attempt, 4))
+                continue
+            raise VisionError(f"Vision API response decode error: {exc}") from exc
         except json.JSONDecodeError as exc:
             raise VisionError("Vision API returned invalid JSON") from exc
     raise VisionError("Vision API request failed")

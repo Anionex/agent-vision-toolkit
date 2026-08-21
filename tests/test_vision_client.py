@@ -318,6 +318,47 @@ def main():
         finally:
             vision_client.time.sleep = original_sleep
 
+        invalid_gzip = b"\x1f\x8btruncated"
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0,
+            [200, 200, 200],
+            [invalid_gzip] * 3,
+            [{"Content-Encoding": "gzip"}] * 3,
+        )
+        delays = []
+        original_sleep = vision_client.time.sleep
+        vision_client.time.sleep = delays.append
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        except vision_client.VisionError as exc:
+            assert "Invalid gzip response body" in str(exc)
+        else:
+            raise AssertionError("a corrupt gzip success response must raise VisionError")
+        finally:
+            vision_client.time.sleep = original_sleep
+        assert Handler.calls == 3, "a corrupt gzip success response must use bounded retries"
+        assert delays == [1, 2]
+
+        Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = (
+            0,
+            [500, 500, 500],
+            [invalid_gzip] * 3,
+            [{"Content-Encoding": "gzip"}] * 3,
+        )
+        delays = []
+        original_sleep = vision_client.time.sleep
+        vision_client.time.sleep = delays.append
+        try:
+            vision_client.describe_image("data:image/png;base64,AAAA")
+        except vision_client.VisionError as exc:
+            assert "Vision API HTTP 500: Invalid gzip response body" in str(exc)
+        else:
+            raise AssertionError("a corrupt gzip HTTP error body must raise VisionError")
+        finally:
+            vision_client.time.sleep = original_sleep
+        assert Handler.calls == 3, "a corrupt gzip HTTP error body must use bounded retries"
+        assert delays == [1, 2]
+
         Handler.calls, Handler.statuses, Handler.bodies, Handler.response_headers = 0, [200], [], []
         os.environ["VISION_API_PROTOCOL"] = "chat_completions"
         try:
