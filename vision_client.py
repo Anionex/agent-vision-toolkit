@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 from email.utils import parsedate_to_datetime
+import gzip
 import http.client
 import json
 import mimetypes
@@ -174,6 +175,18 @@ def _api_error_code(body: bytes) -> str:
     return code if isinstance(code, str) else ""
 
 
+def _decompress_body(raw: bytes, response) -> bytes:
+    """Decompress a response body when the server advertises gzip encoding.
+
+    urllib does not transparently decompress gzip responses; the bundled
+    http.client leaves the raw compressed bytes untouched.
+    """
+    encoding = (response.headers.get("Content-Encoding") or "").lower()
+    if encoding == "gzip" and raw[:2] == b"\x1f\x8b":
+        return gzip.decompress(raw)
+    return raw
+
+
 def _retryable_http_error(status: int, body: bytes) -> bool:
     if status not in {429, 500, 502, 503, 504, 529}:
         return False
@@ -268,7 +281,8 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
     for attempt in range(retries + 1):
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
-                data = json.load(response)
+                raw = response.read()
+                data = json.loads(_decompress_body(raw, response))
             try:
                 text = extract_text(data)
             except (KeyError, IndexError, TypeError) as exc:
@@ -277,7 +291,7 @@ def describe_image(image_url: str | list[str], prompt: str | None = None, max_to
                 raise VisionError("Vision API returned an empty description")
             return text
         except urllib.error.HTTPError as exc:
-            raw_body = exc.read()
+            raw_body = _decompress_body(exc.read(), exc)
             body = _redact(raw_body.decode(errors="replace")[:400], api_key)
             body = body.replace("\r", " ").replace("\n", " ")
             if _retryable_http_error(exc.code, raw_body) and attempt < retries:
