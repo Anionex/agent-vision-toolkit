@@ -42,8 +42,12 @@
 
 <table>
 <tr>
-<td width="220"><a href="https://aihubmix.com/?aff=sinZ"><img src="assets/logo_aihubmix.png" alt="AIHubMix" height="48"></a></td>
-<td>感谢 <a href="https://aihubmix.com/?aff=sinZ">AIHubMix</a> 赞助本项目！AIHubMix 是稳定、高并发的 AI 大模型 API 聚合平台，一个 API Key 即可接入 Claude、GPT、Gemini、DeepSeek 等主流模型，兼容多种协议，并提供<b>免费模型选择</b>。国内用户请通过<a href="https://inferera.com/?aff=sinZ">国内入口</a>使用，海外用户请通过<a href="https://aihubmix.com/?aff=sinZ">海外入口</a>使用。</td>
+<td width="220" align="center" valign="middle"><a href="https://aihubmix.com/?aff=sinZ"><img src="assets/logo_aihubmix.png" alt="AIHubMix" height="48"></a></td>
+<td valign="middle">感谢 <a href="https://aihubmix.com/?aff=sinZ">AIHubMix</a> 赞助本项目！AIHubMix 是稳定、高并发的 AI 大模型 API 聚合平台，一个 API Key 即可接入 Claude、GPT、Gemini、DeepSeek 等主流模型，兼容多种协议，并提供<b>免费模型选择</b>。国内用户请通过<a href="https://inferera.com/?aff=sinZ">国内入口</a>使用，海外用户请通过<a href="https://aihubmix.com/?aff=sinZ">海外入口</a>使用。</td>
+</tr>
+<tr>
+<td width="220" align="center" valign="middle"><a href="https://api.ewo.so/register?aff=U6PT7J"><img src="assets/logo_eapi_dark.png" alt="E-API" height="48"></a></td>
+<td valign="middle">感谢 <a href="https://api.ewo.so/register?aff=U6PT7J">E-API</a> 赞助本项目！E-API 聚合主流 AI 模型，兼容 OpenAI、Anthropic 与 Codex 接口；部分 Claude 模型相比官方价<b>最高优惠约 98%</b>，DeepSeek V4 系列<b>优惠约 25%</b>。</td>
 </tr>
 </table>
 
