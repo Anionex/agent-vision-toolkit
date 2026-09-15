@@ -4,6 +4,10 @@ All notable user-facing changes to agent-vision-toolkit are documented in this f
 
 ## [Unreleased]
 
+### Added
+
+- Persist OpenCode plugin descriptions to a disk cache so a restarted host process reuses them instead of re-describing every image in history; `VISION_CACHE=off` disables disk persistence and `VISION_CACHE_FILE` relocates the JSONL file.
+
 ### Changed
 
 - Renamed the bundled agent skill from `vision-tools` to `vision-skills` so the name describes the capability instead of the underlying tools.

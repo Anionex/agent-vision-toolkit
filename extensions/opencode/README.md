@@ -36,7 +36,15 @@ in the working directory are also read; later files override earlier ones.
 
 - Attached/pasted images (data URLs, http URLs, or local paths — local files
   are inlined) are described under their own message's text.
-- Descriptions are cached per (image, prompt) for the process lifetime.
+- Descriptions are cached per (image, prompt): in memory for the process
+  lifetime, and on disk so a restarted host process (a fresh `opencode acp`
+  on reconnect) reuses them instead of re-describing every image in history.
+  The JSONL file defaults to
+  `$XDG_CACHE_HOME/agent-vision-toolkit/opencode-vision-cache.jsonl` (or
+  `~/.cache/...`), is capped at 4 MB and compacted automatically, and never
+  stores failed descriptions. Set `VISION_CACHE=off` in the process
+  environment to disable disk persistence, or `VISION_CACHE_FILE` to relocate
+  the file.
 - A failed description is replaced with an explicit failure note — the raw
   image is never forwarded and failures are never silent.
 

@@ -8,9 +8,14 @@
 // Network is stubbed: every test injects its own fetch and vision config, so
 // no VISION_API_KEY is needed and the machine's real env chain is never read.
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+// Keep the OpenCode plugin's disk cache out of the developer's real cache
+// directory: every description produced below lands in this throwaway file.
+process.env.VISION_CACHE_FILE = join(mkdtempSync(join(tmpdir(), "cvp-oc-cache-")), "cache.jsonl");
 
 const pi = await import("../extensions/pi/vision.ts");
 const ocModule = await import("../extensions/opencode/vision.ts");
@@ -238,6 +243,77 @@ const ocMessages = (parts) => [{ info: { role: "user" }, parts }];
   } finally {
     delete process.env.VISION_REWRITE;
   }
+}
+
+// ---------------------------------------------------------------------------
+// OpenCode plugin: disk cache across host restarts
+//
+// A restarted host spawns a fresh process with an empty in-memory cache, so
+// these cases run the plugin in child processes against one cache file.
+
+const childFile = join(mkdtempSync(join(tmpdir(), "cvp-oc-child-")), "vision-disk-cache-child.mjs");
+writeFileSync(childFile, `
+const mod = await import(process.env.VISION_TS_URL);
+const { rewriteMessages } = mod.default.internals;
+const config = { apiKey: "test-key", baseUrl: "http://vision.test", model: "test-vision" };
+let calls = 0;
+const fetchImpl = async () => {
+  calls += 1;
+  return new Response(
+    JSON.stringify({ choices: [{ message: { content: process.env.VISION_TEST_DESC || "DESC" } }] }),
+    { status: 200 },
+  );
+};
+const parts = [
+  { id: "p1", type: "text", text: "cache me across restarts" },
+  { id: "p2", type: "file", mediaType: "image/png", url: "data:image/png;base64,DDDD" },
+];
+await rewriteMessages([{ info: { role: "user" }, parts }], config, fetchImpl);
+console.log("CHILD_RESULT " + JSON.stringify({ calls, text: parts.at(-1)?.text }));
+`);
+
+function runVisionChild(overrides) {
+  const env = { ...process.env, VISION_TS_URL: new URL("../extensions/opencode/vision.ts", import.meta.url).href };
+  delete env.VISION_CACHE;
+  delete env.VISION_REWRITE;
+  Object.assign(env, overrides);
+  const result = spawnSync(process.execPath, [childFile], { encoding: "utf8", env, timeout: 30_000 });
+  if (result.status !== 0) {
+    throw new Error("vision child failed: " + result.status + "\n" + result.stderr);
+  }
+  const line = result.stdout.split("\n").filter((l) => l.startsWith("CHILD_RESULT ")).at(-1);
+  if (!line) throw new Error("vision child produced no result: " + result.stdout);
+  return JSON.parse(line.slice("CHILD_RESULT ".length));
+}
+
+{
+  const cacheFile = join(mkdtempSync(join(tmpdir(), "cvp-oc-disk-")), "cache.jsonl");
+  const cold = runVisionChild({ VISION_CACHE_FILE: cacheFile });
+  check("opencode: a cold process describes the image and persists it to disk",
+    cold.calls === 1 && cold.text === "[vision model description] DESC" && existsSync(cacheFile),
+    cold);
+  const warm = runVisionChild({ VISION_CACHE_FILE: cacheFile });
+  check("opencode: a restarted process reuses the disk cache without a vision call",
+    warm.calls === 0 && warm.text === "[vision model description] DESC",
+    warm);
+}
+
+{
+  const cacheFile = join(mkdtempSync(join(tmpdir(), "cvp-oc-disk-")), "cache.jsonl");
+  writeFileSync(cacheFile, "not json at all\n" + JSON.stringify({ k: 42, v: "x" }) + "\n");
+  const result = runVisionChild({ VISION_CACHE_FILE: cacheFile });
+  check("opencode: malformed disk-cache lines are ignored, not fatal",
+    result.calls === 1 && result.text === "[vision model description] DESC",
+    result);
+}
+
+{
+  const cacheFile = join(mkdtempSync(join(tmpdir(), "cvp-oc-disk-")), "cache.jsonl");
+  runVisionChild({ VISION_CACHE_FILE: cacheFile });
+  const off = runVisionChild({ VISION_CACHE_FILE: cacheFile, VISION_CACHE: "off", VISION_TEST_DESC: "DESC2" });
+  check("opencode: VISION_CACHE=off bypasses the disk cache",
+    off.calls === 1 && off.text === "[vision model description] DESC2",
+    off);
 }
 
 if (failures) {
