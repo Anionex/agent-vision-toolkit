@@ -9,8 +9,12 @@
  *
  * Descriptions are focus-hinted: an image rides its own message's text, so the
  * vision model covers what the turn is actually about. The transform runs per
- * model call on a fresh copy of history; an in-process cache keyed on
- * (image, prompt) makes replayed turns free.
+ * model call on a fresh copy of history; a cache keyed on (image, prompt)
+ * makes replayed turns free. Descriptions are cached in memory and on disk, so
+ * a restarted host process (codeg reconnects spawn a fresh `opencode acp`)
+ * reuses prior descriptions instead of re-describing every image in history.
+ * Set VISION_CACHE=off to disable disk persistence, or VISION_CACHE_FILE to
+ * relocate the cache file.
  *
  * The transform hook does not expose the active model, so the plugin cannot
  * auto-detect vision-capable primaries; set VISION_REWRITE=off in the
@@ -28,10 +32,18 @@
  * one-file install.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import {
+  readFileSync,
+  existsSync,
+  appendFileSync,
+  mkdirSync,
+  statSync,
+  writeFileSync,
+  renameSync,
+} from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 const ROLE_PROMPT =
   "You help a text-only coding assistant understand images.";
@@ -283,6 +295,74 @@ function cacheKey(imageUrl: string, prompt: string): string {
   return createHash("sha256").update(imageUrl).update("\x00").update(prompt).digest("hex");
 }
 
+// Persistent disk cache: the host process may be restarted at any time (codeg
+// reconnects spawn a fresh `opencode acp` process), which previously dropped
+// the in-process cache and made the next model call re-describe every image in
+// history. Descriptions are appended as JSON lines; the newest entry wins.
+const DISK_CACHE_MAX_BYTES = 4 * 1024 * 1024;
+
+function diskCacheEnabled(): boolean {
+  return (process.env.VISION_CACHE || "").toLowerCase() !== "off";
+}
+
+function diskCachePath(): string {
+  const override = (process.env.VISION_CACHE_FILE || "").trim();
+  if (override) return override;
+  const xdg = (process.env.XDG_CACHE_HOME || "").trim();
+  return join(xdg || join(homedir(), ".cache"), "agent-vision-toolkit", "opencode-vision-cache.jsonl");
+}
+
+let _diskCacheLoaded = false;
+
+function loadDiskCache(): void {
+  if (_diskCacheLoaded) return;
+  _diskCacheLoaded = true;
+  if (!diskCacheEnabled()) return;
+  let raw: string;
+  try {
+    raw = readFileSync(diskCachePath(), "utf8");
+  } catch {
+    return;
+  }
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line);
+      if (typeof entry?.k !== "string" || typeof entry?.v !== "string") continue;
+      if (_cache.size >= CACHE_MAX) {
+        const oldest = _cache.keys().next().value;
+        if (oldest !== undefined) _cache.delete(oldest);
+      }
+      _cache.set(entry.k, entry.v);
+    } catch {
+      // Ignore malformed lines: the cache is best-effort.
+    }
+  }
+}
+
+function persistDescription(key: string, text: string): void {
+  if (!diskCacheEnabled()) return;
+  const path = diskCachePath();
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, JSON.stringify({ k: key, v: text }) + "\n");
+    if (statSync(path).size > DISK_CACHE_MAX_BYTES) compactDiskCache(path);
+  } catch {
+    // Caching must never break the request path.
+  }
+}
+
+function compactDiskCache(path: string): void {
+  try {
+    const tmp = path + ".tmp";
+    const body = [..._cache.entries()].map(([k, v]) => JSON.stringify({ k, v })).join("\n");
+    writeFileSync(tmp, body + "\n");
+    renameSync(tmp, path);
+  } catch {
+    // Keep the (larger) cache file rather than failing the request.
+  }
+}
+
 function failureText(reason: string): string {
   return (
     "[vision proxy] image description failed: " +
@@ -306,6 +386,7 @@ async function rewriteMessages(
 ): Promise<boolean> {
   const jobs = collectJobs(messages);
   if (!jobs.length) return false;
+  loadDiskCache();
 
   const results = new Map<string, string>();
   const describable = jobs.filter((job) => job.imageUrl);
@@ -337,7 +418,9 @@ async function rewriteMessages(
             const oldest = _cache.keys().next().value;
             if (oldest !== undefined) _cache.delete(oldest);
           }
-          _cache.set(key, DESCRIPTION_PREFIX + desc);
+          const text = DESCRIPTION_PREFIX + desc;
+          _cache.set(key, text);
+          persistDescription(key, text);
         } catch (err) {
           results.set(key, failureText(err instanceof Error ? err.message : String(err)));
         }
