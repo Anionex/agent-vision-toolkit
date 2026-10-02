@@ -4,6 +4,10 @@ All notable user-facing changes to agent-vision-toolkit are documented in this f
 
 ## [Unreleased]
 
+### Added
+
+- Add opt-in `detect --fail-on-empty` to signal empty inventories with exit status 1 and a stderr diagnostic, while preserving the default output and exit status.
+
 ### Changed
 
 - Renamed the bundled agent skill from `vision-tools` to `vision-skills` so the name describes the capability instead of the underlying tools.

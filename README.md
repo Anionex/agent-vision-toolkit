@@ -252,12 +252,13 @@ It analyzes one full image per call. With `--region X1,Y1,X2,Y2` it searches onl
 <details>
 <summary><b><code>detect</code> — "what is in the image, and where?"</b></summary>
 
-Inventory the elements of an image (or a region) — a numbered list with exact visible text and pixel boxes:
+Inventory UI elements in a screenshot (or a region) by default — a numbered list with exact visible text and pixel boxes. For photographs or video frames, specify a category such as `"objects"` or `"text"` to avoid the default UI framing:
 
 ```bash
 detect page.png
 detect page.png "buttons"
 detect page.png --region 238,600,953,671
+detect frame.png "text" --fail-on-empty
 ```
 
 ```
@@ -265,6 +266,8 @@ detect page.png --region 238,600,953,671
 2. bottom-left + x1: 254, y1: 650, x2: 268, y2: 665
 3. bottom-right stop button x1: 924, y1: 645, x2: 952, y2: 670
 ```
+
+By default, an empty inventory prints `no elements detected` to stdout and exits 0 for compatibility. Add `--fail-on-empty` to exit 1 with `detect: no elements detected` on stderr and no stdout instead, so scripts can detect empty results. This signals an empty result; it does not prove the image contains no matching elements or validate the model’s labels.
 
 A full-screen pass is a fast first draft; for completeness on dense screens, inventory region by region.
 

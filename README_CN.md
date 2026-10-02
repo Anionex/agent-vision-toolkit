@@ -249,12 +249,13 @@ x1: 1067, y1: 841, x2: 1108, y2: 881
 <details>
 <summary><b><code>detect</code> —— “图片里都有些什么/都在哪里？”</b></summary>
 
-盘点图片（或指定区域）中的元素——输出编号清单，带逐字可见文字和像素框：
+默认盘点界面截图（或指定区域）中的 UI 元素——输出编号清单，带逐字可见文字和像素框。对于照片或视频帧，请指定 `"objects"` 或 `"text"` 等类别，避免默认的 UI 提示语：
 
 ```bash
 detect page.png
 detect page.png "buttons"
 detect page.png --region 238,600,953,671
+detect frame.png "text" --fail-on-empty
 ```
 
 ```
@@ -262,6 +263,8 @@ detect page.png --region 238,600,953,671
 2. bottom-left + x1: 254, y1: 650, x2: 268, y2: 665
 3. bottom-right stop button x1: 924, y1: 645, x2: 952, y2: 670
 ```
+
+为保持兼容，空清单默认向 stdout 输出 `no elements detected` 并以 0 退出。添加 `--fail-on-empty` 后，空清单以 1 退出，向 stderr 输出 `detect: no elements detected`，stdout 不输出内容，方便脚本识别空结果。这只表示结果为空，不能证明图片中没有匹配元素，也不验证模型标签是否正确。
 
 整屏一遍是快速初稿；密集页面要完整清单时，按区域逐块盘点。
 
