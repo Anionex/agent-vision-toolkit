@@ -137,7 +137,14 @@ full-image pass.
 detect <image>                        # every UI element
 detect <image> "buttons"              # one kind only
 detect <image> --region X1,Y1,X2,Y2   # inside one box
+detect <image> "text" --fail-on-empty # fail if no text is detected
 ```
+
+The default category targets UI screenshots. For photographs or video frames,
+pass an explicit category such as `"objects"` or `"text"`. An empty inventory
+normally prints `no elements detected` and exits 0; `--fail-on-empty` instead
+exits 1 with a stderr diagnostic and no stdout. This reports an empty model
+result, not proof that the image has no matching elements.
 
 You name a particular thing for `ground`; you name a kind for `detect` and
 it enumerates the instances. Output is a numbered list with each item's

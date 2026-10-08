@@ -43,6 +43,8 @@ def main() -> None:
                         help='restrict to a category, e.g. "buttons" or "icons" (default: all UI elements)')
     parser.add_argument("--region", metavar="X1,Y1,X2,Y2",
                         help="inventory only this pixel box; output stays in original-image coordinates")
+    parser.add_argument("--fail-on-empty", action="store_true",
+                        help="exit 1 with a stderr diagnostic when no elements are detected")
     args = parser.parse_args()
     try:
         matches = locate(args.image.expanduser(), build_target(args.category), region=args.region)
@@ -52,6 +54,8 @@ def main() -> None:
             width, height = image.size
     except (GroundError, VisionError) as exc:
         parser.exit(1, f"detect: {exc}\n")
+    if args.fail_on_empty and not matches:
+        parser.exit(1, "detect: no elements detected\n")
     for line in format_inventory(matches, width, height):
         print(line)
 
