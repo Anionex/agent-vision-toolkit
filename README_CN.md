@@ -423,6 +423,7 @@ Codex（携带原有 Authorization）
 - 安全问题：[安全策略](SECURITY.md)
 - 社区规范：[行为准则](CODE_OF_CONDUCT.md)
 - 用户可见变更：[更新日志](CHANGELOG.md)
+- 国内访问：项目已同步至 [AtomGit](https://atomgit.com/Anionex/agent-vision-toolkit)，方便国内开发者访问、下载和使用。
 
 ## 关于
 
